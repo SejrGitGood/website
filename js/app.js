@@ -6,7 +6,7 @@ const NAV_LINKS = [
   { href: "index.html", label: "Forside" },
   { href: "sessions.html", label: "Sessions" },
   { href: "lore.html", label: "Lore" },
-  { href: "shops.html", label: "Butikker" },
+  { href: "dmtools.html", label: "DM Tools" },
   { href: "logistics.html", label: "Logistik" },
 ];
 

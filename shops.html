@@ -14,12 +14,14 @@
 
 <main>
   <div class="page-head">
-    <p class="eyebrow">Værktøj</p>
+    <p class="eyebrow">DM Tools</p>
     <h1>Butiksgenerator</h1>
     <p>Markér de butikker, byen skal have &mdash; befolkningen sætter kun byens størrelse og varernes variation.</p>
   </div>
 
   <div class="wrap" style="max-width:760px;">
+    <p style="margin:-8px 0 4px;"><a href="dmtools.html" class="back-link">&larr; Alle DM Tools</a></p>
+
     <section class="section">
       <div class="card">
         <form class="form" id="genForm">
@@ -65,13 +67,13 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=1"></script>
+<script src="js/app.js?v=2"></script>
 <script src="js/shops.js?v=5"></script>
 <script>
 (async function () {
   const session = await guardPage();
   if (!session) return;
-  renderNav("shops.html");
+  renderNav("dmtools.html");
 
   let lastResult = null;
 
