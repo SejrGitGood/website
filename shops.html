@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Butiksgenerator &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">Værktøj</p>
+    <h1>Butiksgenerator</h1>
+    <p>Indtast et bynavn og en befolkning &mdash; få et sæt butikker, der passer til byens størrelse.</p>
+  </div>
+
+  <div class="wrap" style="max-width:760px;">
+    <section class="section">
+      <div class="card">
+        <form class="form" id="genForm">
+          <div class="row">
+            <div class="field" style="flex:2;">
+              <label for="townName">Bynavn</label>
+              <input type="text" id="townName" placeholder="F.eks. Daggerford" required>
+            </div>
+            <div class="field" style="max-width:200px;">
+              <label for="population">Befolkning</label>
+              <input type="number" id="population" min="1" value="150" required>
+            </div>
+          </div>
+          <div class="card-actions">
+            <button class="btn" type="submit">Generér butikker</button>
+            <button class="btn secondary" type="button" id="rerollBtn" hidden>Prøv igen</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="section" id="resultSection" hidden>
+      <div class="section-title"><h2 id="resultTitle"></h2></div>
+      <div class="grid" id="resultGrid"></div>
+      <div class="card-actions" style="margin-top:16px;">
+        <button class="btn secondary" id="saveLoreBtn">Gem som lore-indgang</button>
+        <span id="savedMsg" class="notice" style="display:none;">Gemt i Lore.</span>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script src="js/shops.js"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("shops.html");
+
+  let lastResult = null;
+
+  function runGeneration() {
+    const townName = document.getElementById("townName").value.trim() || "Byen";
+    const population = parseInt(document.getElementById("population").value, 10) || 1;
+    const { tierName, shops } = generateShopList(population);
+    lastResult = { townName, population, tierName, shops };
+
+    document.getElementById("resultTitle").textContent = `${townName} — ${tierName}, ca. ${population} indbyggere`;
+    document.getElementById("resultGrid").innerHTML = shops
+      .map(
+        (s) => `
+      <div class="card">
+        <span class="badge">${escapeHtml(s.type)}</span>
+        <h3 style="margin-top:8px;">${escapeHtml(s.name)}</h3>
+        <p class="body">${escapeHtml(s.flavor)}</p>
+      </div>`
+      )
+      .join("");
+    document.getElementById("resultSection").hidden = false;
+    document.getElementById("rerollBtn").hidden = false;
+    document.getElementById("savedMsg").style.display = "none";
+  }
+
+  document.getElementById("genForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    runGeneration();
+  });
+  document.getElementById("rerollBtn").addEventListener("click", runGeneration);
+
+  document.getElementById("saveLoreBtn").addEventListener("click", async () => {
+    if (!lastResult) return;
+    const btn = document.getElementById("saveLoreBtn");
+    await withBusy(btn, "Gemmer…", async () => {
+      const body =
+        `${lastResult.tierName}, ca. ${lastResult.population} indbyggere.\n\n` +
+        lastResult.shops.map((s) => `${s.name} (${s.type}) — ${s.flavor}`).join("\n\n");
+      const { error } = await window.sb.from("lore_entries").insert({
+        title: lastResult.townName,
+        category: "Butik",
+        body,
+        created_by: session.user.email,
+      });
+      if (error) {
+        alert("Kunne ikke gemme: " + error.message);
+        return;
+      }
+      document.getElementById("savedMsg").style.display = "inline-block";
+    });
+  });
+})();
+</script>
+</body>
+</html>
