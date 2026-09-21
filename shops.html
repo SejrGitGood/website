@@ -7,7 +7,7 @@
 <title>Butiksgenerator &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=1">
+<link rel="stylesheet" href="css/styles.css?v=2">
 </head>
 <body>
 <nav class="site-nav" id="site-nav"></nav>
@@ -49,6 +49,11 @@
         <span id="savedMsg" class="notice" style="display:none;">Gemt i Lore.</span>
       </div>
     </section>
+
+    <p class="paste-hint" style="text-align:center;margin-top:8px;">
+      Varer og priser er ægte D&amp;D 5e-udstyr fra <a href="https://open5e.com" target="_blank" rel="noopener">Open5e</a>,
+      hentet fra Wizards of the Coasts officielle System Reference Document 5.1.
+    </p>
   </div>
 </main>
 
@@ -57,7 +62,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
 <script src="js/app.js?v=1"></script>
-<script src="js/shops.js?v=1"></script>
+<script src="js/shops.js?v=2"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -66,26 +71,49 @@
 
   let lastResult = null;
 
-  function runGeneration() {
+  function shopCardHtml(s, loadingItems) {
+    let itemsHtml = "";
+    if (loadingItems) {
+      itemsHtml = `<p class="paste-hint" style="margin-top:10px;">Henter varer…</p>`;
+    } else if (s.items && s.items.length) {
+      itemsHtml = `<ul class="shop-items">${s.items
+        .map(
+          (i) => `<li><strong>${escapeHtml(i.name)}</strong> &mdash; ${escapeHtml(i.cost)}${
+            i.stat ? ` &middot; ${escapeHtml(i.stat)}` : ""
+          }</li>`
+        )
+        .join("")}</ul>`;
+    }
+    return `
+      <div class="card">
+        <span class="badge">${escapeHtml(s.type)}</span>
+        <h3 style="margin-top:8px;">${escapeHtml(s.name)}</h3>
+        <p class="body">${escapeHtml(s.flavor)}</p>
+        ${itemsHtml}
+      </div>`;
+  }
+
+  function renderShops(shops, loadingItems) {
+    document.getElementById("resultGrid").innerHTML = shops.map((s) => shopCardHtml(s, loadingItems)).join("");
+  }
+
+  async function runGeneration() {
     const townName = document.getElementById("townName").value.trim() || "Byen";
     const population = parseInt(document.getElementById("population").value, 10) || 1;
     const { tierName, shops } = generateShopList(population);
     lastResult = { townName, population, tierName, shops };
 
     document.getElementById("resultTitle").textContent = `${townName} — ${tierName}, ca. ${population} indbyggere`;
-    document.getElementById("resultGrid").innerHTML = shops
-      .map(
-        (s) => `
-      <div class="card">
-        <span class="badge">${escapeHtml(s.type)}</span>
-        <h3 style="margin-top:8px;">${escapeHtml(s.name)}</h3>
-        <p class="body">${escapeHtml(s.flavor)}</p>
-      </div>`
-      )
-      .join("");
+    const hasItemShops = shops.some((s) => SHOP_ITEM_CATEGORIES[s.type]);
+    renderShops(shops, hasItemShops);
     document.getElementById("resultSection").hidden = false;
     document.getElementById("rerollBtn").hidden = false;
     document.getElementById("savedMsg").style.display = "none";
+
+    if (hasItemShops) {
+      await attachShopItems(shops);
+      renderShops(shops, false);
+    }
   }
 
   document.getElementById("genForm").addEventListener("submit", (e) => {
@@ -100,7 +128,15 @@
     await withBusy(btn, "Gemmer…", async () => {
       const body =
         `${lastResult.tierName}, ca. ${lastResult.population} indbyggere.\n\n` +
-        lastResult.shops.map((s) => `${s.name} (${s.type}) — ${s.flavor}`).join("\n\n");
+        lastResult.shops
+          .map((s) => {
+            const header = `${s.name} (${s.type}) — ${s.flavor}`;
+            const itemLines = (s.items || [])
+              .map((i) => `  · ${i.name} — ${i.cost}${i.stat ? ` (${i.stat})` : ""}`)
+              .join("\n");
+            return itemLines ? `${header}\n${itemLines}` : header;
+          })
+          .join("\n\n");
       const { error } = await window.sb.from("lore_entries").insert({
         title: lastResult.townName,
         category: "Butik",
