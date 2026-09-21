@@ -16,7 +16,7 @@
   <div class="page-head">
     <p class="eyebrow">Værktøj</p>
     <h1>Butiksgenerator</h1>
-    <p>Indtast et bynavn og en befolkning &mdash; få et sæt butikker, der passer til byens størrelse.</p>
+    <p>Markér de butikker, byen skal have &mdash; befolkningen sætter kun byens størrelse og varernes variation.</p>
   </div>
 
   <div class="wrap" style="max-width:760px;">
@@ -32,6 +32,10 @@
               <label for="population">Befolkning</label>
               <input type="number" id="population" min="1" value="150" required>
             </div>
+          </div>
+          <div class="field">
+            <label>Butikstyper (klik for at markere)</label>
+            <div class="tabs" id="typeChecklist"></div>
           </div>
           <div class="card-actions">
             <button class="btn" type="submit">Generér butikker</button>
@@ -62,7 +66,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
 <script src="js/app.js?v=1"></script>
-<script src="js/shops.js?v=4"></script>
+<script src="js/shops.js?v=5"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -70,6 +74,21 @@
   renderNav("shops.html");
 
   let lastResult = null;
+
+  const DEFAULT_TYPES = ["Kro", "Købmand"];
+  const checklistEl = document.getElementById("typeChecklist");
+  checklistEl.innerHTML = SHOP_TYPE_LIST.map(
+    (t) => `<button type="button" data-type="${escapeHtml(t)}" class="${DEFAULT_TYPES.includes(t) ? "active" : ""}">${escapeHtml(t)}</button>`
+  ).join("");
+  checklistEl.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-type]");
+    if (!btn) return;
+    btn.classList.toggle("active");
+  });
+
+  function selectedTypes() {
+    return [...checklistEl.querySelectorAll("button.active")].map((b) => b.dataset.type);
+  }
 
   function loadingCardHtml(s) {
     return `
@@ -90,10 +109,16 @@
   async function runGeneration() {
     const townName = document.getElementById("townName").value.trim() || "Byen";
     const population = parseInt(document.getElementById("population").value, 10) || 1;
-    const { tierName, shops } = generateShopList(population);
-    lastResult = { townName, population, tierName, shops };
+    const types = selectedTypes();
+    if (!types.length) {
+      alert("Markér mindst én butikstype.");
+      return;
+    }
+    const tier = tierForPopulation(population);
+    const shops = generateShopsFromTypes(types);
+    lastResult = { townName, population, tierName: tier.name, shops };
 
-    document.getElementById("resultTitle").textContent = `${townName} — ${tierName}, ca. ${population} indbyggere`;
+    document.getElementById("resultTitle").textContent = `${townName} — ${tier.name}, ca. ${population} indbyggere`;
     const hasItemShops = shops.some((s) => SHOP_ITEM_CATEGORIES[s.type]);
     renderShops(shops, hasItemShops);
     document.getElementById("resultSection").hidden = false;
@@ -101,7 +126,7 @@
     document.getElementById("savedMsg").style.display = "none";
 
     if (hasItemShops) {
-      await attachShopItems(shops);
+      await attachShopItems(shops, tier.itemCount);
       renderShops(shops, false);
     }
   }

@@ -1,14 +1,20 @@
-// Butiksgenerator: hvilke butikstyper der plausibelt findes i en bosætning,
-// skaleret efter befolkningstal, plus tilfældige navne og smagsprøver.
+// Butiksgenerator: brugeren markerer selv, hvilke butikstyper der SKAL være
+// i byen. Befolkningstal sætter kun byens størrelsesbetegnelse og hvor
+// mange varer (variation), hver butik viser — ikke længere hvilke butikker
+// der findes.
 
 const SHOP_TIERS = [
-  { name: "Torp", maxPop: 20, guaranteed: [], adds: ["Købmand"], count: [0, 1] },
-  { name: "Landsby", maxPop: 200, guaranteed: ["Kro"], adds: ["Smed", "Helligdom", "Stald"], count: [2, 3] },
-  { name: "Lille By", maxPop: 2000, guaranteed: ["Kro", "Købmand"], adds: ["Urtekræmmer", "Skrædder", "Tempel"], count: [4, 5] },
-  { name: "Stor By", maxPop: 5000, guaranteed: ["Kro", "Købmand", "Tempel"], adds: ["Våbensmed", "Rustningssmed", "Juveler", "Boghandler", "Pengeudlåner"], count: [6, 8] },
-  { name: "Storby", maxPop: 25000, guaranteed: ["Kro", "Købmand", "Tempel", "Våbensmed"], adds: ["Magibutik", "Alkymist", "Eksotisk Handler", "Gildehus"], count: [9, 12] },
-  { name: "Metropol", maxPop: Infinity, guaranteed: ["Kro", "Købmand", "Tempel", "Våbensmed", "Magibutik"], adds: ["Sortebørs", "Ærkemagi-akademi", "Ambassade", "Auktionshus"], count: [12, 16] },
+  { name: "Torp", maxPop: 20, itemCount: [1, 2] },
+  { name: "Landsby", maxPop: 200, itemCount: [2, 3] },
+  { name: "Lille By", maxPop: 2000, itemCount: [3, 4] },
+  { name: "Stor By", maxPop: 5000, itemCount: [4, 5] },
+  { name: "Storby", maxPop: 25000, itemCount: [5, 7] },
+  { name: "Metropol", maxPop: Infinity, itemCount: [6, 9] },
 ];
+
+function tierForPopulation(population) {
+  return SHOP_TIERS.find((t) => population <= t.maxPop) || SHOP_TIERS[SHOP_TIERS.length - 1];
+}
 
 const EPITHETS = [
   "Den Gyldne", "Den Rustne", "Den Glade", "Den Sidste", "Ravnens", "Ulvens",
@@ -197,23 +203,14 @@ function makeShop(type) {
   return { type, name, flavor };
 }
 
-function cumulativePool(tierIndex) {
-  const pool = new Set();
-  for (let i = 0; i <= tierIndex; i++) SHOP_TIERS[i].adds.forEach((a) => pool.add(a));
-  return [...pool];
-}
+// Alle butikstyper, i den rækkefølge de blev defineret — bruges til
+// markeringslisten på siden.
+const SHOP_TYPE_LIST = Object.keys(SHOP_TYPES);
 
-// Genererer en tilfældig, men størrelses-passende butiksliste for en given befolkning.
-function generateShopList(population) {
-  let tierIndex = SHOP_TIERS.findIndex((t) => population <= t.maxPop);
-  if (tierIndex === -1) tierIndex = SHOP_TIERS.length - 1;
-  const tier = SHOP_TIERS[tierIndex];
-  const pool = cumulativePool(tierIndex).filter((t) => !tier.guaranteed.includes(t));
-  const [minTotal, maxTotal] = tier.count;
-  const total = minTotal + Math.floor(Math.random() * (maxTotal - minTotal + 1));
-  const extraNeeded = Math.max(0, total - tier.guaranteed.length);
-  const types = [...tier.guaranteed, ...pickN(pool, extraNeeded)];
-  return { tierName: tier.name, shops: types.map(makeShop) };
+// Bygger én butik pr. markeret type. Ingen tilfældighed i HVILKE typer der
+// kommer med — kun i navn, smagsprøve og hvilke konkrete varer der trækkes.
+function generateShopsFromTypes(types) {
+  return types.map(makeShop);
 }
 
 // --- Varer til salg: rigtige D&D-genstande fra Open5e's åbne SRD-database ---
@@ -290,21 +287,24 @@ async function fetchCategoryItems(category) {
   return items;
 }
 
-async function fetchShopItems(shopType) {
+async function fetchShopItems(shopType, itemCountRange) {
   const categories = SHOP_ITEM_CATEGORIES[shopType];
   if (!categories) return [];
   const pools = await Promise.all(categories.map(fetchCategoryItems));
   const merged = pools.flat();
-  const count = 3 + Math.floor(Math.random() * 2);
+  const [min, max] = itemCountRange;
+  const count = min + Math.floor(Math.random() * (max - min + 1));
   return pickN(merged, Math.min(count, merged.length));
 }
 
 // Henter varer til alle butikker i `shops` parallelt og sætter dem på
-// `shop.items`. Fejlende/tomme kategorier giver bare en tom vareliste.
-async function attachShopItems(shops) {
+// `shop.items`. `itemCountRange` (fra byens tier) styrer variationen —
+// større by, flere varer pr. butik. Fejlende/tomme kategorier giver bare en
+// tom vareliste.
+async function attachShopItems(shops, itemCountRange) {
   await Promise.all(
     shops.map(async (shop) => {
-      shop.items = await fetchShopItems(shop.type);
+      shop.items = await fetchShopItems(shop.type, itemCountRange);
     })
   );
   return shops;
