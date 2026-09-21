@@ -46,6 +46,9 @@ alter table lore_entries add column if not exists images text[] not null default
 -- Holdning/omdømme for NPC-indgange (5e's klassiske Fjendtlig..Hjælpsom-skala).
 -- Kun meningsfuld for kategori "NPC", ellers null.
 alter table lore_entries add column if not exists relationship text;
+-- Status for NPC-indgange (Levende/Død/Forsvundet/Ukendt). Samme princip:
+-- kun meningsfuld for kategori "NPC", ellers null.
+alter table lore_entries add column if not exists status text;
 
 -- Karakterroster, hentet fra D&D Beyond. `data` er en renset opsummering
 -- (klasse, HP, ability scores, udstyr, portræt) — kun sat, når karakteren er

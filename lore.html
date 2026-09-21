@@ -7,7 +7,7 @@
 <title>Lore &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=5">
+<link rel="stylesheet" href="css/styles.css?v=6">
 <script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
 </head>
 <body>
@@ -44,16 +44,28 @@
               </select>
             </div>
           </div>
-          <div class="field" id="relationshipField" hidden style="max-width:220px;">
-            <label for="relationship">Holdning</label>
-            <select id="relationship">
-              <option value="">Ikke sat</option>
-              <option value="Fjendtlig">Fjendtlig</option>
-              <option value="Uvenlig">Uvenlig</option>
-              <option value="Ligegyldig">Ligegyldig</option>
-              <option value="Venlig">Venlig</option>
-              <option value="Hjælpsom">Hjælpsom</option>
-            </select>
+          <div class="row" id="npcFieldsRow" hidden>
+            <div class="field" style="max-width:220px;">
+              <label for="relationship">Holdning</label>
+              <select id="relationship">
+                <option value="">Ikke sat</option>
+                <option value="Fjendtlig">Fjendtlig</option>
+                <option value="Uvenlig">Uvenlig</option>
+                <option value="Ligegyldig">Ligegyldig</option>
+                <option value="Venlig">Venlig</option>
+                <option value="Hjælpsom">Hjælpsom</option>
+              </select>
+            </div>
+            <div class="field" style="max-width:220px;">
+              <label for="status">Status</label>
+              <select id="status">
+                <option value="">Ikke sat</option>
+                <option value="Levende">Levende</option>
+                <option value="Død">Død</option>
+                <option value="Forsvundet">Forsvundet</option>
+                <option value="Ukendt">Ukendt</option>
+              </select>
+            </div>
           </div>
           <div class="field">
             <label for="body">Beskrivelse</label>
@@ -149,17 +161,28 @@
     Venlig: "friendly",
     Hjælpsom: "helpful",
   };
+  const STATUS_CLASS = {
+    Levende: "alive",
+    Død: "dead",
+    Forsvundet: "missing",
+    Ukendt: "unknown",
+  };
 
   function rowHtml(l) {
     const bodyHtml = l.shop_data ? shopEntryHtml(l.shop_data) : `<div class="body">${renderBodyHtml(l.body)}</div>`;
+    const isNpc = l.category === "NPC";
     const attitudeBadge =
-      l.category === "NPC" && l.relationship
+      isNpc && l.relationship
         ? `<span class="attitude ${ATTITUDE_CLASS[l.relationship] || ""}">${escapeHtml(l.relationship)}</span>`
+        : "";
+    const statusBadge =
+      isNpc && l.status
+        ? `<span class="status-badge ${STATUS_CLASS[l.status] || ""}">${escapeHtml(l.status)}</span>`
         : "";
     return `
       <div class="card" id="lore-${l.id}" data-id="${l.id}">
         <div class="view">
-          <span class="badge">${escapeHtml(l.category)}</span>${attitudeBadge}
+          <span class="badge">${escapeHtml(l.category)}</span>${attitudeBadge}${statusBadge}
           <h3 style="margin-top:8px;"><a href="lore.html?id=${l.id}">${escapeHtml(l.title)}</a></h3>
           ${bodyHtml}
           <div class="card-actions">
@@ -183,13 +206,23 @@
                 </select>
               </div>
             </div>
-            <div class="field f-relationshipField" ${l.category === "NPC" ? "" : "hidden"} style="max-width:220px;">
-              <label>Holdning</label>
-              <select class="f-relationship">
-                ${["", "Fjendtlig", "Uvenlig", "Ligegyldig", "Venlig", "Hjælpsom"]
-                  .map((v) => `<option value="${v}" ${v === (l.relationship || "") ? "selected" : ""}>${v || "Ikke sat"}</option>`)
-                  .join("")}
-              </select>
+            <div class="row f-npcFieldsRow" ${isNpc ? "" : "hidden"}>
+              <div class="field" style="max-width:220px;">
+                <label>Holdning</label>
+                <select class="f-relationship">
+                  ${["", "Fjendtlig", "Uvenlig", "Ligegyldig", "Venlig", "Hjælpsom"]
+                    .map((v) => `<option value="${v}" ${v === (l.relationship || "") ? "selected" : ""}>${v || "Ikke sat"}</option>`)
+                    .join("")}
+                </select>
+              </div>
+              <div class="field" style="max-width:220px;">
+                <label>Status</label>
+                <select class="f-status">
+                  ${["", "Levende", "Død", "Forsvundet", "Ukendt"]
+                    .map((v) => `<option value="${v}" ${v === (l.status || "") ? "selected" : ""}>${v || "Ikke sat"}</option>`)
+                    .join("")}
+                </select>
+              </div>
             </div>
             <div class="field">
               <label>Beskrivelse</label>
@@ -212,9 +245,9 @@
     wireInlinePasteUpload(card.querySelector(".f-body"));
 
     const fCategory = card.querySelector(".f-category");
-    const fRelationshipField = card.querySelector(".f-relationshipField");
+    const fNpcFieldsRow = card.querySelector(".f-npcFieldsRow");
     fCategory.addEventListener("change", () => {
-      fRelationshipField.hidden = fCategory.value !== "NPC";
+      fNpcFieldsRow.hidden = fCategory.value !== "NPC";
     });
 
     card.querySelector(".editBtn").addEventListener("click", () => {
@@ -237,10 +270,12 @@
         const title = card.querySelector(".f-title").value.trim();
         const category = card.querySelector(".f-category").value;
         const body = card.querySelector(".f-body").value.trim();
-        const relationship = category === "NPC" ? card.querySelector(".f-relationship").value || null : null;
+        const isNpc = category === "NPC";
+        const relationship = isNpc ? card.querySelector(".f-relationship").value || null : null;
+        const status = isNpc ? card.querySelector(".f-status").value || null : null;
         await window.sb
           .from("lore_entries")
-          .update({ title, category, body, relationship, updated_at: new Date().toISOString() })
+          .update({ title, category, body, relationship, status, updated_at: new Date().toISOString() })
           .eq("id", row.id);
         load();
       });
@@ -258,12 +293,12 @@
   wireInlinePasteUpload(document.getElementById("body"));
 
   const categorySelect = document.getElementById("category");
-  const relationshipField = document.getElementById("relationshipField");
-  function updateRelationshipVisibility() {
-    relationshipField.hidden = categorySelect.value !== "NPC";
+  const npcFieldsRow = document.getElementById("npcFieldsRow");
+  function updateNpcFieldsVisibility() {
+    npcFieldsRow.hidden = categorySelect.value !== "NPC";
   }
-  categorySelect.addEventListener("change", updateRelationshipVisibility);
-  updateRelationshipVisibility();
+  categorySelect.addEventListener("change", updateNpcFieldsVisibility);
+  updateNpcFieldsVisibility();
 
   document.getElementById("addForm").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -272,12 +307,15 @@
       const title = document.getElementById("title").value.trim();
       const category = document.getElementById("category").value;
       const body = document.getElementById("body").value.trim();
-      const relationship = category === "NPC" ? document.getElementById("relationship").value || null : null;
+      const isNpc = category === "NPC";
+      const relationship = isNpc ? document.getElementById("relationship").value || null : null;
+      const status = isNpc ? document.getElementById("status").value || null : null;
       const { error } = await window.sb.from("lore_entries").insert({
         title,
         category,
         body,
         relationship,
+        status,
         created_by: session.user.email,
       });
       if (error) {
@@ -285,7 +323,7 @@
         return;
       }
       e.target.reset();
-      updateRelationshipVisibility();
+      updateNpcFieldsVisibility();
       load();
     });
   });

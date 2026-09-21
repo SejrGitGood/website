@@ -131,6 +131,16 @@ a:hover{text-decoration:underline;}
 .attitude.friendly{--attitude-color:var(--gold);}
 .attitude.helpful{--attitude-color:var(--mist);}
 
+.status-badge{
+  display:inline-block;font-family:"Cinzel",serif;font-size:0.68rem;letter-spacing:0.05em;text-transform:uppercase;
+  padding:2px 9px;border-radius:999px;margin-left:6px;background:transparent;
+  border:1px solid var(--status-color);color:var(--status-color);
+}
+.status-badge.alive{--status-color:var(--gold);}
+.status-badge.dead{--status-color:var(--blood);}
+.status-badge.missing{--status-color:var(--ember);}
+.status-badge.unknown{--status-color:var(--ink-faint);}
+
 main{flex:1;}
 .page-head{padding-block:clamp(30px,6vw,52px) 10px;text-align:center;}
 .eyebrow{
