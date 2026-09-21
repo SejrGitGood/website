@@ -15,12 +15,14 @@
 
 <main>
   <div class="page-head">
-    <p class="eyebrow">Opslagsværk</p>
+    <p class="eyebrow">Historien</p>
     <h1>Lore</h1>
     <p>NPC'er, steder og begivenheder &mdash; alt det, ingen af os kan huske til næste session.</p>
   </div>
 
   <div class="wrap">
+    <p style="margin:-8px 0 4px;"><a href="historien.html" class="back-link">&larr; Historien</a></p>
+
     <section class="section" id="addSection">
       <div class="section-title"><h2>Ny lore</h2></div>
       <div class="card">
@@ -102,13 +104,13 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=6"></script>
+<script src="js/app.js?v=7"></script>
 <script src="js/shops.js?v=5"></script>
 <script>
 (async function () {
   const session = await guardPage();
   if (!session) return;
-  renderNav("lore.html");
+  renderNav("historien.html");
   wireLightbox();
 
   const list = document.getElementById("list");

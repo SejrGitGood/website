@@ -15,12 +15,14 @@
 
 <main>
   <div class="page-head">
-    <p class="eyebrow">Arkiv</p>
+    <p class="eyebrow">Historien</p>
     <h1>Sessions</h1>
     <p>Hver session, kort fortalt. Tilføj den seneste, eller ret i en gammel.</p>
   </div>
 
   <div class="wrap">
+    <p style="margin:-8px 0 4px;"><a href="historien.html" class="back-link">&larr; Historien</a></p>
+
     <section class="section">
       <div class="card">
         <span class="badge">Session 1</span>
@@ -76,12 +78,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=6"></script>
+<script src="js/app.js?v=7"></script>
 <script>
 (async function () {
   const session = await guardPage();
   if (!session) return;
-  renderNav("sessions.html");
+  renderNav("historien.html");
   wireLightbox();
 
   const list = document.getElementById("list");

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Historien &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=7">
+<script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">Kampagnen</p>
+    <h1>Historien</h1>
+    <p>Sessions, Lore, mål og tidslinjen &mdash; alt det, kampagnen består af.</p>
+  </div>
+
+  <div class="wrap">
+    <section class="section">
+      <div class="grid">
+        <a class="card" href="sessions.html" style="display:block;">
+          <span class="badge">Arkiv</span>
+          <h3 style="margin-top:8px;">Sessions</h3>
+          <p class="body">Hver session, kort fortalt. Tilføj den seneste, eller ret i en gammel.</p>
+        </a>
+        <a class="card" href="lore.html" style="display:block;">
+          <span class="badge">Opslagsværk</span>
+          <h3 style="margin-top:8px;">Lore</h3>
+          <p class="body">NPC'er, steder og begivenheder &mdash; alt det, ingen af os kan huske til næste session.</p>
+        </a>
+        <a class="card" href="quests.html" style="display:block;">
+          <span class="badge">Lige nu</span>
+          <h3 style="margin-top:8px;">Mål</h3>
+          <p class="body">Hvad selskabet er i gang med lige nu &mdash; adskilt fra Lore's opslagsværk.</p>
+        </a>
+        <a class="card" href="timeline.html" style="display:block;">
+          <span class="badge">Overblik</span>
+          <h3 style="margin-top:8px;">Tidslinje</h3>
+          <p class="body">Sessions og store begivenheder, i den rækkefølge de skete.</p>
+        </a>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=7"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("historien.html");
+})();
+</script>
+</body>
+</html>

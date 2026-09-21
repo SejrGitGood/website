@@ -21,6 +21,8 @@
   </div>
 
   <div class="wrap" style="max-width:700px;">
+    <p style="margin:-8px 0 4px;"><a href="historien.html" class="back-link">&larr; Historien</a></p>
+
     <div class="tabs" id="filterTabs" style="margin-bottom:20px;">
       <button data-filter="all" class="active">Alle</button>
       <button data-filter="session">Sessions</button>
@@ -34,12 +36,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=6"></script>
+<script src="js/app.js?v=7"></script>
 <script>
 (async function () {
   const session = await guardPage();
   if (!session) return;
-  renderNav("timeline.html");
+  renderNav("historien.html");
 
   let items = [];
   let activeFilter = "all";
