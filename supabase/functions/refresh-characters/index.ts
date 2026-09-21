@@ -23,6 +23,24 @@ const ALIGNMENTS: Record<number, string> = {
   7: "Lovlig ond", 8: "Neutral ond", 9: "Kaotisk ond",
 };
 
+// `baseHitPoints` fra D&D Beyond er KUN summen af hit dice (f.eks. 8+5+5 for
+// en niveau 3-klasse med d8) — Konstitution-bonussen pr. niveau, og ethvert
+// feat/race der giver "hit-points-per-level" (f.eks. Tough), er IKKE talt med
+// og skal lægges til manuelt, ellers vises max-HP for lavt.
+function totalLevel(classes: any[]): number {
+  return (classes || []).reduce((sum: number, c: any) => sum + (c.level ?? 0), 0);
+}
+
+function hitPointsPerLevelBonus(modifiers: any): number {
+  const allMods = Object.values(modifiers || {}).flat() as any[];
+  return allMods.reduce((sum: number, m: any) => {
+    if (m?.subType === "hit-points-per-level" && m?.isGranted !== false) {
+      return sum + (m.value ?? 0);
+    }
+    return sum;
+  }, 0);
+}
+
 function summarize(data: any) {
   const stats: Record<number, number> = {};
   (data.stats || []).forEach((s: any) => (stats[s.id] = s.value));
@@ -36,7 +54,12 @@ function summarize(data: any) {
     return { name: STAT_NAMES[id], score: val, mod: Math.floor((val - 10) / 2) };
   });
 
-  const maxHp = data.overrideHitPoints ?? (data.baseHitPoints ?? 0) + (data.bonusHitPoints ?? 0);
+  const level = totalLevel(data.classes);
+  const conMod = finalStats.find((s) => s.name === "CON")?.mod ?? 0;
+  const hpBonusPerLevel = hitPointsPerLevelBonus(data.modifiers);
+  const maxHp =
+    data.overrideHitPoints ??
+    (data.baseHitPoints ?? 0) + (data.bonusHitPoints ?? 0) + conMod * level + hpBonusPerLevel * level;
   const currentHp = maxHp - (data.removedHitPoints ?? 0);
 
   const equipped = (data.inventory || [])
