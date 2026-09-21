@@ -19,7 +19,7 @@
   </div>
 
   <div class="wrap">
-    <section class="section">
+    <section class="section" id="addSection">
       <div class="section-title"><h2>Ny indgang</h2></div>
       <div class="card">
         <form class="form" id="addForm">
@@ -51,7 +51,8 @@
 
     <section class="section">
       <div class="section-title">
-        <h2>Alle indgange</h2>
+        <h2 id="listTitle">Alle indgange</h2>
+        <a href="lore.html" id="backLink" hidden>&larr; Se al lore</a>
         <div class="tabs" id="tabs">
           <button data-cat="all" class="active">Alle</button>
           <button data-cat="NPC">NPC</button>
@@ -76,13 +77,24 @@
   const session = await guardPage();
   if (!session) return;
   renderNav("lore.html");
+  wireLightbox();
 
   const list = document.getElementById("list");
+  const onlyId = new URLSearchParams(location.search).get("id");
   let activeCat = "all";
   let rowsCache = [];
 
+  if (onlyId) {
+    document.getElementById("addSection").hidden = true;
+    document.getElementById("tabs").hidden = true;
+    document.getElementById("listTitle").textContent = "Indgang";
+    document.getElementById("backLink").hidden = false;
+  }
+
   async function load() {
-    const { data, error } = await window.sb.from("lore_entries").select("*").order("title", { ascending: true });
+    let query = window.sb.from("lore_entries").select("*");
+    query = onlyId ? query.eq("id", onlyId) : query.order("title", { ascending: true });
+    const { data, error } = await query;
     if (error) {
       list.innerHTML = `<div class="empty">Kunne ikke hente lore: ${escapeHtml(error.message)}</div>`;
       return;
@@ -92,6 +104,15 @@
   }
 
   function render() {
+    if (onlyId) {
+      if (!rowsCache.length) {
+        list.innerHTML = `<div class="empty">Denne indgang findes ikke (mere). <a href="lore.html">Se al lore</a>.</div>`;
+        return;
+      }
+      list.innerHTML = rowsCache.map(rowHtml).join("");
+      rowsCache.forEach(wireRow);
+      return;
+    }
     const rows = activeCat === "all" ? rowsCache : rowsCache.filter((r) => r.category === activeCat);
     if (!rows.length) {
       list.innerHTML = `<div class="empty">Ingen indgange her endnu.</div>`;

@@ -88,7 +88,7 @@
     sessionsGrid.innerHTML = pilotCard + sessionsRows
       .map(
         (s) => `
-      <a class="card" href="sessions.html#session-${s.id}" style="display:block;">
+      <a class="card" href="sessions.html?id=${s.id}" style="display:block;">
         <span class="badge">Session ${s.number}</span>
         <h3 style="margin-top:8px;">${escapeHtml(s.title)}</h3>
         <p class="meta">${formatDate(s.session_date)}</p>
@@ -110,7 +110,7 @@
     loreGrid.innerHTML = loreRows
       .map(
         (l) => `
-      <a class="card" href="lore.html#lore-${l.id}" style="display:block;">
+      <a class="card" href="lore.html?id=${l.id}" style="display:block;">
         <span class="badge">${escapeHtml(l.category)}</span>
         <h3 style="margin-top:8px;">${escapeHtml(l.title)}</h3>
         <p class="body">${escapeHtml(stripImageMarkdown(l.body || "").slice(0, 160))}${(l.body || "").length > 160 ? "…" : ""}</p>

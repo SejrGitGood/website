@@ -124,7 +124,8 @@ function wireInlinePasteUpload(textareaEl) {
 const IMAGE_MARKDOWN_RE = /!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/g;
 
 // Escaper almindelig tekst, men gengiver `![billede](url)`-mærker som rigtige
-// billeder, der hvor de står i teksten.
+// billeder, der hvor de står i teksten. Ingen href/URL ender i det synlige
+// eller kopierbare indhold — klik håndteres af wireLightbox() i stedet.
 function renderBodyHtml(text) {
   const parts = (text || "").split(new RegExp(`(${IMAGE_MARKDOWN_RE.source})`, "g"));
   return parts
@@ -132,7 +133,7 @@ function renderBodyHtml(text) {
       const m = part.match(/^!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)$/);
       if (m) {
         const url = m[1];
-        return `<a class="inline-thumb" href="${escapeHtml(url)}" target="_blank" rel="noopener"><img src="${escapeHtml(url)}" alt="Vedhæftet billede" loading="lazy"></a>`;
+        return `<img class="inline-thumb" src="${escapeHtml(url)}" alt="Vedhæftet billede" loading="lazy">`;
       }
       return escapeHtml(part);
     })
@@ -142,4 +143,37 @@ function renderBodyHtml(text) {
 // Til korte, afkortede tekstuddrag (forsiden): fjern billedmærker helt.
 function stripImageMarkdown(text) {
   return (text || "").replace(IMAGE_MARKDOWN_RE, "[billede]");
+}
+
+// Ét delt lightbox-overlay pr. side. Klik på et .inline-thumb-billede åbner
+// det forstørret i stedet for at navigere til en ny fane.
+function wireLightbox() {
+  if (document.getElementById("lightbox")) return;
+  const box = document.createElement("div");
+  box.id = "lightbox";
+  box.className = "lightbox";
+  box.hidden = true;
+  box.innerHTML = `<button type="button" class="lightbox-close" aria-label="Luk">&times;</button><img alt="Forstørret billede">`;
+  document.body.appendChild(box);
+  const img = box.querySelector("img");
+
+  function close() {
+    box.hidden = true;
+    img.src = "";
+  }
+  box.addEventListener("click", close);
+  box.querySelector(".lightbox-close").addEventListener("click", (e) => {
+    e.stopPropagation();
+    close();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !box.hidden) close();
+  });
+  document.addEventListener("click", (e) => {
+    const thumb = e.target.closest(".inline-thumb");
+    if (!thumb) return;
+    e.preventDefault();
+    img.src = thumb.src;
+    box.hidden = false;
+  });
 }

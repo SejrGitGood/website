@@ -32,7 +32,7 @@
       </div>
     </section>
 
-    <section class="section">
+    <section class="section" id="addSection">
       <div class="section-title"><h2>Tilføj ny session</h2></div>
       <div class="card">
         <form class="form" id="addForm">
@@ -61,7 +61,10 @@
     </section>
 
     <section class="section">
-      <div class="section-title"><h2>Tidligere Sessions</h2></div>
+      <div class="section-title">
+        <h2 id="listTitle">Tidligere Sessions</h2>
+        <a href="sessions.html" id="backLink" hidden>&larr; Se alle sessions</a>
+      </div>
       <div id="list"><div class="empty">Indlæser&hellip;</div></div>
     </section>
   </div>
@@ -77,17 +80,29 @@
   const session = await guardPage();
   if (!session) return;
   renderNav("sessions.html");
+  wireLightbox();
 
   const list = document.getElementById("list");
+  const onlyId = new URLSearchParams(location.search).get("id");
+
+  if (onlyId) {
+    document.getElementById("addSection").hidden = true;
+    document.getElementById("listTitle").textContent = "Session";
+    document.getElementById("backLink").hidden = false;
+  }
 
   async function load() {
-    const { data, error } = await window.sb.from("sessions").select("*").order("number", { ascending: false });
+    let query = window.sb.from("sessions").select("*");
+    query = onlyId ? query.eq("id", onlyId) : query.order("number", { ascending: false });
+    const { data, error } = await query;
     if (error) {
       list.innerHTML = `<div class="empty">Kunne ikke hente sessions: ${escapeHtml(error.message)}</div>`;
       return;
     }
     if (!data.length) {
-      list.innerHTML = `<div class="empty">Ingen sessions endnu ud over pilotepisoden.</div>`;
+      list.innerHTML = onlyId
+        ? `<div class="empty">Denne session findes ikke (mere). <a href="sessions.html">Se alle sessions</a>.</div>`
+        : `<div class="empty">Ingen sessions endnu ud over pilotepisoden.</div>`;
       return;
     }
     list.innerHTML = data.map(rowHtml).join("");

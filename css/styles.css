@@ -157,8 +157,22 @@ a.card:hover{text-decoration:none;box-shadow:0 12px 30px -12px rgba(43,32,22,0.5
 }
 
 .paste-hint{font-size:0.78rem;color:var(--ink-faint);font-style:italic;margin-top:-4px;}
-.inline-thumb{display:inline-block;margin:8px 0;}
-.inline-thumb img{max-width:100%;max-height:340px;border-radius:8px;border:1px solid var(--line);display:block;}
+.inline-thumb{
+  display:block;max-width:100%;max-height:340px;margin:8px 0;
+  border-radius:8px;border:1px solid var(--line);cursor:zoom-in;
+}
+
+.lightbox{
+  position:fixed;inset:0;z-index:1000;
+  background:rgba(15,12,8,0.88);
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;cursor:zoom-out;
+}
+.lightbox img{max-width:100%;max-height:100%;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,0.6);cursor:default;}
+.lightbox-close{
+  position:absolute;top:16px;right:20px;width:40px;height:40px;border-radius:50%;
+  background:rgba(255,255,255,0.12);color:#F3E7D8;border:none;cursor:pointer;font-size:1.6rem;line-height:1;
+}
 
 .back-link{
   display:inline-flex;align-items:center;gap:6px;
@@ -166,13 +180,6 @@ a.card:hover{text-decoration:none;box-shadow:0 12px 30px -12px rgba(43,32,22,0.5
   color:var(--ink-soft);
 }
 .back-link svg{width:14px;height:14px;}
-
-:target{scroll-margin-top:96px;}
-.card:target{animation:target-flash 2s ease;}
-@keyframes target-flash{
-  0%{box-shadow:0 0 0 3px var(--ember);}
-  100%{box-shadow:var(--shadow);}
-}
 
 [hidden]{display:none !important;}
 
