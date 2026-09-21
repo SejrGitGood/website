@@ -10,6 +10,31 @@ const NAV_LINKS = [
   { href: "logistics.html", label: "Logistik" },
 ];
 
+// --- Tema: Auto følger systemet, de andre tilsidesætter det. Rent
+// visningsvalg pr. browser — gemmes kun lokalt, aldrig i databasen. ---
+function getStoredTheme() {
+  try {
+    return localStorage.getItem("theme") || "auto";
+  } catch (e) {
+    return "auto";
+  }
+}
+function setStoredTheme(theme) {
+  try {
+    localStorage.setItem("theme", theme);
+  } catch (e) {
+    // ignoreres — temaet virker stadig for denne visning, gemmes bare ikke
+  }
+}
+function applyTheme(theme) {
+  if (theme && theme !== "auto") {
+    document.documentElement.dataset.theme = theme;
+  } else {
+    delete document.documentElement.dataset.theme;
+  }
+}
+applyTheme(getStoredTheme());
+
 function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str ?? "";
@@ -80,11 +105,24 @@ async function renderNav(activeHref) {
     authHtml = `<a href="login.html">Log ind</a>`;
   }
 
+  const currentQ = new URLSearchParams(location.search).get("q") || "";
+
   mount.innerHTML = `
     <div class="wrap">
       <a class="brand" href="index.html">${navSvg()}Blessings of Valkyriegade</a>
       <div class="nav-links">${links}</div>
-      <div class="nav-auth">${authHtml}</div>
+      <form class="nav-search" id="navSearchForm">
+        <input type="search" id="navSearchInput" placeholder="Søg…" aria-label="Søg i sessions og lore" value="${escapeHtml(currentQ)}">
+      </form>
+      <div class="nav-auth">
+        <select class="theme-select" id="themeSelect" aria-label="Tema">
+          <option value="auto">Auto</option>
+          <option value="light">Lys</option>
+          <option value="dark">Mørk</option>
+          <option value="blood">Blodmåne</option>
+        </select>
+        ${authHtml}
+      </div>
     </div>
   `;
 
@@ -95,6 +133,20 @@ async function renderNav(activeHref) {
       location.href = "login.html";
     });
   }
+
+  const themeSelect = document.getElementById("themeSelect");
+  themeSelect.value = getStoredTheme();
+  themeSelect.addEventListener("change", () => {
+    setStoredTheme(themeSelect.value);
+    applyTheme(themeSelect.value);
+  });
+
+  document.getElementById("navSearchForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const q = document.getElementById("navSearchInput").value.trim();
+    if (!q) return;
+    location.href = `search.html?q=${encodeURIComponent(q)}`;
+  });
 }
 
 // --- Billeder: indsæt med Ctrl+V direkte i teksten, der hvor markøren står ---

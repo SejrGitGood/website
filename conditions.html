@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Tilstande &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=5">
+<script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">DM Tools</p>
+    <h1>Tilstande</h1>
+    <p>De officielle D&amp;D 5e-tilstande, altid ved hånden &mdash; ingen søgning nødvendig, bare slå op.</p>
+  </div>
+
+  <div class="wrap">
+    <p style="margin:-8px 0 4px;"><a href="dmtools.html" class="back-link">&larr; Alle DM Tools</a></p>
+
+    <section class="section">
+      <div class="grid" id="grid"><div class="empty">Indlæser&hellip;</div></div>
+    </section>
+
+    <p class="paste-hint" style="text-align:center;">
+      Data er hentet fra <a href="https://open5e.com" target="_blank" rel="noopener">Open5e</a>,
+      Wizards of the Coasts officielle System Reference Document 5.1.
+    </p>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=5"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("dmtools.html");
+
+  const grid = document.getElementById("grid");
+
+  // Beskrivelser er markdown: "* punkt"-linjer, men Exhaustion indeholder også
+  // en "| Level | Effect |"-tabel — den vises i en monospace-blok i stedet
+  // for at blive listet som ulæselige punkttegn med tegn.
+  function conditionBodyHtml(desc) {
+    const lines = (desc || "").split("\n").map((l) => l.trim()).filter(Boolean);
+    const parts = [];
+    let bullets = [];
+    let tableLines = [];
+    function flushBullets() {
+      if (bullets.length) {
+        parts.push(`<ul class="shop-items">${bullets.map((l) => `<li>${escapeHtml(l)}</li>`).join("")}</ul>`);
+        bullets = [];
+      }
+    }
+    function flushTable() {
+      if (tableLines.length) {
+        parts.push(`<pre class="condition-table">${escapeHtml(tableLines.join("\n"))}</pre>`);
+        tableLines = [];
+      }
+    }
+    lines.forEach((line) => {
+      if (line.startsWith("|")) {
+        flushBullets();
+        tableLines.push(line);
+      } else {
+        flushTable();
+        bullets.push(line.replace(/^\*\s*/, ""));
+      }
+    });
+    flushBullets();
+    flushTable();
+    return parts.join("");
+  }
+
+  try {
+    const res = await fetch("https://api.open5e.com/v1/conditions/?document__slug=wotc-srd&limit=25");
+    const data = await res.json();
+    const rows = (data.results || []).sort((a, b) => a.name.localeCompare(b.name));
+    grid.innerHTML = rows.length
+      ? rows.map((c) => `<div class="card"><h3>${escapeHtml(c.name)}</h3>${conditionBodyHtml(c.desc)}</div>`).join("")
+      : `<div class="empty">Ingen tilstande fundet.</div>`;
+  } catch (err) {
+    grid.innerHTML = `<div class="empty">Kunne ikke hente tilstande: ${escapeHtml(err.message)}</div>`;
+  }
+})();
+</script>
+</body>
+</html>

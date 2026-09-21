@@ -7,7 +7,8 @@
 <title>Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=4">
+<link rel="stylesheet" href="css/styles.css?v=5">
+<script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
 </head>
 <body>
 <nav class="site-nav" id="site-nav"></nav>
@@ -30,7 +31,7 @@
 
     <section class="section" id="logisticsSection">
       <div class="section-title">
-        <h2>Næste session</h2>
+        <h2>Næste session <span class="badge" id="dayBadge" hidden></span></h2>
         <a href="logistics.html">Se/ret logistik &rarr;</a>
       </div>
       <div id="logisticsCard"><div class="empty">Indlæser&hellip;</div></div>
@@ -58,7 +59,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=4"></script>
+<script src="js/app.js?v=5"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -95,6 +96,11 @@
     : `<div class="empty">Ingen karakterer i rosteret endnu.</div>`;
 
   const { data: logistics } = await window.sb.from("logistics").select("*").eq("id", 1).maybeSingle();
+  if (logistics && logistics.campaign_day) {
+    const dayBadge = document.getElementById("dayBadge");
+    dayBadge.textContent = `Dag ${logistics.campaign_day}`;
+    dayBadge.hidden = false;
+  }
   const logisticsCard = document.getElementById("logisticsCard");
   if (logistics && logistics.next_session_date) {
     logisticsCard.innerHTML = `

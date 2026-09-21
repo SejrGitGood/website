@@ -7,7 +7,8 @@
 <title>Logistik &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=4">
+<link rel="stylesheet" href="css/styles.css?v=5">
+<script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
 </head>
 <body>
 <nav class="site-nav" id="site-nav"></nav>
@@ -20,6 +21,18 @@
   </div>
 
   <div class="wrap" style="max-width:700px;">
+    <section class="section">
+      <div class="card">
+        <p class="meta" style="margin-bottom:6px;">Kampagnedag</p>
+        <div style="display:flex;align-items:center;gap:16px;">
+          <button class="btn secondary" id="dayMinusBtn" type="button">&minus;1 Dag</button>
+          <h2 id="dayDisplay" style="min-width:110px;text-align:center;">Dag 1</h2>
+          <button class="btn secondary" id="dayPlusBtn" type="button">+1 Dag</button>
+        </div>
+        <p class="paste-hint" style="margin-top:10px;">Barovias egen kalender &mdash; ingen forbindelse til den rigtige dato. Månefaser og Vistani-begivenheder er bundet til dette tal.</p>
+      </div>
+    </section>
+
     <section class="section">
       <div class="card">
         <form class="form" id="logisticsForm">
@@ -49,7 +62,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=4"></script>
+<script src="js/app.js?v=5"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -69,12 +82,28 @@
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
+  let campaignDay = 1;
+  const dayDisplay = document.getElementById("dayDisplay");
+
   const { data } = await window.sb.from("logistics").select("*").eq("id", 1).maybeSingle();
   if (data) {
     nextSessionEl.value = toLocalInputValue(data.next_session_date);
     notesEl.value = data.notes || "";
     houseRulesEl.value = data.house_rules || "";
+    campaignDay = data.campaign_day ?? 1;
+    dayDisplay.textContent = `Dag ${campaignDay}`;
   }
+
+  async function saveDay(newDay) {
+    campaignDay = Math.max(1, newDay);
+    dayDisplay.textContent = `Dag ${campaignDay}`;
+    await window.sb
+      .from("logistics")
+      .update({ campaign_day: campaignDay, updated_at: new Date().toISOString() })
+      .eq("id", 1);
+  }
+  document.getElementById("dayMinusBtn").addEventListener("click", () => saveDay(campaignDay - 1));
+  document.getElementById("dayPlusBtn").addEventListener("click", () => saveDay(campaignDay + 1));
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();

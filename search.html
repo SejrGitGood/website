@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Søgning &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=5">
+<script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">Opslag</p>
+    <h1>Søgning</h1>
+    <p id="queryLine">Indtast en søgning i feltet i menuen.</p>
+  </div>
+
+  <div class="wrap">
+    <section class="section">
+      <div class="section-title"><h2>Sessions</h2></div>
+      <div class="grid" id="sessionResults"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-title"><h2>Lore</h2></div>
+      <div class="grid" id="loreResults"></div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=5"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("");
+
+  const q = (new URLSearchParams(location.search).get("q") || "").trim();
+  const sessionResults = document.getElementById("sessionResults");
+  const loreResults = document.getElementById("loreResults");
+
+  if (!q) {
+    return;
+  }
+  document.getElementById("queryLine").textContent = `Resultater for "${q}"`;
+  sessionResults.innerHTML = `<div class="empty">Søger&hellip;</div>`;
+  loreResults.innerHTML = `<div class="empty">Søger&hellip;</div>`;
+
+  // Én .ilike()-forespørgsel pr. kolonne (aldrig rå strengsammensætning i et
+  // .or()-filter) — undgår at søgeord med komma/parenteser kan ødelægge
+  // PostgREST's filter-syntaks.
+  async function searchTable(table, columns) {
+    const responses = await Promise.all(
+      columns.map((col) => window.sb.from(table).select("*").ilike(col, `%${q}%`))
+    );
+    const byId = new Map();
+    responses.forEach(({ data }) => (data || []).forEach((row) => byId.set(row.id, row)));
+    return [...byId.values()];
+  }
+
+  function sessionResultHtml(s) {
+    return `
+      <a class="card" href="sessions.html?id=${s.id}" style="display:block;">
+        <span class="badge">Session ${s.number}</span>
+        <h3 style="margin-top:8px;">${escapeHtml(s.title)}</h3>
+        <p class="body">${escapeHtml(stripImageMarkdown(s.summary || "").slice(0, 160))}${(s.summary || "").length > 160 ? "…" : ""}</p>
+      </a>`;
+  }
+
+  function loreResultHtml(l) {
+    return `
+      <a class="card" href="lore.html?id=${l.id}" style="display:block;">
+        <span class="badge">${escapeHtml(l.category)}</span>
+        <h3 style="margin-top:8px;">${escapeHtml(l.title)}</h3>
+        <p class="body">${escapeHtml(stripImageMarkdown(l.body || "").slice(0, 160))}${(l.body || "").length > 160 ? "…" : ""}</p>
+      </a>`;
+  }
+
+  const [sessionRows, loreRows] = await Promise.all([
+    searchTable("sessions", ["title", "summary"]),
+    searchTable("lore_entries", ["title", "body"]),
+  ]);
+
+  sessionResults.innerHTML = sessionRows.length
+    ? sessionRows.map(sessionResultHtml).join("")
+    : `<div class="empty">Ingen sessions matcher.</div>`;
+  loreResults.innerHTML = loreRows.length
+    ? loreRows.map(loreResultHtml).join("")
+    : `<div class="empty">Ingen lore matcher.</div>`;
+})();
+</script>
+</body>
+</html>

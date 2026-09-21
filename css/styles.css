@@ -13,7 +13,7 @@
   --shadow: 0 10px 30px -14px rgba(43,32,22,0.35);
 }
 @media (prefers-color-scheme: dark){
-  :root{
+  :root:not([data-theme="light"]):not([data-theme="blood"]){
     --bg:#17140F;
     --surface:#221C14;
     --ink:#EDE1C7;
@@ -27,6 +27,35 @@
     --gold:#D2AC5C;
     --shadow: 0 10px 34px -10px rgba(0,0,0,0.6);
   }
+}
+/* Manuelt valgte temaer (tilsidesætter systemets lys/mørk-indstilling) */
+:root[data-theme="dark"]{
+  --bg:#17140F;
+  --surface:#221C14;
+  --ink:#EDE1C7;
+  --ink-soft:#C3B393;
+  --ink-faint:#8F8266;
+  --ember:#E08A4F;
+  --ember-soft:#C9723A;
+  --mist:#9FB0C4;
+  --blood:#D6717A;
+  --line:#453A29;
+  --gold:#D2AC5C;
+  --shadow: 0 10px 34px -10px rgba(0,0,0,0.6);
+}
+:root[data-theme="blood"]{
+  --bg:#150B0C;
+  --surface:#1F1213;
+  --ink:#F0DCD3;
+  --ink-soft:#CBA79B;
+  --ink-faint:#8C6A61;
+  --ember:#E8492B;
+  --ember-soft:#C43A22;
+  --mist:#8C7CA8;
+  --blood:#FF3B4E;
+  --line:#3D2224;
+  --gold:#D9A03E;
+  --shadow: 0 10px 34px -10px rgba(0,0,0,0.75);
 }
 
 *{box-sizing:border-box;}
@@ -76,6 +105,31 @@ a:hover{text-decoration:underline;}
   font-family:"Cinzel",serif;font-size:0.75rem;letter-spacing:0.05em;text-transform:uppercase;
   background:none;border:1px solid var(--ember);color:var(--ember);padding:7px 14px;border-radius:999px;cursor:pointer;
 }
+
+.nav-search{display:flex;}
+.nav-search input{
+  font-family:"Cormorant Garamond",serif;font-size:0.92rem;
+  background:var(--bg);border:1px solid var(--line);border-radius:999px;
+  padding:7px 14px;color:var(--ink);width:130px;transition:width .15s ease;
+}
+.nav-search input:focus-visible{width:190px;}
+
+.theme-select{
+  font-family:"Cinzel",serif;font-size:0.68rem;letter-spacing:0.04em;text-transform:uppercase;
+  background:var(--bg);border:1px solid var(--line);border-radius:999px;
+  padding:7px 10px;color:var(--ink-soft);cursor:pointer;
+}
+
+.attitude{
+  display:inline-block;font-family:"Cinzel",serif;font-size:0.68rem;letter-spacing:0.05em;text-transform:uppercase;
+  padding:3px 9px;border-radius:999px;margin-left:6px;
+  background:color-mix(in srgb, var(--attitude-color) 14%, transparent);color:var(--attitude-color);
+}
+.attitude.hostile{--attitude-color:var(--blood);}
+.attitude.unfriendly{--attitude-color:var(--ember);}
+.attitude.indifferent{--attitude-color:var(--ink-faint);}
+.attitude.friendly{--attitude-color:var(--gold);}
+.attitude.helpful{--attitude-color:var(--mist);}
 
 main{flex:1;}
 .page-head{padding-block:clamp(30px,6vw,52px) 10px;text-align:center;}
@@ -166,6 +220,12 @@ a.card:hover{text-decoration:none;box-shadow:0 12px 30px -12px rgba(43,32,22,0.5
 .shop-items summary:hover strong{color:var(--ember);}
 .item-desc{margin:8px 0 0;font-size:0.85rem;font-style:italic;color:var(--ink-faint);}
 
+.condition-table{
+  font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:0.78rem;
+  background:var(--bg);border:1px solid var(--line);border-radius:8px;
+  padding:10px 12px;margin:10px 0 0;overflow-x:auto;color:var(--ink-soft);white-space:pre;
+}
+
 .paste-hint{font-size:0.78rem;color:var(--ink-faint);font-style:italic;margin-top:-4px;}
 .inline-thumb{
   display:block;max-width:100%;max-height:340px;margin:8px 0;
@@ -206,4 +266,7 @@ a.card:hover{text-decoration:none;box-shadow:0 12px 30px -12px rgba(43,32,22,0.5
 @media (max-width:600px){
   .site-nav .wrap{gap:10px;}
   .nav-auth{width:100%;justify-content:space-between;margin-left:0;order:3;}
+  .nav-search{width:100%;order:2;}
+  .nav-search input{width:100%;}
+  .nav-search input:focus-visible{width:100%;}
 }

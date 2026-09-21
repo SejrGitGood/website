@@ -43,6 +43,9 @@ create table if not exists lore_entries (
 -- spørge Open5e på ny. Almindelige lore-indgange lader denne stå tom (null).
 alter table lore_entries add column if not exists shop_data jsonb;
 alter table lore_entries add column if not exists images text[] not null default '{}';
+-- Holdning/omdømme for NPC-indgange (5e's klassiske Fjendtlig..Hjælpsom-skala).
+-- Kun meningsfuld for kategori "NPC", ellers null.
+alter table lore_entries add column if not exists relationship text;
 
 -- Karakterroster, hentet fra D&D Beyond. `data` er en renset opsummering
 -- (klasse, HP, ability scores, udstyr, portræt) — kun sat, når karakteren er
@@ -68,6 +71,10 @@ create table if not exists logistics (
 );
 
 insert into logistics (id) values (1) on conflict (id) do nothing;
+
+-- Dag-tæller for kampagnen (Barovia kører på egen kalender, ikke den
+-- rigtige verdens dato) — DM'en trykker +/- manuelt, ingen datomatematik.
+alter table logistics add column if not exists campaign_day int not null default 1;
 
 -- Fælles bytte/loot: løs liste af fund, hvem der bærer dem, og en delt guldpose.
 create table if not exists loot_items (
