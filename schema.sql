@@ -11,7 +11,7 @@ create table if not exists allowed_users (
 );
 
 insert into allowed_users (email) values
-  ('gruppe@daggerford.local')
+  ('sejr1234@gmail.com')
 on conflict (email) do nothing;
 
 create table if not exists sessions (
