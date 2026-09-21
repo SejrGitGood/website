@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
 <title>Lore &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
@@ -185,14 +186,17 @@
     });
     card.querySelector(".editForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const title = card.querySelector(".f-title").value.trim();
-      const category = card.querySelector(".f-category").value;
-      const body = card.querySelector(".f-body").value.trim();
-      await window.sb
-        .from("lore_entries")
-        .update({ title, category, body, updated_at: new Date().toISOString() })
-        .eq("id", row.id);
-      load();
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      await withBusy(submitBtn, "Gemmer…", async () => {
+        const title = card.querySelector(".f-title").value.trim();
+        const category = card.querySelector(".f-category").value;
+        const body = card.querySelector(".f-body").value.trim();
+        await window.sb
+          .from("lore_entries")
+          .update({ title, category, body, updated_at: new Date().toISOString() })
+          .eq("id", row.id);
+        load();
+      });
     });
   }
 
@@ -208,21 +212,24 @@
 
   document.getElementById("addForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const title = document.getElementById("title").value.trim();
-    const category = document.getElementById("category").value;
-    const body = document.getElementById("body").value.trim();
-    const { error } = await window.sb.from("lore_entries").insert({
-      title,
-      category,
-      body,
-      created_by: session.user.email,
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    await withBusy(submitBtn, "Gemmer…", async () => {
+      const title = document.getElementById("title").value.trim();
+      const category = document.getElementById("category").value;
+      const body = document.getElementById("body").value.trim();
+      const { error } = await window.sb.from("lore_entries").insert({
+        title,
+        category,
+        body,
+        created_by: session.user.email,
+      });
+      if (error) {
+        alert("Kunne ikke gemme: " + error.message);
+        return;
+      }
+      e.target.reset();
+      load();
     });
-    if (error) {
-      alert("Kunne ikke gemme: " + error.message);
-      return;
-    }
-    e.target.reset();
-    load();
   });
 
   load();

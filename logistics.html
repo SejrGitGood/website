@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
 <title>Logistik &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
@@ -78,19 +79,22 @@
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     savedMsg.style.display = "none";
-    const payload = {
-      id: 1,
-      next_session_date: nextSessionEl.value ? new Date(nextSessionEl.value).toISOString() : null,
-      notes: notesEl.value.trim(),
-      house_rules: houseRulesEl.value.trim(),
-      updated_at: new Date().toISOString(),
-    };
-    const { error } = await window.sb.from("logistics").upsert(payload);
-    if (error) {
-      alert("Kunne ikke gemme: " + error.message);
-      return;
-    }
-    savedMsg.style.display = "inline-block";
+    const submitBtn = form.querySelector('button[type="submit"]');
+    await withBusy(submitBtn, "Gemmer…", async () => {
+      const payload = {
+        id: 1,
+        next_session_date: nextSessionEl.value ? new Date(nextSessionEl.value).toISOString() : null,
+        notes: notesEl.value.trim(),
+        house_rules: houseRulesEl.value.trim(),
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await window.sb.from("logistics").upsert(payload);
+      if (error) {
+        alert("Kunne ikke gemme: " + error.message);
+        return;
+      }
+      savedMsg.style.display = "inline-block";
+    });
   });
 })();
 </script>

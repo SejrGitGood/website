@@ -29,6 +29,21 @@ function formatDateTime(value) {
   return d.toLocaleString("da-DK", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+// Deaktiverer `btn` og viser `busyLabel`, mens `fn` kører — forhindrer
+// dobbelt-indsendelse og giver et tegn på, at noget sker, på en langsom
+// forbindelse. Gendanner altid knappen bagefter, uanset om fn fejler.
+async function withBusy(btn, busyLabel, fn) {
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = busyLabel;
+  try {
+    await fn();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
 async function currentSession() {
   const { data } = await window.sb.auth.getSession();
   return data.session;
@@ -83,10 +98,41 @@ async function renderNav(activeHref) {
 
 // --- Billeder: indsæt med Ctrl+V direkte i teksten, der hvor markøren står ---
 
+// Skalerer ned til maks `maxDim` px på den lange led og genkoder som JPEG,
+// så en telefonskærmbillede ikke fylder unødigt i Supabase's gratis lager.
+// Er billedet allerede lille nok, sendes det uændret videre.
+function compressImage(blob, maxDim = 1600, quality = 0.85) {
+  return new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const { width, height } = img;
+      if (width <= maxDim && height <= maxDim) {
+        resolve(blob);
+        return;
+      }
+      const scale = maxDim / Math.max(width, height);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(width * scale);
+      canvas.height = Math.round(height * scale);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((out) => resolve(out || blob), "image/jpeg", quality);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(blob);
+    };
+    img.src = objectUrl;
+  });
+}
+
 async function uploadPastedImage(blob) {
-  const ext = (blob.type.split("/")[1] || "png").replace("jpeg", "jpg");
+  const compressed = await compressImage(blob);
+  const mime = compressed.type || blob.type || "image/png";
+  const ext = (mime.split("/")[1] || "png").replace("jpeg", "jpg");
   const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error } = await window.sb.storage.from("photos").upload(path, blob, { contentType: blob.type });
+  const { error } = await window.sb.storage.from("photos").upload(path, compressed, { contentType: mime });
   if (error) throw error;
   return window.sb.storage.from("photos").getPublicUrl(path).data.publicUrl;
 }
