@@ -1,8 +1,8 @@
 # Blessings of Valkyriegade — setup
 
-Live and working: Supabase project, shared login, public repo, GitHub Pages, image pasting, the shop generator, the character roster (Karakterer), monster/spell/condition lookup, the party health widget, the campaign day counter, the loot/gold tracker (Skattekammer), NPC attitude tracking on Lore, site-wide search, and a manual theme switcher (Auto/Lys/Mørk/Blodmåne) in the nav.
+Live and working: Supabase project, shared login, public repo, GitHub Pages, image pasting, the shop generator, the character roster (Karakterer), monster/spell/condition lookup, the party health widget, the campaign day counter, the loot/gold tracker (Skattekammer), NPC attitude and status tracking on Lore, site-wide search, and a manual theme switcher (Auto/Lys/Mørk/Blodmåne) in the nav.
 
-**One-time step needed**: run the latest `schema.sql` once in Supabase → SQL Editor → New query → Run. Safe to re-run any time. It adds (among earlier additions) `loot_items`, `party_treasury`, the campaign-day counter on `logistics`, and the NPC attitude field on `lore_entries`.
+**One-time step needed**: run the latest `schema.sql` once in Supabase → SQL Editor → New query → Run. Safe to re-run any time. It adds (among earlier additions) `loot_items`, `party_treasury`, the campaign-day counter on `logistics`, and the NPC attitude/status fields on `lore_entries`.
 
 Automatic D&D Beyond refresh is fully set up: the Edge Function is deployed, the "Opdater nu" button on Karakterer works, and a `pg_cron` job (`refresh-characters-nightly`) refreshes every character automatically at 03:00 UTC. See `CHARACTERS_SETUP.md` if it ever needs to be redeployed or rescheduled.
 
