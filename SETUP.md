@@ -5,24 +5,25 @@ Everything the code needs is written. These are the one-time steps only you can 
 ## 1. Supabase (database + login) — free
 
 1. Go to supabase.com, sign up, click **New project**. Pick any name/region, set a database password (save it somewhere, you likely won't need it again).
-2. Once the project is ready, open **SQL Editor → New query**, paste the entire contents of `schema.sql` (in this folder), and click **Run**. This creates the three tables and locks them to logged-in users only.
-3. Go to **Authentication → Providers** and confirm **Email** is enabled.
-4. Go to **Authentication → Settings** (or "Sign In / Providers" settings depending on the current Supabase UI) and **turn off "Allow new users to sign up"**. This is what keeps the site to just your group — nobody else can create an account.
-5. Go to **Authentication → Users → Invite user**, and invite the five email addresses (yours + your four friends'). Each of you will get an email to confirm; after that, logging in on the site (via the magic-link box) will work for that address.
-6. Go to **Project Settings → API**. Copy the **Project URL** and the **anon public** key (NOT the service_role key — that one is secret and should never go in this site).
+2. Open `schema.sql` (in this folder) and edit the five placeholder emails near the top (`spiller1@eksempel.dk` etc.) to your and your four friends' real addresses. This list is what locks the site to just your group — nobody else can read or write anything, even if they somehow get a login link.
+3. In Supabase, open **SQL Editor → New query**, paste the edited file, and click **Run**.
+4. Confirm **Email** sign-in is on: look under **Authentication** in the left sidebar for a "Providers" or "Sign In / Providers" page and check Email is enabled (it's on by default on a new project, so this is usually already done).
+5. Go to **Project Settings → API Keys** (Supabase renamed this from plain "API" — if you only see "API", that's the same page). Copy the **Project URL** and the **publishable key** (starts with `sb_publishable_...`; if your project instead shows a legacy **anon public** key starting with `eyJ...`, that works exactly the same way — use whichever one is there).
+
+You do *not* need to find any "invite user" or "disable signups" screen — the email allow-list in `schema.sql` does that job instead, and it's easy to edit later (see the bottom of that file).
 
 ## 2. Fill in the config
 
-Open `js/config.js` and replace the two placeholder values with the ones from step 1.6:
+Open `js/config.js` and replace the two placeholder values with the ones from step 1.5:
 
 ```js
 window.SUPABASE_CONFIG = {
   url: "https://xxxxxxxx.supabase.co",
-  anonKey: "eyJ..."
+  anonKey: "sb_publishable_..."   // or the eyJ... anon key, either works
 };
 ```
 
-The anon key is meant to be public (it ships in every Supabase frontend) — the real protection is the row-level security policies in `schema.sql` plus the signup lock in step 1.4.
+This key is meant to be public (it ships in every Supabase frontend) — the real protection is the row-level security policies in `schema.sql`, which check the logged-in user's email against your `allowed_users` list.
 
 ## 3. Put it on GitHub
 
