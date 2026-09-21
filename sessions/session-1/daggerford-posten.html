@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daggerford-Posten</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
+<style>
+:root{
+  --bg:#EFE3C8;
+  --surface-news:#F6EFDD;
+  --ink:#2B2016;
+  --ink-soft:#5B4E3D;
+  --ink-faint:#8A7A61;
+  --ember:#A6461C;
+  --line:#C9B790;
+  --shadow: 0 10px 30px -12px rgba(43,32,22,0.35);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#17140F; --surface-news:#1D1812; --ink:#EDE1C7; --ink-soft:#C3B393; --ink-faint:#8F8266;
+    --ember:#E08A4F; --line:#453A29;
+    --shadow: 0 10px 34px -10px rgba(0,0,0,0.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#17140F; --surface-news:#1D1812; --ink:#EDE1C7; --ink-soft:#C3B393; --ink-faint:#8F8266;
+  --ember:#E08A4F; --line:#453A29;
+  --shadow: 0 10px 34px -10px rgba(0,0,0,0.6);
+  color-scheme: dark;
+}
+*{box-sizing:border-box;}
+body{
+  background:
+    radial-gradient(ellipse 900px 460px at 50% -10%, color-mix(in srgb, var(--ember) 8%, transparent), transparent 60%),
+    var(--bg);
+  color:var(--ink);
+  font-family:"Cormorant Garamond", Georgia, "Times New Roman", serif;
+  font-size:1.08rem;
+  line-height:1.6;
+  padding-left:max(18px, env(safe-area-inset-left,0px));
+  padding-right:max(18px, env(safe-area-inset-right,0px));
+}
+h2,h3,h4{font-family:"Cinzel", Georgia, serif;font-weight:600;color:var(--ink);text-wrap:balance;margin:0;}
+.page{max-width:780px;margin:0 auto;padding-block:clamp(28px,6vw,56px);}
+:focus-visible{outline:2px solid var(--ember);outline-offset:3px;border-radius:4px;}
+@media (prefers-reduced-motion: reduce){*{animation-duration:0.001ms !important;transition-duration:0.001ms !important;}}
+
+.eyebrow{
+  text-align:center;font-family:"Cinzel", serif;font-size:0.72rem;letter-spacing:0.22em;text-transform:uppercase;
+  color:var(--ember);margin:0 0 20px;
+}
+
+.newspaper{
+  background:var(--surface-news);
+  border:1px solid var(--line);
+  box-shadow:var(--shadow);
+  border-radius:4px;
+  padding:clamp(20px,5vw,40px);
+}
+.masthead{text-align:center;}
+.masthead .paperdate{
+  font-family:"Cinzel",serif;font-size:0.68rem;letter-spacing:0.14em;text-transform:uppercase;
+  color:var(--ink-soft);
+}
+.masthead h2{
+  font-family:"Cinzel",serif;font-size:clamp(2.1rem,7vw,3.2rem);letter-spacing:0.05em;
+  margin-top:8px;
+}
+.masthead .slogan{font-style:italic;color:var(--ink-soft);margin-top:4px;font-size:0.95rem;}
+.rule{height:3px;background:var(--ink);margin-top:14px;}
+.rule.thin{height:1px;background:var(--ink);opacity:0.5;margin-top:5px;}
+
+.headline{margin-top:26px;text-align:center;}
+.headline h3{font-size:clamp(1.5rem,4.4vw,2.3rem);line-height:1.15;}
+.headline .deck{
+  font-style:italic;color:var(--ink-soft);max-width:34em;margin:12px auto 0;font-size:1.05rem;
+}
+.byline{
+  display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;
+  font-family:"Cinzel",serif;font-size:0.68rem;letter-spacing:0.08em;text-transform:uppercase;
+  color:var(--ink-faint);margin-top:16px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding-block:8px;
+}
+
+.news-body{
+  margin-top:22px;
+  columns:2;
+  column-width:250px;
+  column-gap:32px;
+  text-align:justify;
+  hyphens:auto;
+}
+.news-body p{margin:0 0 14px;break-inside:avoid;}
+.news-body p:first-of-type::first-letter{
+  font-family:"Cinzel",serif;font-weight:700;font-size:3.1rem;line-height:0.8;
+  float:left;padding:6px 8px 0 0;color:var(--ember);
+}
+.news-quote{
+  break-inside:avoid;
+  font-family:"Cinzel",serif;font-size:1.05rem;line-height:1.4;
+  border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);
+  padding-block:12px;margin:6px 0 16px;
+}
+
+.boxes{
+  margin-top:10px;
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:18px;
+}
+.news-box{border:1px solid var(--ink);padding:14px 16px;}
+.news-box h4{
+  font-family:"Cinzel",serif;font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;
+  border-bottom:1px solid var(--ink);padding-bottom:8px;margin-bottom:10px;
+}
+.news-box p, .news-box li{font-size:0.92rem;margin:0 0 8px;color:var(--ink-soft);}
+.news-box ul{margin:0;padding-left:18px;}
+.news-box li{margin-bottom:6px;}
+.news-box.next{background:color-mix(in srgb, var(--ember) 8%, transparent);border-color:var(--ember);}
+.news-box.next h4{color:var(--ember);border-color:var(--ember);}
+
+.colophon{
+  text-align:center;margin-top:28px;color:var(--ink-faint);font-style:italic;font-size:0.9rem;
+}
+.seal{ width:90px;height:90px;margin:2px auto 4px;color:var(--ember);display:block; }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="eyebrow">Curse of Strahd &middot; Session 1 &middot; Avisforside</p>
+
+  <section class="newspaper" aria-label="Daggerford-Posten">
+    <div class="masthead">
+      <p class="paperdate">Løvfaldsmåned &middot; 1492 D.R. &middot; Daggerford, Faerûn &middot; 2 kobbermønter</p>
+      <svg class="seal" viewBox="0 0 200 200" role="img" aria-label="Daggerford-Postens segl">
+        <circle cx="100" cy="100" r="92" fill="none" stroke="currentColor" stroke-width="3"/>
+        <circle cx="100" cy="100" r="81" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        <text x="100" y="45" text-anchor="middle" font-family="Cinzel, serif" font-size="15" letter-spacing="2" fill="currentColor">DAGGERFORD</text>
+        <text x="100" y="167" text-anchor="middle" font-family="Cinzel, serif" font-size="15" letter-spacing="5" fill="currentColor">POSTEN</text>
+        <g fill="currentColor">
+          <polygon points="100,58 90,101 110,101"/>
+          <rect x="79" y="101" width="42" height="6" rx="2"/>
+          <rect x="97" y="107" width="6" height="27" rx="2"/>
+          <circle cx="100" cy="137" r="6.5"/>
+        </g>
+        <circle cx="62" cy="104" r="2.6" fill="currentColor"/>
+        <circle cx="138" cy="104" r="2.6" fill="currentColor"/>
+      </svg>
+      <h2>Daggerford-Posten</h2>
+      <p class="slogan">Sandheden &mdash; når vi når at skrive den ned</p>
+      <div class="rule"></div>
+      <div class="rule thin"></div>
+    </div>
+
+    <div class="headline">
+      <h3>Hertugindens Fem Udsendinge Sporløst Forsvundet</h3>
+      <p class="deck">Alt, hertuginde Morwen har hørt fra dem siden, er ét kryptisk brev &mdash; afleveret af due, forfattet af en mand, der ikke engang kender sit eget navn.</p>
+    </div>
+    <div class="byline">
+      <span>Af vores udsendte i Daggerford</span>
+      <span>Forsiden</span>
+    </div>
+
+    <div class="news-body">
+      <p>Fem rejsende, der for nylig gjorde tjeneste for hertuginde Morwen, er forsvundet under omstændigheder, byens rådgivere kun kan kalde &laquo;bekymrende&raquo; &mdash; og som denne avis foretrækker at kalde &laquo;det bedste, der er sket for salget i månedsvis.&raquo;</p>
+      <p>Selskabet blev sidst set forlade et middagsselskab på Morwen-manoren, hvor hertuginden havde bedt om hjælp til at overtale en gruppe omrejsende til fredeligt at forlade området uden for byens mure. I stedet for at vende hjem samme aften, opsøgte de fem de rejsende &mdash; og forsvandt med dem.</p>
+      <div class="news-quote">&laquo;Er taget ud for at finde fortiden. Mvh.&raquo;<br>&mdash; hele beskeden, leveret pr. brevdue</div>
+      <p>Beskeden, håndskrevet af en mand kendt lokalt blot som Frank Blæk, er det eneste livstegn, hertugindens husstand har modtaget siden. Ingen i byen kan bekræfte hans efternavn. Flere tvivler på, at han selv kender det.</p>
+      <p>Vagten Moliyr, som tidligere afhørte de omrejsende på hertugindens vegne, kunne ved en efterfølgende samtale ikke huske indholdet af sin egen samtale med dem &mdash; en detalje, byens rådgivere afviser som &laquo;irrelevant&raquo; og denne avis finder dybt foruroligende.</p>
+      <p>De omrejsendes lejr uden for murene blev fundet forladt næste morgen. Ingen hjulspor. Ingen aske i bålstedet. Naboer i den nordlige bydel rapporterer at have hørt, hvad de beskriver som &laquo;usædvanligt dårlig panfløjtemusik&raquo; sent samme aften &mdash; en detalje efterforskningen endnu ikke har kunnet forbinde til sagen, men som redaktionen nægter at lade ligge.</p>
+      <p>Hertuginde Morwen har afvist at udtale sig yderligere, men bekræfter, at de fem stadig står på hendes lønningsliste, &laquo;indtil videre.&raquo;</p>
+    </div>
+
+    <div class="boxes">
+      <div class="news-box">
+        <h4>Set &amp; Hørt</h4>
+        <ul>
+          <li>Værten Albert bekræfter: &laquo;De skyldte ikke for drikkevarerne. Det skal siges.&raquo;</li>
+          <li>Byens skakklub efterlyser et &laquo;usædvanligt velbrugt drage-skakspil&raquo;. Dusør tilbydes.</li>
+          <li>Hvem er Frank Blæk(fløjte)? End ikke han selv ved det.</li>
+        </ul>
+      </div>
+      <div class="news-box">
+        <h4>Småannoncer</h4>
+        <ul>
+          <li>Tabt: ca. 400 solsikkefrø, sidst set i en lomme. Findeløn: resten af posen.</li>
+          <li>Efterlyst: metalkonstruktion svarende til navnet &laquo;Troelbot&raquo;. Henvendelse til hertugindens kontor.</li>
+          <li>Til salg: brugt varulveskræk. Aldrig brugt. (Løgn.)</li>
+        </ul>
+      </div>
+      <div class="news-box">
+        <h4>Vejret</h4>
+        <p>Tæt, uendelig tåge. Sigtbarhed: 0 alen.</p>
+        <p>Udsigt: uændret på ubestemt tid.</p>
+      </div>
+      <div class="news-box next">
+        <h4>I Næste Udgave</h4>
+        <p>Hvad venter bag De Hovedløse Vogtere? Og vender fem helte nogensinde hjem til Daggerford?</p>
+      </div>
+    </div>
+  </section>
+
+  <p class="colophon">Uddrag af Daggerfords lokale nyheder, trykt kort efter selskabets forsvinden.</p>
+</div>
+</body>
+</html>

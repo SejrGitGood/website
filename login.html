@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Log ind &middot; Daggerford-Krøniken</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<main>
+  <div class="wrap" style="max-width:420px;padding-top:10vh;">
+    <div class="page-head" style="padding-top:0;">
+      <p class="eyebrow">Daggerford-Krøniken</p>
+      <h1>Log ind</h1>
+      <p>Skriv din mail, så sender vi et login-link. Ingen kodeord at huske.</p>
+    </div>
+
+    <div class="card">
+      <form class="form" id="loginForm">
+        <div class="field">
+          <label for="email">E-mail</label>
+          <input type="email" id="email" required placeholder="dig@eksempel.dk" autocomplete="email">
+        </div>
+        <button class="btn" type="submit" id="sendBtn">Send login-link</button>
+      </form>
+      <p class="notice" id="statusMsg" hidden style="margin-top:14px;"></p>
+    </div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script>
+  window.sb = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
+
+  const params = new URLSearchParams(location.search);
+  const redirectTarget = params.get("redirect") || "index.html";
+
+  window.sb.auth.getSession().then(({ data }) => {
+    if (data.session) location.href = redirectTarget;
+  });
+
+  const form = document.getElementById("loginForm");
+  const statusMsg = document.getElementById("statusMsg");
+  const sendBtn = document.getElementById("sendBtn");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("email").value.trim();
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Sender...";
+    const { error } = await window.sb.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: location.origin + location.pathname.replace("login.html", redirectTarget) }
+    });
+    statusMsg.hidden = false;
+    if (error) {
+      statusMsg.textContent = "Noget gik galt: " + error.message;
+    } else {
+      statusMsg.textContent = "Tjek din indbakke — vi har sendt et login-link til " + email + ".";
+    }
+    sendBtn.disabled = false;
+    sendBtn.textContent = "Send login-link";
+  });
+</script>
+</body>
+</html>

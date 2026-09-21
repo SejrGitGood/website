@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lore &middot; Daggerford-Krøniken</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">Opslagsværk</p>
+    <h1>Lore</h1>
+    <p>NPC'er, steder og begivenheder &mdash; alt det, ingen af os kan huske til næste session.</p>
+  </div>
+
+  <div class="wrap">
+    <section class="section">
+      <div class="section-title"><h2>Ny indgang</h2></div>
+      <div class="card">
+        <form class="form" id="addForm">
+          <div class="row">
+            <div class="field" style="flex:2;">
+              <label for="title">Titel</label>
+              <input type="text" id="title" required placeholder="F.eks. Stanimir">
+            </div>
+            <div class="field" style="max-width:200px;">
+              <label for="category">Kategori</label>
+              <select id="category">
+                <option value="NPC">NPC</option>
+                <option value="Sted">Sted</option>
+                <option value="Begivenhed">Begivenhed</option>
+                <option value="Genstand">Genstand</option>
+                <option value="Andet">Andet</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="body">Beskrivelse</label>
+            <textarea id="body" required></textarea>
+          </div>
+          <button class="btn" type="submit">Gem</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">
+        <h2>Alle indgange</h2>
+        <div class="tabs" id="tabs">
+          <button data-cat="all" class="active">Alle</button>
+          <button data-cat="NPC">NPC</button>
+          <button data-cat="Sted">Sted</button>
+          <button data-cat="Begivenhed">Begivenhed</button>
+          <button data-cat="Genstand">Genstand</button>
+          <button data-cat="Andet">Andet</button>
+        </div>
+      </div>
+      <div id="list"><div class="empty">Indlæser&hellip;</div></div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Daggerford-Krøniken &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("lore.html");
+
+  const list = document.getElementById("list");
+  let activeCat = "all";
+  let rowsCache = [];
+
+  async function load() {
+    const { data, error } = await window.sb.from("lore_entries").select("*").order("title", { ascending: true });
+    if (error) {
+      list.innerHTML = `<div class="empty">Kunne ikke hente lore: ${escapeHtml(error.message)}</div>`;
+      return;
+    }
+    rowsCache = data || [];
+    render();
+  }
+
+  function render() {
+    const rows = activeCat === "all" ? rowsCache : rowsCache.filter((r) => r.category === activeCat);
+    if (!rows.length) {
+      list.innerHTML = `<div class="empty">Ingen indgange her endnu.</div>`;
+      return;
+    }
+    list.innerHTML = rows.map(rowHtml).join("");
+    rows.forEach(wireRow);
+  }
+
+  function rowHtml(l) {
+    return `
+      <div class="card" data-id="${l.id}">
+        <div class="view">
+          <span class="badge">${escapeHtml(l.category)}</span>
+          <h3 style="margin-top:8px;">${escapeHtml(l.title)}</h3>
+          <p class="body">${escapeHtml(l.body)}</p>
+          <div class="card-actions">
+            <button class="btn secondary editBtn">Rediger</button>
+            <button class="btn danger deleteBtn">Slet</button>
+          </div>
+        </div>
+        <div class="edit" hidden>
+          <form class="form editForm">
+            <div class="row">
+              <div class="field" style="flex:2;">
+                <label>Titel</label>
+                <input type="text" class="f-title" value="${escapeHtml(l.title)}" required>
+              </div>
+              <div class="field" style="max-width:200px;">
+                <label>Kategori</label>
+                <select class="f-category">
+                  ${["NPC", "Sted", "Begivenhed", "Genstand", "Andet"]
+                    .map((c) => `<option value="${c}" ${c === l.category ? "selected" : ""}>${c}</option>`)
+                    .join("")}
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label>Beskrivelse</label>
+              <textarea class="f-body" required>${escapeHtml(l.body)}</textarea>
+            </div>
+            <div class="card-actions">
+              <button class="btn" type="submit">Gem</button>
+              <button class="btn secondary cancelBtn" type="button">Annuller</button>
+            </div>
+          </form>
+        </div>
+      </div>`;
+  }
+
+  function wireRow(row) {
+    const card = list.querySelector(`.card[data-id="${row.id}"]`);
+    const viewEl = card.querySelector(".view");
+    const editEl = card.querySelector(".edit");
+
+    card.querySelector(".editBtn").addEventListener("click", () => {
+      viewEl.hidden = true;
+      editEl.hidden = false;
+    });
+    card.querySelector(".cancelBtn").addEventListener("click", () => {
+      viewEl.hidden = false;
+      editEl.hidden = true;
+    });
+    card.querySelector(".deleteBtn").addEventListener("click", async () => {
+      if (!confirm(`Slet "${row.title}"?`)) return;
+      await window.sb.from("lore_entries").delete().eq("id", row.id);
+      load();
+    });
+    card.querySelector(".editForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const title = card.querySelector(".f-title").value.trim();
+      const category = card.querySelector(".f-category").value;
+      const body = card.querySelector(".f-body").value.trim();
+      await window.sb
+        .from("lore_entries")
+        .update({ title, category, body, updated_at: new Date().toISOString() })
+        .eq("id", row.id);
+      load();
+    });
+  }
+
+  document.getElementById("tabs").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-cat]");
+    if (!btn) return;
+    activeCat = btn.dataset.cat;
+    document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b === btn));
+    render();
+  });
+
+  document.getElementById("addForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const title = document.getElementById("title").value.trim();
+    const category = document.getElementById("category").value;
+    const body = document.getElementById("body").value.trim();
+    const { error } = await window.sb.from("lore_entries").insert({
+      title,
+      category,
+      body,
+      created_by: session.user.email,
+    });
+    if (error) {
+      alert("Kunne ikke gemme: " + error.message);
+      return;
+    }
+    e.target.reset();
+    load();
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

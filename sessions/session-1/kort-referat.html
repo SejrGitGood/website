@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rejsen Indtil Videre</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Caveat:wght@600&display=swap">
+<style>
+:root{
+  --bg:#F1E6CC;
+  --surface:#FBF4E2;
+  --ink:#2B2016;
+  --ink-soft:#5B4E3D;
+  --ink-faint:#8A7A61;
+  --ember:#A6461C;
+  --mist:#4B5566;
+  --line:#C9B790;
+  --gold:#8C6A2F;
+  --shadow: 0 10px 30px -14px rgba(43,32,22,0.35);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#17140F; --surface:#221C14; --ink:#EDE1C7; --ink-soft:#C3B393; --ink-faint:#8F8266;
+    --ember:#E08A4F; --mist:#9FB0C4; --line:#453A29; --gold:#D2AC5C;
+    --shadow: 0 10px 34px -10px rgba(0,0,0,0.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#17140F; --surface:#221C14; --ink:#EDE1C7; --ink-soft:#C3B393; --ink-faint:#8F8266;
+  --ember:#E08A4F; --mist:#9FB0C4; --line:#453A29; --gold:#D2AC5C;
+  --shadow: 0 10px 34px -10px rgba(0,0,0,0.6);
+  color-scheme: dark;
+}
+*{box-sizing:border-box;}
+body{
+  background:
+    radial-gradient(ellipse 900px 460px at 50% -10%, color-mix(in srgb, var(--ember) 10%, transparent), transparent 60%),
+    var(--bg);
+  color:var(--ink);
+  font-family:"Cormorant Garamond", Georgia, "Times New Roman", serif;
+  font-size:1.12rem;
+  line-height:1.7;
+  padding-left:max(18px, env(safe-area-inset-left,0px));
+  padding-right:max(18px, env(safe-area-inset-right,0px));
+}
+h1,h2{font-family:"Cinzel", Georgia, serif;font-weight:600;color:var(--ink);text-wrap:balance;margin:0;}
+.page{max-width:680px;margin:0 auto;padding-block:clamp(28px,6vw,56px);}
+:focus-visible{outline:2px solid var(--ember);outline-offset:3px;border-radius:4px;}
+@media (prefers-reduced-motion: reduce){*{animation-duration:0.001ms !important;transition-duration:0.001ms !important;}}
+
+.card{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:12px;
+  box-shadow:var(--shadow);
+  padding:clamp(22px,5vw,44px);
+}
+.eyebrow{
+  font-family:"Cinzel", serif;font-size:0.72rem;letter-spacing:0.22em;text-transform:uppercase;
+  color:var(--ember);text-align:center;margin:0 0 12px;
+}
+h1{font-size:clamp(1.9rem,5vw + 0.4rem,2.6rem);text-align:center;}
+.sub{
+  font-size:1.05rem;font-style:italic;color:var(--ink-soft);text-align:center;
+  margin:12px auto 0;max-width:34em;
+}
+.rule{height:1px;background:var(--line);margin:22px 0;}
+.roster{
+  text-align:center;font-family:"Cinzel",serif;font-size:0.78rem;letter-spacing:0.05em;
+  color:var(--ink-faint);text-transform:uppercase;line-height:1.9;
+}
+.story p{margin:0 0 16px;}
+.story h2{
+  font-size:1.05rem;letter-spacing:0.04em;color:var(--ember);
+  margin:26px 0 10px;
+}
+.story h2:first-child{margin-top:0;}
+.pull{
+  font-family:"Caveat",cursive;font-size:1.4rem;color:var(--ember);
+  border-left:3px solid var(--ember);padding-left:14px;margin:16px 0;
+}
+.close{
+  text-align:center;font-style:italic;color:var(--ink-soft);margin-top:26px;
+}
+.logistics{
+  text-align:center;font-size:0.85rem;color:var(--ink-faint);margin-top:18px;
+  border-top:1px dashed var(--line);padding-top:16px;
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="card">
+    <p class="eyebrow">Curse of Strahd &middot; Session 1 &middot; Kort Referat</p>
+    <h1>Rejsen Indtil Videre</h1>
+    <p class="sub">Fem fremmede forlod en kro i Daggerford. Ingen af dem nåede hjem samme aften.</p>
+
+    <div class="rule"></div>
+
+    <p class="roster">Frank Blækfløjte &middot; Troelius Richter&nbsp;II &middot; Abbas Ibn Al-Salah &middot; Clarence &laquo;CC&raquo; Claymore &middot; Mick Jaggstone</p>
+
+    <div class="rule"></div>
+
+    <div class="story">
+      <h2>Daggerford</h2>
+      <p>Selskabet mødes som altid på deres faste kro, hvor værten Albert byder velkommen, og en navnløs, notesbogsskrivende mand bliver døbt &laquo;Frank Blæk&raquo;. Der venter dem en middagsinvitation hos hertuginde Morwen &mdash; en tak for at have bragt et stjålet diadem hjem fra en flok goblins.</p>
+
+      <h2>Middagen</h2>
+      <p>Under middagen beder Morwen om hjælp: en gruppe omrejsende (Vistani) har slået lejr uden for byens mure og anklages for at true forbipasserende. Værre er det, at hendes egne vagter kom hjem underligt sympatiske efter et besøg hos dem. Vagten Moliyr afhøres og kan intet huske af samtalen &mdash; en tydelig fingerpeg om magi. Undervejs slår Clarence en vittighed om elverben, som Abbas uden omsvøb kalder en anelse racistisk.</p>
+
+      <h2>Vistani-lejren</h2>
+      <p>Selskabet opsøger lejren og møder Stanimir, som fortæller historien om en prins i landet Barovia, forvandlet af en forbandelse til en tyran. En synsk kvinde, Madam Eva, kan angiveligt hjælpe. Selskabet vælger &mdash; samlet og uden lang tøven &mdash; at følge de rejsende til Barovia i stedet for blot at jage dem væk. Frank sender et sidste brev hjem til hertuginden:</p>
+      <p class="pull">&laquo;Er taget ud for at finde fortiden. Mvh.&raquo;</p>
+
+      <h2>Vejen &amp; Tågen</h2>
+      <p>En dags rejse med karavanen følger, med et lejrbål, et elendigt panfløjtesolo og et nyt navn til Frank: &laquo;Frank Blækfløjte&raquo;. Næste morgen vågner selskabet alene &mdash; ingen telte, ingen heste, ingen Vistani. Kun en tæt, uendelig tåge. Efter at have splittet sig og fundet hinanden igen (ved hjælp af en lysraket og et højt ulvehyl), finder de en sti gennem tågen.</p>
+
+      <h2>De Hovedløse Vogtere</h2>
+      <p>Stien fører til to kæmpe, hovedløse stenstatuer og en massiv dør, der åbner sig selv. Bag den venter en mørk skov &mdash; og ulve. Frank kløver to i to, Abbas rammer en i øjet med en pil, Clarence maner en spiritual weapon frem, og Mick dræber en ulv med ren spot, mens den bløder fra ørerne til noget, der uhyggeligt minder om <em>Ice Ice Baby</em>. Selskabet står tilbage sejrende, forpustede &mdash; og et godt stykke fra alt, hvad der ligner sikkerhed.</p>
+
+      <p class="close">Hvad der venter bag Vogternes dør, ved ingen endnu.</p>
+    </div>
+
+    <p class="logistics">Næste session om to uger. Mød talrigt op &mdash; og husk: ingen telefoner ved bordet.</p>
+  </div>
+</div>
+</body>
+</html>

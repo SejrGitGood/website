@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sessioner &middot; Daggerford-Krøniken</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">Arkiv</p>
+    <h1>Sessioner</h1>
+    <p>Hver session, kort fortalt. Tilføj den seneste, eller ret i en gammel.</p>
+  </div>
+
+  <div class="wrap">
+    <section class="section">
+      <div class="card">
+        <span class="badge">Session 1</span>
+        <h3 style="margin-top:8px;">For at Finde Fortiden</h3>
+        <p class="meta">Den store, illustrerede pilotudgave &mdash; rejsen, avisen og kort-referatet</p>
+        <div class="card-actions">
+          <a class="btn secondary" href="sessions/session-1/for-at-finde-fortiden.html">Rejsen</a>
+          <a class="btn secondary" href="sessions/session-1/daggerford-posten.html">Avisen</a>
+          <a class="btn secondary" href="sessions/session-1/kort-referat.html">Kort referat</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title"><h2>Tilføj ny session</h2></div>
+      <div class="card">
+        <form class="form" id="addForm">
+          <div class="row">
+            <div class="field" style="max-width:140px;">
+              <label for="number">Nr.</label>
+              <input type="number" id="number" min="2" required>
+            </div>
+            <div class="field" style="flex:2;">
+              <label for="title">Titel</label>
+              <input type="text" id="title" required placeholder="F.eks. Ind i Barovia">
+            </div>
+            <div class="field" style="max-width:200px;">
+              <label for="sessionDate">Dato</label>
+              <input type="date" id="sessionDate">
+            </div>
+          </div>
+          <div class="field">
+            <label for="summary">Referat</label>
+            <textarea id="summary" required placeholder="Hvad skete der?"></textarea>
+          </div>
+          <button class="btn" type="submit">Gem session</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title"><h2>Tidligere sessioner</h2></div>
+      <div id="list"><div class="empty">Indlæser&hellip;</div></div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Daggerford-Krøniken &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("sessions.html");
+
+  const list = document.getElementById("list");
+
+  async function load() {
+    const { data, error } = await window.sb.from("sessions").select("*").order("number", { ascending: false });
+    if (error) {
+      list.innerHTML = `<div class="empty">Kunne ikke hente sessioner: ${escapeHtml(error.message)}</div>`;
+      return;
+    }
+    if (!data.length) {
+      list.innerHTML = `<div class="empty">Ingen sessioner endnu ud over pilotepisoden.</div>`;
+      return;
+    }
+    list.innerHTML = data.map(rowHtml).join("");
+    data.forEach((row) => wireRow(row));
+  }
+
+  function rowHtml(s) {
+    return `
+      <div class="card" data-id="${s.id}">
+        <div class="view">
+          <span class="badge">Session ${s.number}</span>
+          <h3 style="margin-top:8px;">${escapeHtml(s.title)}</h3>
+          <p class="meta">${formatDate(s.session_date)}</p>
+          <p class="body">${escapeHtml(s.summary)}</p>
+          <div class="card-actions">
+            <button class="btn secondary editBtn">Rediger</button>
+            <button class="btn danger deleteBtn">Slet</button>
+          </div>
+        </div>
+        <div class="edit" hidden>
+          <form class="form editForm">
+            <div class="row">
+              <div class="field" style="max-width:140px;">
+                <label>Nr.</label>
+                <input type="number" class="f-number" value="${s.number}" required>
+              </div>
+              <div class="field" style="flex:2;">
+                <label>Titel</label>
+                <input type="text" class="f-title" value="${escapeHtml(s.title)}" required>
+              </div>
+              <div class="field" style="max-width:200px;">
+                <label>Dato</label>
+                <input type="date" class="f-date" value="${s.session_date || ""}">
+              </div>
+            </div>
+            <div class="field">
+              <label>Referat</label>
+              <textarea class="f-summary" required>${escapeHtml(s.summary)}</textarea>
+            </div>
+            <div class="card-actions">
+              <button class="btn" type="submit">Gem</button>
+              <button class="btn secondary cancelBtn" type="button">Annuller</button>
+            </div>
+          </form>
+        </div>
+      </div>`;
+  }
+
+  function wireRow(row) {
+    const card = list.querySelector(`.card[data-id="${row.id}"]`);
+    const viewEl = card.querySelector(".view");
+    const editEl = card.querySelector(".edit");
+
+    card.querySelector(".editBtn").addEventListener("click", () => {
+      viewEl.hidden = true;
+      editEl.hidden = false;
+    });
+    card.querySelector(".cancelBtn").addEventListener("click", () => {
+      viewEl.hidden = false;
+      editEl.hidden = true;
+    });
+    card.querySelector(".deleteBtn").addEventListener("click", async () => {
+      if (!confirm(`Slet session ${row.number}?`)) return;
+      await window.sb.from("sessions").delete().eq("id", row.id);
+      load();
+    });
+    card.querySelector(".editForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const number = parseInt(card.querySelector(".f-number").value, 10);
+      const title = card.querySelector(".f-title").value.trim();
+      const sessionDate = card.querySelector(".f-date").value || null;
+      const summary = card.querySelector(".f-summary").value.trim();
+      await window.sb
+        .from("sessions")
+        .update({ number, title, session_date: sessionDate, summary, updated_at: new Date().toISOString() })
+        .eq("id", row.id);
+      load();
+    });
+  }
+
+  document.getElementById("addForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const number = parseInt(document.getElementById("number").value, 10);
+    const title = document.getElementById("title").value.trim();
+    const sessionDate = document.getElementById("sessionDate").value || null;
+    const summary = document.getElementById("summary").value.trim();
+    const { error } = await window.sb.from("sessions").insert({
+      number,
+      title,
+      session_date: sessionDate,
+      summary,
+      created_by: session.user.email,
+    });
+    if (error) {
+      alert("Kunne ikke gemme: " + error.message);
+      return;
+    }
+    e.target.reset();
+    load();
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

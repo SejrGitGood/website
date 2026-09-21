@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Logistik &middot; Daggerford-Krøniken</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">Det praktiske</p>
+    <h1>Logistik</h1>
+    <p>Næste session, husregler og andet praktisk. Én side, altid opdateret.</p>
+  </div>
+
+  <div class="wrap" style="max-width:700px;">
+    <section class="section">
+      <div class="card">
+        <form class="form" id="logisticsForm">
+          <div class="field">
+            <label for="nextSession">Næste session (dato og tid)</label>
+            <input type="datetime-local" id="nextSession">
+          </div>
+          <div class="field">
+            <label for="notes">Noter til næste gang</label>
+            <textarea id="notes" placeholder="Hvem henter snacks, hvor mødes vi, hvad skal huskes..."></textarea>
+          </div>
+          <div class="field">
+            <label for="houseRules">Husregler</label>
+            <textarea id="houseRules" style="min-height:220px;" placeholder="F.eks. ingen telefoner ved bordet, feedback-runde efter hver session..."></textarea>
+          </div>
+          <div class="card-actions">
+            <button class="btn" type="submit">Gem</button>
+            <span id="savedMsg" class="notice" style="display:none;">Gemt.</span>
+          </div>
+        </form>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Daggerford-Krøniken &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("logistics.html");
+
+  const form = document.getElementById("logisticsForm");
+  const nextSessionEl = document.getElementById("nextSession");
+  const notesEl = document.getElementById("notes");
+  const houseRulesEl = document.getElementById("houseRules");
+  const savedMsg = document.getElementById("savedMsg");
+
+  function toLocalInputValue(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  const { data } = await window.sb.from("logistics").select("*").eq("id", 1).maybeSingle();
+  if (data) {
+    nextSessionEl.value = toLocalInputValue(data.next_session_date);
+    notesEl.value = data.notes || "";
+    houseRulesEl.value = data.house_rules || "";
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    savedMsg.style.display = "none";
+    const payload = {
+      id: 1,
+      next_session_date: nextSessionEl.value ? new Date(nextSessionEl.value).toISOString() : null,
+      notes: notesEl.value.trim(),
+      house_rules: houseRulesEl.value.trim(),
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await window.sb.from("logistics").upsert(payload);
+    if (error) {
+      alert("Kunne ikke gemme: " + error.message);
+      return;
+    }
+    savedMsg.style.display = "inline-block";
+  });
+})();
+</script>
+</body>
+</html>

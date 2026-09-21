@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>For at Finde Fortiden</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Caveat:wght@500;700&display=swap">
+<style>
+:root{
+  --bg:#F1E6CC;
+  --surface:#FBF4E2;
+  --ink:#2B2016;
+  --ink-soft:#5B4E3D;
+  --ink-faint:#8A7A61;
+  --ember:#A6461C;
+  --ember-soft:#C97A44;
+  --mist:#4B5566;
+  --mist-soft:#7C8898;
+  --blood:#7A1620;
+  --line:#C9B790;
+  --gold:#8C6A2F;
+  --shadow: 0 10px 30px -12px rgba(43,32,22,0.35);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#17140F;
+    --surface:#221C14;
+    --ink:#EDE1C7;
+    --ink-soft:#C3B393;
+    --ink-faint:#8F8266;
+    --ember:#E08A4F;
+    --ember-soft:#C9723A;
+    --mist:#9FB0C4;
+    --mist-soft:#7A8CA0;
+    --blood:#D6717A;
+    --line:#453A29;
+    --gold:#D2AC5C;
+    --shadow: 0 10px 34px -10px rgba(0,0,0,0.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#17140F;
+  --surface:#221C14;
+  --ink:#EDE1C7;
+  --ink-soft:#C3B393;
+  --ink-faint:#8F8266;
+  --ember:#E08A4F;
+  --ember-soft:#C9723A;
+  --mist:#9FB0C4;
+  --mist-soft:#7A8CA0;
+  --blood:#D6717A;
+  --line:#453A29;
+  --gold:#D2AC5C;
+  --shadow: 0 10px 34px -10px rgba(0,0,0,0.6);
+  color-scheme: dark;
+}
+
+*{box-sizing:border-box;}
+body{
+  background:
+    radial-gradient(ellipse 900px 500px at 50% -10%, color-mix(in srgb, var(--ember) 10%, transparent), transparent 60%),
+    var(--bg);
+  color:var(--ink);
+  font-family:"Cormorant Garamond", Georgia, "Times New Roman", serif;
+  font-size:1.08rem;
+  line-height:1.65;
+  padding-left:max(18px, env(safe-area-inset-left,0px));
+  padding-right:max(18px, env(safe-area-inset-right,0px));
+}
+h1,h2,h3,h4{
+  font-family:"Cinzel", Georgia, serif;
+  font-weight:600;
+  color:var(--ink);
+  text-wrap:balance;
+  margin:0;
+}
+.page{max-width:820px;margin:0 auto;padding-block:clamp(28px,6vw,56px);}
+a{color:var(--ember);}
+:focus-visible{outline:2px solid var(--ember);outline-offset:3px;border-radius:4px;}
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;}
+}
+
+.eyebrow{
+  font-family:"Cinzel", serif;
+  font-size:0.72rem;
+  letter-spacing:0.22em;
+  text-transform:uppercase;
+  color:var(--ember);
+  margin:0 0 14px;
+}
+.hero{text-align:center;padding-block:clamp(20px,5vw,40px) 8px;}
+.hero h1{font-size:clamp(2.3rem,6vw + 1rem,3.6rem);letter-spacing:0.01em;}
+.hero-sub{
+  font-size:clamp(1.05rem,2.4vw,1.3rem);
+  font-style:italic;
+  color:var(--ink-soft);
+  margin:14px auto 0;
+  max-width:32em;
+}
+.hero-meta{
+  margin-top:18px;
+  font-family:"Cinzel",serif;
+  font-size:0.72rem;
+  letter-spacing:0.12em;
+  text-transform:uppercase;
+  color:var(--ink-faint);
+}
+
+.divider{
+  display:flex;align-items:center;gap:14px;
+  margin:clamp(30px,6vw,54px) 0;
+  color:var(--gold);
+}
+.divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line);}
+.divider svg{width:18px;height:18px;flex:none;}
+
+.roster h2, .journey-head h2{
+  font-size:clamp(1.5rem,3vw,1.9rem);
+  text-align:center;
+}
+.section-kicker{
+  text-align:center;
+  color:var(--ink-soft);
+  font-style:italic;
+  max-width:36em;
+  margin:10px auto 0;
+}
+
+.cards{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:16px;
+  margin-top:28px;
+}
+.hero-card{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:0;
+  box-shadow:var(--shadow);
+  overflow:hidden;
+}
+.hero-card summary{
+  list-style:none;
+  cursor:pointer;
+  padding:18px 18px 16px;
+  display:flex;
+  gap:14px;
+  align-items:center;
+}
+.hero-card summary::-webkit-details-marker{display:none;}
+.monogram{
+  flex:none;
+  width:52px;height:52px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:"Cinzel",serif;font-weight:700;font-size:1.3rem;
+  background:color-mix(in srgb, var(--ember) 16%, var(--surface));
+  color:var(--ember);
+  border:1px solid var(--line);
+}
+.card-headline{flex:1;min-width:0;}
+.card-headline .name{font-family:"Cinzel",serif;font-size:1.02rem;font-weight:600;}
+.card-headline .role{display:block;font-size:0.82rem;color:var(--ink-soft);margin-top:3px;}
+.card-chevron{flex:none;width:14px;height:14px;color:var(--ink-faint);transition:transform .2s ease;}
+details[open] .card-chevron{transform:rotate(90deg);}
+.hero-card-body{padding:0 18px 20px;border-top:1px dashed var(--line);}
+.hero-card-body p{margin:14px 0 0;color:var(--ink-soft);}
+.hero-card-body .quote{
+  font-family:"Caveat",cursive;
+  font-size:1.35rem;
+  color:var(--ember);
+  margin-top:12px;
+}
+
+.journey-head{text-align:center;}
+.journey-controls{display:flex;justify-content:center;margin-top:18px;}
+.btn-ghost{
+  font-family:"Cinzel",serif;font-size:0.75rem;letter-spacing:0.1em;text-transform:uppercase;
+  background:transparent;border:1px solid var(--ember);color:var(--ember);
+  padding:10px 20px;border-radius:999px;cursor:pointer;
+}
+.btn-ghost:hover{background:color-mix(in srgb, var(--ember) 12%, transparent);}
+
+.trail{
+  list-style:none;margin:36px 0 0;padding:0;
+  position:relative;
+}
+.trail::before{
+  content:"";position:absolute;left:23px;top:6px;bottom:6px;width:2px;
+  background:linear-gradient(to bottom, var(--ember), var(--mist));
+  opacity:0.6;
+}
+.stone{
+  position:relative;
+  margin-bottom:14px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:10px;
+  box-shadow:var(--shadow);
+}
+.stone summary{
+  list-style:none;cursor:pointer;
+  padding:14px 18px 14px 64px;
+  position:relative;
+  min-height:48px;
+  display:flex;flex-direction:column;justify-content:center;
+}
+.stone summary::-webkit-details-marker{display:none;}
+.stone-num{
+  position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:48px;height:48px;border-radius:50%;
+  background:var(--surface);
+  border:2px solid var(--ember);
+  color:var(--ember);
+  font-family:"Cinzel",serif;font-weight:700;font-size:0.95rem;
+  display:flex;align-items:center;justify-content:center;
+  z-index:1;
+}
+.stone:nth-child(5) .stone-num,.stone:nth-child(6) .stone-num,.stone:nth-child(7) .stone-num{
+  border-color:var(--mist);color:var(--mist);
+}
+.stone-title{font-family:"Cinzel",serif;font-size:1.08rem;font-weight:600;}
+.stone-teaser{font-style:italic;color:var(--ink-soft);font-size:0.92rem;margin-top:4px;}
+.stone-chev{
+  position:absolute;right:16px;top:50%;transform:translateY(-50%);
+  width:14px;height:14px;color:var(--ink-faint);transition:transform .2s ease;
+}
+.stone[open] .stone-chev{transform:translateY(-50%) rotate(90deg);}
+.stone-body{padding:2px 20px 22px 64px;border-top:1px dashed var(--line);}
+.stone-body p{margin:14px 0 0;}
+.stone-body p:first-child{margin-top:16px;}
+.pull{
+  font-family:"Caveat",cursive;
+  font-size:1.5rem;
+  color:var(--ember);
+  border-left:3px solid var(--ember);
+  padding-left:14px;
+  margin:16px 0;
+}
+
+.persp{
+  display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 6px;
+}
+.persp button{
+  font-family:"Cinzel",serif;font-size:0.7rem;letter-spacing:0.06em;text-transform:uppercase;
+  padding:8px 14px;border-radius:999px;border:1px solid var(--line);
+  background:var(--bg);color:var(--ink-soft);cursor:pointer;
+}
+.persp button[aria-pressed="true"]{
+  background:var(--ember);border-color:var(--ember);color:var(--surface);
+}
+.persp-panel{margin-top:8px;}
+.persp-panel p{margin-top:0;}
+
+.dice-wrap{
+  margin-top:18px;padding-top:16px;border-top:1px dashed var(--line);
+}
+.dice-btn{
+  display:inline-flex;align-items:center;gap:10px;
+  font-family:"Cinzel",serif;font-size:0.78rem;letter-spacing:0.06em;text-transform:uppercase;
+  background:var(--blood);color:#F3E7D8;border:none;
+  padding:11px 18px;border-radius:8px;cursor:pointer;
+}
+.die{
+  width:22px;height:22px;flex:none;
+  clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background:#F3E7D8;color:var(--blood);
+  display:flex;align-items:center;justify-content:center;
+  font-family:"Cinzel",serif;font-weight:700;font-size:0.75rem;
+}
+.die.rolling{animation:spin .7s ease;}
+@keyframes spin{
+  0%{transform:rotate(0deg) scale(1);}
+  50%{transform:rotate(200deg) scale(1.15);}
+  100%{transform:rotate(360deg) scale(1);}
+}
+.crit-box{
+  margin-top:16px;background:color-mix(in srgb, var(--blood) 10%, var(--surface));
+  border:1px solid color-mix(in srgb, var(--blood) 40%, var(--line));
+  border-radius:8px;padding:16px 18px;
+}
+.crit-box p{margin:0;}
+.crit-box p + p{margin-top:10px;}
+
+.cliffhanger{
+  text-align:center;font-style:italic;color:var(--ink-soft);
+  max-width:34em;margin:34px auto 0;
+}
+
+.colophon{
+  text-align:center;margin-top:40px;color:var(--ink-faint);font-style:italic;font-size:0.9rem;
+}
+
+@media (max-width:560px){
+  .stone summary,.stone-body{padding-left:56px;}
+  .stone-num{width:40px;height:40px;font-size:0.82rem;}
+  .trail::before{left:19px;}
+  .hero-card summary{flex-wrap:wrap;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hero">
+    <p class="eyebrow">Curse of Strahd &middot; Session 1</p>
+    <h1>For at Finde Fortiden</h1>
+    <p class="hero-sub">Fem fremmede. Én kro. Ingen anelse om, hvad de gik ind til.</p>
+    <p class="hero-meta">Daggerford &rarr; Vistani-lejren &rarr; Den Uendelige Tåge</p>
+  </header>
+
+  <div class="divider" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2 L14 10 L22 12 L14 14 L12 22 L10 14 L2 12 L10 10 Z"/></svg></div>
+
+  <section class="roster" aria-label="Selskabet">
+    <h2>Selskabet</h2>
+    <p class="section-kicker">Ingen partinavn. Ingen fælles fortid. Bare fem mennesker, der tilfældigvis sidder om det samme bord, da tågen finder dem.</p>
+    <div class="cards">
+
+      <details class="hero-card">
+        <summary>
+          <span class="monogram">F</span>
+          <span class="card-headline">
+            <span class="name">Frank Blækfløjte</span>
+            <span class="role">Menneske &middot; Emil</span>
+          </span>
+          <svg class="card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+        </summary>
+        <div class="hero-card-body">
+          <p>En ældre mand med gråstribet, piggende hår og runde beskyttelsesbriller, klædt i en olie- og askeplettet frakke med et bælte fyldt af altmuligt grej. Han ved ikke, hvad han hedder &mdash; kun sin lille, slidte bog, som han fylder med febrilske noter, mens verden går forbi. Bærer en krigshammer med talrige navne indridset i askesort stål.</p>
+          <p class="quote">&laquo;Kroens folk døbte ham Frank Blæk. Skoven døbte ham om.&raquo;</p>
+        </div>
+      </details>
+
+      <details class="hero-card">
+        <summary>
+          <span class="monogram">T</span>
+          <span class="card-headline">
+            <span class="name">Troelius Richter&nbsp;II</span>
+            <span class="role">Menneske &middot; Jacob</span>
+          </span>
+          <svg class="card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+        </summary>
+        <div class="hero-card-body">
+          <p>Støvler på bordet, slangeskindssko, mørkt hår med stænk af gråt. Rejser aldrig uden sin konstrukt Troelbot og et tykt ringbind fuldt af post-its og halvfærdige opfindelser. Tidligere en mand med magt i sin hjemby &mdash; indtil hans højre hånd, Mario, forrådte ham.</p>
+          <p class="quote">&laquo;Vil have magt nok til &eacute;n ting: at slette Mario fra kortet.&raquo;</p>
+        </div>
+      </details>
+
+      <details class="hero-card">
+        <summary>
+          <span class="monogram">A</span>
+          <span class="card-headline">
+            <span class="name">Abbas Ibn Al-Salah</span>
+            <span class="role">Menneske &middot; Markus</span>
+          </span>
+          <svg class="card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+        </summary>
+        <div class="hero-card-body">
+          <p>Ung, skarpsindig og hurtig til at stille de rigtige spørgsmål. Bueskytte med tætsiddende, guldgraveret læderrustning og en pose med omkring 800 solsikkefrø, som han sjældent er uden. Har stadig ikke tilgivet Clarence for vittigheden om elverben.</p>
+          <p class="quote">&laquo;Han lytter til svaret &eacute;n gang. Så afhører han det.&raquo;</p>
+        </div>
+      </details>
+
+      <details class="hero-card">
+        <summary>
+          <span class="monogram">C</span>
+          <span class="card-headline">
+            <span class="name">Clarence &laquo;CC&raquo; Claymore</span>
+            <span class="role">Menneske &middot; Sejr</span>
+          </span>
+          <svg class="card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+        </summary>
+        <div class="hero-card-body">
+          <p>Garvet krigsveteran i tresserne med kortklippet sølvhår og en ryg, der aldrig vender sig mod en dør. Tung, velholdt rustning, en krigshammer med tredive navne indridset i asksort stål, og et velbrugt drage-skakspil, han aldrig rejser uden.</p>
+          <p class="quote">&laquo;Halvtreds år i felten. Stadig tid til en dårlig joke om elverben.&raquo;</p>
+        </div>
+      </details>
+
+      <details class="hero-card">
+        <summary>
+          <span class="monogram">M</span>
+          <span class="card-headline">
+            <span class="name">Mick Jaggstone</span>
+            <span class="role">Menneske &middot; Thomas</span>
+          </span>
+          <svg class="card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+        </summary>
+        <div class="hero-card-body">
+          <p>Pensioneret rockstjerne, tidligere forsanger i The Rolling Grunds &mdash; nu mest at finde med fødderne oppe og et glas rosé i hånden. Langt rødt hår, dinglende ørenringe og en tunge, der flænser hurtigere end noget sværd.</p>
+          <p class="quote">&laquo;Spiller lyre dårligt, synger godt, og har mindst &eacute;n gang dræbt en ulv med ren spot.&raquo;</p>
+        </div>
+      </details>
+
+    </div>
+  </section>
+
+  <div class="divider" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2 L14 10 L22 12 L14 14 L12 22 L10 14 L2 12 L10 10 Z"/></svg></div>
+
+  <section class="journey">
+    <div class="journey-head">
+      <h2>Rejsen Indtil Videre</h2>
+      <p class="section-kicker">Syv stop, fra solbeskinnede brosten til en tåge, der ikke vil give slip. Klik dig igennem &mdash; eller udfold det hele på én gang.</p>
+      <div class="journey-controls">
+        <button class="btn-ghost" id="revealAll" type="button">Udfold hele rejsen</button>
+      </div>
+    </div>
+
+    <ol class="trail">
+
+      <details class="stone" open>
+        <summary>
+          <span class="stone-num">I</span>
+          <span class="stone-title">Kroen i Daggerford</span>
+          <span class="stone-teaser">Fem fremmede, én kro, og et navn ingen kendte.</span>
+          <svg class="stone-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+        </summary>
+        <div class="stone-body">
+          <p>Daggerford ligger badet i eftermiddagssol. Små, solide brosten. Musik siver ud fra en nærliggende kro. Fem rejsende &mdash; som hver især fandt vej til byen for mellem to og fire uger siden &mdash; sidder om et rundt bord med udsyn til hele lokalet, ryggen mod muren, som vanen byder.</p>
+          <p>Værten Albert kender dem allerede. &laquo;Halløj, gutter &mdash; på huset, som sædvanlig,&raquo; siger han og sætter mere vin og en portion solsikkefrø på bordet, mens en ældre mand ved bordets ende sidder helt opslugt af en lille, slidt bog &mdash; febrilsk skrivende, læsende, bladrende. Han aner ikke selv, hvad han hedder.</p>
+          <p>Det gør de andre heller ikke. Efter lidt frem-og-tilbage bliver han døbt der og da, efter det, han bruger mest af sin tid på: <strong>&laquo;Frank Blæk.&raquo;</strong></p>
+          <p>Der er knap en time til middagsselskabet hos hertuginde Morwen &mdash; hendes tak for en nyligt afsluttet opgave med et bortstjålet diadem og en flok urolige goblins. Rygsække og våben samles, et velbrugt skakspil pakkes ned, og selskabet begiver sig ud i de brostensbelagte gader mod borgen.</p>
+        </div>
+      </details>
+
+      <details class="stone">
+        <summary>
+          <span class="stone-num">II</span>
+          <span class="stone-title">Middag på Morwens Manor</span>
+          <span class="stone-teaser">God mad, godt vin &mdash; og et problem, hertuginden ikke selv kan løse.</span>
+          <svg class="stone-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+        </summary>
+        <div class="stone-body">
+          <p>Manoren er præcis så stor og overdådigt udsmykket, som byens rigeste indbygger fortjener &mdash; farverige malerier, spejle i entréen, et klokketårn, der kan kalde hele byen til våben ved fare. Den nervøse butler Jimothy fører de fem ind til et bugnende middagsbord, hvor hertuginde Morwen selv byder velkommen med et smil, der er lige dele varme og lettelse.</p>
+          <p>Gennem forret og hovedret ligger der en stemning og lurer &mdash; indtil hun endelig lægger kortene på bordet:</p>
+          <p class="pull">&laquo;Det er jo ikke bare for hyggens skyld, at jeg har inviteret jer her i dag.&raquo;</p>
+          <p>En gruppe omrejsende har slået lejr uden for byens mure. Først harmløse &mdash; nu anklaget for at true forbipasserende og kræve penge under trussel om forbandelser. Værre endnu: de vagter, hun sendte for at jage dem væk, kom hjem underligt forstående. Sympatiske. Som forhekset.</p>
+          <p>Hun beder ikke om blodsudgydelse. Blot om, at nogen får dem til at rejse videre &mdash; fredeligt, om muligt.</p>
+        </div>
+      </details>
+
+      <details class="stone">
+        <summary>
+          <span class="stone-num">III</span>
+          <span class="stone-title">Afhøringen af Vagten Moliyr</span>
+          <span class="stone-teaser">En forhekset vagt, et par skarpe spørgsmål &mdash; og en joke, der ikke lander godt.</span>
+          <svg class="stone-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+        </summary>
+        <div class="stone-body">
+          <p>Vagten Moliyr bliver hentet og stillet frem ved bordet, rank i ryggen af gammel vane &mdash; men med et blik, der er underligt tomt for detaljer.</p>
+
+          <div class="persp" role="group" aria-label="Vælg synsvinkel">
+            <button type="button" data-target="persp-abbas" aria-pressed="true">Abbas' afhøring</button>
+            <button type="button" data-target="persp-frank" aria-pressed="false">Franks notesbog</button>
+          </div>
+          <div class="persp-panel" id="persp-abbas">
+            <p>Abbas overtager forhøret uden tøven. &laquo;Hvorfor er det, du ikke har udført den opgave, du fik?&raquo; Moliyr står stille i tyve lange sekunder, som om spørgsmålet først nu giver mening &mdash; og indrømmer så, næsten forundret over sig selv, at han ikke har passet sit arbejde. Han kan huske, at han talte med de rejsende. Han kan ikke huske &eacute;t eneste ord af, hvad der blev sagt. Abbas' vurdering: ikke usandsynligt, at manden har været under en besværgelse.</p>
+          </div>
+          <div class="persp-panel" id="persp-frank" hidden>
+            <p>I sin lille bog skriver Frank travlt, mens de andre taler: <em>&laquo;Vagt. Tom i blikket. Kan huske at han gik derhen. Kan intet huske af, hvad der blev sagt. Konklusion: enten magi &mdash; eller den dårligste hukommelse i Daggerford.&raquo;</em> Han understreger ordet <em>magi</em> tre gange og fortsætter med at tegne, hvad der ligner en meget dårlig skitse af en ulv.</p>
+          </div>
+
+          <p>Imens Abbas tygger sig gennem en håndfuld af sine 800 solsikkefrø, bemærker Clarence tørt, at de rejsende nok bare skulle &laquo;løbe med de der lange elverben&raquo; i stedet for at vente længere på svar &mdash; en kommentar, Abbas uden omsvøb kalder &laquo;en anelse racistisk.&raquo; Konklusionen står dog klar: nogen, eller noget, har rodet med vagternes hoveder. Spørgsmålet er bare hvem.</p>
+        </div>
+      </details>
+
+      <details class="stone">
+        <summary>
+          <span class="stone-num">IV</span>
+          <span class="stone-title">Lejrbålet Uden for Murene</span>
+          <span class="stone-teaser">Fem helte, en flok Vistani, og et tilbud, ingen af dem kan sige nej til.</span>
+          <svg class="stone-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+        </summary>
+        <div class="stone-body">
+          <p>En halv kilometer uden for hovedporten, langs skovkanten, brænder bålet allerede, da selskabet ankommer i det tiltagende mørke. Et dusin farverigt klædte rejsende synger, danser og drikker omkring tre store, tøndeformede vogne. Troelius tager ordet, som aftalt.</p>
+          <p>Manden, der byder dem velkommen, hedder Stanimir. Ja, indrømmer han uden tøven &mdash; hans folk har forbandet nogen. Bare ikke inden for de sidste ti dage. Så, mens flammerne skifter fra orange til grønt og danserne svajer omkring dem, fortæller han historien:</p>
+          <p class="pull">&laquo;Vi kommer fra et gammelt land, et land af konger&hellip;&raquo;</p>
+          <p>En prins, taget til nåde af hans folk efter et blodigt slag, siden forvandlet af en forbandelse til en tyran i sit eget rige. Vistani-folket søger helte, der kan hjælpe med at bryde den &mdash; og en synsk kvinde ved navn Madam Eva, i landet Barovia, som angiveligt allerede har forudset deres komme.</p>
+          <p>Belønningen er uklar. Guld, magt, eller bare information &mdash; men Stanimir lover, at Troelius til gengæld kan få hjælp til at spore to navne, han har hvisket for sig selv i årevis: Baltazar Saheir. Og Mario.</p>
+          <p>Det er nok. Selskabet beslutter, samlet og uden lang tøven, at følge de rejsende mod Barovia i stedet for blot at jage dem væk. Før de bryder op, kradser Frank en besked ned og sender den med brevdue tilbage til hertuginden &mdash; hele forklaringen på &eacute;n linje:</p>
+          <p class="pull">&laquo;Er taget ud for at finde fortiden. Mvh.&raquo;</p>
+        </div>
+      </details>
+
+      <details class="stone">
+        <summary>
+          <span class="stone-num">V</span>
+          <span class="stone-title">Vejen til Barovia</span>
+          <span class="stone-teaser">En dags rejse, et dårligt panfløjtesolo, og et nyt navn.</span>
+          <svg class="stone-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+        </summary>
+        <div class="stone-body">
+          <p>Karavanen ruller gennem det åbne land i godt selskab &mdash; mad deles rundt, historier fortælles, og Vistani-folket virker oprigtigt glade for at have fundet deres helte. Ved aftenens lejrbål tager Frank sin panfløjte frem. Det går&hellip; ikke godt.</p>
+          <p>&laquo;Du spiller godt,&raquo; lyver Mick høfligt, og selskabet døber ham på stedet om &mdash; fra &laquo;Frank Blæk&raquo; til den fulde, uforkortede titel: <strong>&laquo;Frank Blækfløjte.&raquo;</strong></p>
+          <p>Senere, da de fleste er gået til ro, sidder Mick og Abbas tilbage med Stanimir omkring gløderne. Troelius fortæller &mdash; måske for femte gang, måske for femtende &mdash; historien om det årlige gyserløb i sin hjemby: begivenheden, han selv stod for at arrangere, indtil hans højre hånd Mario forrådte ham fuldstændig. Ilden i hans blik, når han siger navnet, efterlader ingen tvivl om, hvor rejsen egentlig ender for ham.</p>
+          <p>Stanimir lytter, nikker, og siger, at han stoler på hertugindens dømmekraft, når det kommer til at vælge lejesvende. Alle lægger sig til at sove under åben himmel.</p>
+        </div>
+      </details>
+
+      <details class="stone">
+        <summary>
+          <span class="stone-num">VI</span>
+          <span class="stone-title">Den Uendelige Tåge</span>
+          <span class="stone-teaser">De vågner alene. Ingen telte. Ingen heste. Ingen Vistani. Kun tåge.</span>
+          <svg class="stone-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+        </summary>
+        <div class="stone-body">
+          <p>Der er ingen overgang, intet varsel. De fem vågner liggende på række, side om side, præcis som de lagde sig &mdash; men teltene er væk. Vognene er væk. Hestene, Vistani-folket, bålet: alt sammen væk. Tilbage er kun deres egne ting, hinanden, og en tæt, tæt tåge, der ikke ender.</p>
+          <p>Troelius stormer ud med Troelbot og en fakkel for at udforske &mdash; og bliver på sekunder fuldstændig desorienteret. Hvilken vej kom han overhovedet fra? Frank klatrer op i et træ og skimter, langt væk, noget lys mod en klippe. Nogen råber det eneste, der giver mening: &laquo;Det er en uendelighedståge.&raquo;</p>
+          <p>Så kommer ulvehylet. Selskabet splittes et øjeblik i mørket &mdash; Abbas fyrer en lysraket af for at samle folk igen, og &eacute;n efter &eacute;n finder de hinanden i tågen, rystede, men samlede. Frank har stadig blikket rettet mod den retning, hvor han så lyset.</p>
+        </div>
+      </details>
+
+      <details class="stone">
+        <summary>
+          <span class="stone-num">VII</span>
+          <span class="stone-title">De Hovedløse Vogtere</span>
+          <span class="stone-teaser">En dør, der åbner sig selv. En skov, der ikke svarer. Og så: ulve.</span>
+          <svg class="stone-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+        </summary>
+        <div class="stone-body">
+          <p>De binder sig sammen med reb og går i skildpaddeformation gennem tågen, med Troelbot forrest som fyrtårn. En sti dukker op under fødderne &mdash; brugt før, måske for nylig, måske af vogne. Troelius, utålmodig, sprænger en åbning i tågen med et Thunderclap, der runger som torden gennem skoven. Frank og Clarence råber ad ham i kor. Det virker &mdash; men det tiltrækker også opmærksomhed.</p>
+          <p>Stien fører til et åbent område, hvor tågen endelig letter en smule. Der, hugget direkte ind i en klippevæg, står to kæmpe stenstatuer af krigere &mdash; hovedløse, tavse, evigt på vagt &mdash; og mellem dem: en massiv stendør med rustne hængsler.</p>
+          <p>Dørene knirker. Og åbner sig selv.</p>
+          <p>Bag dem: en mørk, ventende skov og en sti med tydelige menneskefodspor. Ulvehylene er stoppet. Noget andet er der i stedet &mdash; grene, der knækker i mørket, uden for synsvidde. Nogen råber en advarsel ud i tågen. Ingen svarer. Så angriber ulvene.</p>
+
+          <div class="dice-wrap">
+            <button class="dice-btn" id="rollDice" type="button">
+              <span class="die" id="dieFace">?</span>
+              Rul for kritisk ramt
+            </button>
+            <div class="crit-box" id="critBox" hidden>
+              <p>Abbas' pil finder en ulveskulder med et brag, der driver den helt igennem skulderbladet. Frank kløver den næste ulv i to på tværs med et brøl, der runger gennem tågen: <strong>&laquo;HUUUUUUEH!&raquo;</strong> Troelius smadrer en tredje med en sten fra jorden. Clarence maner en spiritual weapon frem af ren pligtfølelse.</p>
+              <p>Og Mick &mdash; Mick spiller &eacute;n syrlig tone på sin lyre og hvisker noget dissonant direkte ind i en ulvs kranie. Den begynder at bløde fra ørerne, mens den falder om til noget, der uhyggeligt minder om <em>Ice Ice Baby</em>. Den sidste ulv falder for en pil, lige i øjet.</p>
+              <p>Selskabet står tilbage, forpustede, sejrende &mdash; og et godt stykke fra alt, hvad der ligner sikkerhed. Og der, midt i en fremmed, tåget skov, satte vi punktum for aftenen.</p>
+            </div>
+          </div>
+        </div>
+      </details>
+
+    </ol>
+
+    <p class="cliffhanger">Hvad der venter bag Vogternes dør, ved ingen endnu. Men rygterne fra Daggerford var allerede begyndt at løbe forud for sandheden&hellip;</p>
+  </section>
+
+  <footer class="colophon">
+    <p>Ført i pennen efter session 1. Næste session om to uger &mdash; mød talrigt op, og husk: ingen telefoner ved bordet.</p>
+  </footer>
+
+</div>
+
+<script>
+document.getElementById('revealAll').addEventListener('click', function(){
+  document.querySelectorAll('details').forEach(function(d){ d.open = true; });
+});
+
+document.querySelectorAll('.persp').forEach(function(group){
+  var buttons = group.querySelectorAll('button');
+  buttons.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      buttons.forEach(function(b){ b.setAttribute('aria-pressed','false'); });
+      btn.setAttribute('aria-pressed','true');
+      var body = group.parentElement;
+      body.querySelectorAll('.persp-panel').forEach(function(p){ p.hidden = true; });
+      var target = document.getElementById(btn.getAttribute('data-target'));
+      if(target){ target.hidden = false; }
+    });
+  });
+});
+
+var rollBtn = document.getElementById('rollDice');
+var die = document.getElementById('dieFace');
+var critBox = document.getElementById('critBox');
+var faces = ['4','13','9','20','7','15'];
+var rolled = false;
+rollBtn.addEventListener('click', function(){
+  die.classList.remove('rolling');
+  void die.offsetWidth;
+  die.classList.add('rolling');
+  die.textContent = faces[Math.floor(Math.random()*faces.length)];
+  setTimeout(function(){
+    die.textContent = '20';
+    critBox.hidden = false;
+  }, 550);
+  if(!rolled){
+    rolled = true;
+    setTimeout(function(){ rollBtn.lastChild.textContent = ' Rul igen'; }, 600);
+  }
+});
+</script>
+</body>
+</html>

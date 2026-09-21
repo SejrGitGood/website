@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daggerford-Krøniken</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">Curse of Strahd</p>
+    <h1>Daggerford-Krøniken</h1>
+    <p>Vores fælles sted til sessionsreferater, lore og logistik. Ret det, tilføj det, glem intet.</p>
+  </div>
+
+  <div class="wrap">
+    <section class="section" id="logisticsSection">
+      <div class="section-title">
+        <h2>Næste session</h2>
+        <a href="logistics.html">Se/ret logistik &rarr;</a>
+      </div>
+      <div id="logisticsCard"><div class="empty">Indlæser&hellip;</div></div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">
+        <h2>Seneste sessioner</h2>
+        <a href="sessions.html">Se alle &rarr;</a>
+      </div>
+      <div class="grid" id="sessionsGrid"><div class="empty">Indlæser&hellip;</div></div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">
+        <h2>Seneste lore</h2>
+        <a href="lore.html">Se alt &rarr;</a>
+      </div>
+      <div class="grid" id="loreGrid"><div class="empty">Indlæser&hellip;</div></div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Daggerford-Krøniken &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("index.html");
+
+  const { data: logistics } = await window.sb.from("logistics").select("*").eq("id", 1).maybeSingle();
+  const logisticsCard = document.getElementById("logisticsCard");
+  if (logistics && logistics.next_session_date) {
+    logisticsCard.innerHTML = `
+      <div class="card">
+        <h3>${formatDateTime(logistics.next_session_date)}</h3>
+        ${logistics.notes ? `<p class="body">${escapeHtml(logistics.notes)}</p>` : ""}
+      </div>`;
+  } else {
+    logisticsCard.innerHTML = `<div class="empty">Ingen næste session sat endnu. <a href="logistics.html">Sæt en dato</a>.</div>`;
+  }
+
+  const { data: sessionsRows } = await window.sb
+    .from("sessions")
+    .select("*")
+    .order("number", { ascending: false })
+    .limit(3);
+  const sessionsGrid = document.getElementById("sessionsGrid");
+  const pilotCard = `
+    <div class="card">
+      <span class="badge">Session 1</span>
+      <h3 style="margin-top:8px;">For at Finde Fortiden</h3>
+      <p class="meta">Den store, illustrerede udgave</p>
+      <div class="card-actions">
+        <a class="btn secondary" href="sessions/session-1/for-at-finde-fortiden.html">Åbn rejsen</a>
+        <a class="btn secondary" href="sessions/session-1/daggerford-posten.html">Avisen</a>
+      </div>
+    </div>`;
+  if (sessionsRows && sessionsRows.length) {
+    sessionsGrid.innerHTML = pilotCard + sessionsRows
+      .map(
+        (s) => `
+      <div class="card">
+        <span class="badge">Session ${s.number}</span>
+        <h3 style="margin-top:8px;">${escapeHtml(s.title)}</h3>
+        <p class="meta">${formatDate(s.session_date)}</p>
+        <p class="body">${escapeHtml((s.summary || "").slice(0, 160))}${(s.summary || "").length > 160 ? "…" : ""}</p>
+      </div>`
+      )
+      .join("");
+  } else {
+    sessionsGrid.innerHTML = pilotCard;
+  }
+
+  const { data: loreRows } = await window.sb
+    .from("lore_entries")
+    .select("*")
+    .order("updated_at", { ascending: false })
+    .limit(3);
+  const loreGrid = document.getElementById("loreGrid");
+  if (loreRows && loreRows.length) {
+    loreGrid.innerHTML = loreRows
+      .map(
+        (l) => `
+      <div class="card">
+        <span class="badge">${escapeHtml(l.category)}</span>
+        <h3 style="margin-top:8px;">${escapeHtml(l.title)}</h3>
+        <p class="body">${escapeHtml((l.body || "").slice(0, 160))}${(l.body || "").length > 160 ? "…" : ""}</p>
+      </div>`
+      )
+      .join("");
+  } else {
+    loreGrid.innerHTML = `<div class="empty">Ingen lore endnu. <a href="lore.html">Tilføj den første indgang</a>.</div>`;
+  }
+})();
+</script>
+</body>
+</html>
