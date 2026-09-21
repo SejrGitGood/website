@@ -1,6 +1,8 @@
 # Blessings of Valkyriegade — setup
 
-Live and working: Supabase project, shared login, public repo, GitHub Pages, image pasting, the shop generator, the character roster (Karakterer, under DM Tools).
+Live and working: Supabase project, shared login, public repo, GitHub Pages, image pasting, the shop generator, the character roster (Karakterer), monster/spell lookup, the party health widget, and the loot/gold tracker (Skattekammer) — all under DM Tools except the health widget, which is on the homepage.
+
+**One-time step needed**: the loot tracker (`loot_items`, `party_treasury`) and the "Monster"/"Besværgelse" lore categories need the latest `schema.sql` run once in Supabase → SQL Editor → New query → Run. Safe to re-run any time, including on top of the existing database.
 
 **Pending**: automatic D&D Beyond refresh needs a one-time Edge Function deploy — see `CHARACTERS_SETUP.md`. Until that's done, the "Opdater nu" button on the Karakterer page won't work yet, but the page itself and the seeded data work fine.
 

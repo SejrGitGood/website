@@ -7,7 +7,7 @@
 <title>Lore &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=3">
+<link rel="stylesheet" href="css/styles.css?v=4">
 </head>
 <body>
 <nav class="site-nav" id="site-nav"></nav>
@@ -37,6 +37,8 @@
                 <option value="Begivenhed">Begivenhed</option>
                 <option value="Genstand">Genstand</option>
                 <option value="Butik">Butik</option>
+                <option value="Monster">Monster</option>
+                <option value="Besværgelse">Besværgelse</option>
                 <option value="Andet">Andet</option>
               </select>
             </div>
@@ -62,6 +64,8 @@
           <button data-cat="Begivenhed">Begivenhed</button>
           <button data-cat="Genstand">Genstand</button>
           <button data-cat="Butik">Butik</button>
+          <button data-cat="Monster">Monster</button>
+          <button data-cat="Besværgelse">Besværgelse</button>
           <button data-cat="Andet">Andet</button>
         </div>
       </div>
@@ -149,7 +153,7 @@
               <div class="field" style="max-width:200px;">
                 <label>Kategori</label>
                 <select class="f-category">
-                  ${["NPC", "Sted", "Begivenhed", "Genstand", "Butik", "Andet"]
+                  ${["NPC", "Sted", "Begivenhed", "Genstand", "Butik", "Monster", "Besværgelse", "Andet"]
                     .map((c) => `<option value="${c}" ${c === l.category ? "selected" : ""}>${c}</option>`)
                     .join("")}
                 </select>

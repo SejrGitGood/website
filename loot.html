@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Skattekammer &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=4">
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">DM Tools</p>
+    <h1>Skattekammer</h1>
+    <p>Fælles guld og fund &mdash; hvad selskabet har, og hvem der bærer det.</p>
+  </div>
+
+  <div class="wrap" style="max-width:760px;">
+    <p style="margin:-8px 0 4px;"><a href="dmtools.html" class="back-link">&larr; Alle DM Tools</a></p>
+
+    <datalist id="playerNames">
+      <option value="Emil"></option>
+      <option value="Jacob"></option>
+      <option value="Markus"></option>
+      <option value="Sejr"></option>
+      <option value="Thomas"></option>
+      <option value="Fælles"></option>
+    </datalist>
+
+    <section class="section">
+      <div class="card">
+        <form class="form" id="goldForm">
+          <div class="row">
+            <div class="field" style="max-width:200px;">
+              <label for="gold">Guld (gp)</label>
+              <input type="number" id="gold" min="0" step="0.01" value="0">
+            </div>
+            <div class="field" style="flex:2;">
+              <label for="goldNotes">Noter</label>
+              <input type="text" id="goldNotes" placeholder="F.eks. delt ligeligt, opbevares hos Clarence...">
+            </div>
+          </div>
+          <div class="card-actions">
+            <button class="btn" type="submit">Gem</button>
+            <span id="goldSavedMsg" class="notice" style="display:none;">Gemt.</span>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="section" id="addSection">
+      <div class="section-title"><h2>Tilføj fund</h2></div>
+      <div class="card">
+        <form class="form" id="addForm">
+          <div class="row">
+            <div class="field" style="flex:2;">
+              <label for="itemName">Genstand</label>
+              <input type="text" id="itemName" required placeholder="F.eks. Sølvkandelaber">
+            </div>
+            <div class="field" style="max-width:120px;">
+              <label for="quantity">Antal</label>
+              <input type="number" id="quantity" min="1" value="1" required>
+            </div>
+            <div class="field" style="max-width:180px;">
+              <label for="carriedBy">Båret af</label>
+              <input type="text" id="carriedBy" list="playerNames" placeholder="F.eks. Emil">
+            </div>
+          </div>
+          <div class="field">
+            <label for="notes">Noter</label>
+            <input type="text" id="notes" placeholder="Værdi, oprindelse, eller andet værd at huske">
+          </div>
+          <button class="btn" type="submit">Tilføj</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title"><h2>Bytte</h2></div>
+      <div id="list"><div class="empty">Indlæser&hellip;</div></div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=4"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("dmtools.html");
+
+  const goldForm = document.getElementById("goldForm");
+  const goldEl = document.getElementById("gold");
+  const goldNotesEl = document.getElementById("goldNotes");
+  const goldSavedMsg = document.getElementById("goldSavedMsg");
+
+  const { data: treasury } = await window.sb.from("party_treasury").select("*").eq("id", 1).maybeSingle();
+  if (treasury) {
+    goldEl.value = treasury.gold ?? 0;
+    goldNotesEl.value = treasury.notes || "";
+  }
+
+  goldForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    goldSavedMsg.style.display = "none";
+    const submitBtn = goldForm.querySelector('button[type="submit"]');
+    await withBusy(submitBtn, "Gemmer…", async () => {
+      const { error } = await window.sb.from("party_treasury").upsert({
+        id: 1,
+        gold: parseFloat(goldEl.value) || 0,
+        notes: goldNotesEl.value.trim(),
+        updated_at: new Date().toISOString(),
+      });
+      if (error) {
+        alert("Kunne ikke gemme: " + error.message);
+        return;
+      }
+      goldSavedMsg.style.display = "inline-block";
+    });
+  });
+
+  const list = document.getElementById("list");
+
+  async function load() {
+    const { data, error } = await window.sb.from("loot_items").select("*").order("created_at", { ascending: false });
+    if (error) {
+      list.innerHTML = `<div class="empty">Kunne ikke hente bytte: ${escapeHtml(error.message)}</div>`;
+      return;
+    }
+    if (!data.length) {
+      list.innerHTML = `<div class="empty">Intet fund registreret endnu.</div>`;
+      return;
+    }
+    list.innerHTML = data.map(rowHtml).join("");
+    data.forEach(wireRow);
+  }
+
+  function rowHtml(item) {
+    return `
+      <div class="card" id="loot-${item.id}" data-id="${item.id}">
+        <div class="view">
+          ${item.carried_by ? `<span class="badge">${escapeHtml(item.carried_by)}</span>` : ""}
+          <h3 style="margin-top:8px;">${escapeHtml(item.name)}${item.quantity > 1 ? ` &times;${item.quantity}` : ""}</h3>
+          ${item.notes ? `<p class="body">${escapeHtml(item.notes)}</p>` : ""}
+          <div class="card-actions">
+            <button class="btn secondary editBtn">Rediger</button>
+            <button class="btn danger deleteBtn">Slet</button>
+          </div>
+        </div>
+        <div class="edit" hidden>
+          <form class="form editForm">
+            <div class="row">
+              <div class="field" style="flex:2;">
+                <label>Genstand</label>
+                <input type="text" class="f-name" value="${escapeHtml(item.name)}" required>
+              </div>
+              <div class="field" style="max-width:120px;">
+                <label>Antal</label>
+                <input type="number" class="f-quantity" min="1" value="${item.quantity}" required>
+              </div>
+              <div class="field" style="max-width:180px;">
+                <label>Båret af</label>
+                <input type="text" class="f-carried" list="playerNames" value="${escapeHtml(item.carried_by || "")}">
+              </div>
+            </div>
+            <div class="field">
+              <label>Noter</label>
+              <input type="text" class="f-notes" value="${escapeHtml(item.notes || "")}">
+            </div>
+            <div class="card-actions">
+              <button class="btn" type="submit">Gem</button>
+              <button class="btn secondary cancelBtn" type="button">Annuller</button>
+            </div>
+          </form>
+        </div>
+      </div>`;
+  }
+
+  function wireRow(row) {
+    const card = list.querySelector(`.card[data-id="${row.id}"]`);
+    const viewEl = card.querySelector(".view");
+    const editEl = card.querySelector(".edit");
+
+    card.querySelector(".editBtn").addEventListener("click", () => {
+      viewEl.hidden = true;
+      editEl.hidden = false;
+    });
+    card.querySelector(".cancelBtn").addEventListener("click", () => {
+      viewEl.hidden = false;
+      editEl.hidden = true;
+    });
+    card.querySelector(".deleteBtn").addEventListener("click", async () => {
+      if (!confirm(`Slet "${row.name}"?`)) return;
+      await window.sb.from("loot_items").delete().eq("id", row.id);
+      load();
+    });
+    card.querySelector(".editForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      await withBusy(submitBtn, "Gemmer…", async () => {
+        const name = card.querySelector(".f-name").value.trim();
+        const quantity = parseInt(card.querySelector(".f-quantity").value, 10) || 1;
+        const carriedBy = card.querySelector(".f-carried").value.trim() || null;
+        const notes = card.querySelector(".f-notes").value.trim();
+        await window.sb
+          .from("loot_items")
+          .update({ name, quantity, carried_by: carriedBy, notes, updated_at: new Date().toISOString() })
+          .eq("id", row.id);
+        load();
+      });
+    });
+  }
+
+  document.getElementById("addForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    await withBusy(submitBtn, "Gemmer…", async () => {
+      const name = document.getElementById("itemName").value.trim();
+      const quantity = parseInt(document.getElementById("quantity").value, 10) || 1;
+      const carriedBy = document.getElementById("carriedBy").value.trim() || null;
+      const notes = document.getElementById("notes").value.trim();
+      const { error } = await window.sb.from("loot_items").insert({
+        name,
+        quantity,
+        carried_by: carriedBy,
+        notes,
+        created_by: session.user.email,
+      });
+      if (error) {
+        alert("Kunne ikke gemme: " + error.message);
+        return;
+      }
+      e.target.reset();
+      document.getElementById("quantity").value = 1;
+      load();
+    });
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

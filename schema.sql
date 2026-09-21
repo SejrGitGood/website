@@ -69,11 +69,35 @@ create table if not exists logistics (
 
 insert into logistics (id) values (1) on conflict (id) do nothing;
 
+-- Fælles bytte/loot: løs liste af fund, hvem der bærer dem, og en delt guldpose.
+create table if not exists loot_items (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  quantity int not null default 1,
+  carried_by text,
+  notes text,
+  created_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists party_treasury (
+  id int primary key default 1,
+  gold numeric not null default 0,
+  notes text,
+  updated_at timestamptz not null default now(),
+  constraint single_row_treasury check (id = 1)
+);
+
+insert into party_treasury (id) values (1) on conflict (id) do nothing;
+
 alter table sessions enable row level security;
 alter table lore_entries enable row level security;
 alter table logistics enable row level security;
 alter table allowed_users enable row level security;
 alter table characters enable row level security;
+alter table loot_items enable row level security;
+alter table party_treasury enable row level security;
 
 -- Rydder op efter en evt. tidligere, mere åben version af dette skema,
 -- så denne fil altid trygt kan køres igen fra toppen.
@@ -107,6 +131,18 @@ create policy "allow-listed users only" on logistics
 
 drop policy if exists "allow-listed users only" on characters;
 create policy "allow-listed users only" on characters
+  for all
+  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
+  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+
+drop policy if exists "allow-listed users only" on loot_items;
+create policy "allow-listed users only" on loot_items
+  for all
+  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
+  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+
+drop policy if exists "allow-listed users only" on party_treasury;
+create policy "allow-listed users only" on party_treasury
   for all
   using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
   with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));

@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Monsteropslag &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=4">
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">DM Tools</p>
+    <h1>Monsteropslag</h1>
+    <p>Slå et monster op midt i kamp &mdash; AC, HP og angreb, direkte fra D&amp;D 5e's officielle regler.</p>
+  </div>
+
+  <div class="wrap" style="max-width:760px;">
+    <p style="margin:-8px 0 4px;"><a href="dmtools.html" class="back-link">&larr; Alle DM Tools</a></p>
+
+    <section class="section">
+      <div class="card">
+        <form class="form" id="searchForm">
+          <div class="row">
+            <div class="field" style="flex:2;">
+              <label for="searchInput">Søg efter monster</label>
+              <input type="text" id="searchInput" placeholder="F.eks. goblin, ulv, vampyr" required>
+            </div>
+          </div>
+          <div class="card-actions">
+            <button class="btn" type="submit">Søg</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="section" id="resultsSection" hidden>
+      <div class="section-title"><h2 id="resultsTitle">Resultater</h2></div>
+      <div class="tabs" id="resultsList"></div>
+    </section>
+
+    <section class="section" id="detailSection" hidden>
+      <div id="detail"></div>
+    </section>
+
+    <p class="paste-hint" style="text-align:center;margin-top:8px;">
+      Data er hentet fra <a href="https://open5e.com" target="_blank" rel="noopener">Open5e</a>,
+      Wizards of the Coasts officielle System Reference Document 5.1.
+    </p>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=4"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("dmtools.html");
+
+  const CR_XP = {
+    0: 10, 0.125: 25, 0.25: 50, 0.5: 100, 1: 200, 2: 450, 3: 700, 4: 1100, 5: 1800,
+    6: 2300, 7: 2900, 8: 3900, 9: 5000, 10: 5900, 11: 7200, 12: 8400, 13: 10000,
+    14: 11500, 15: 13000, 16: 15000, 17: 18000, 18: 20000, 19: 22000, 20: 25000,
+    21: 33000, 22: 41000, 23: 50000, 24: 62000, 25: 75000, 26: 90000, 27: 105000,
+    28: 120000, 29: 135000, 30: 155000,
+  };
+
+  let lastResults = [];
+  let selected = null;
+
+  function mod(score) {
+    const m = Math.floor((score - 10) / 2);
+    return m >= 0 ? `+${m}` : `${m}`;
+  }
+
+  function speedText(speed) {
+    if (!speed) return "—";
+    return Object.entries(speed)
+      .map(([k, v]) => (k === "walk" ? `${v} ft.` : `${k} ${v} ft.`))
+      .join(", ");
+  }
+
+  function abilityListHtml(m) {
+    const stats = [
+      ["STR", m.strength], ["DEX", m.dexterity], ["CON", m.constitution],
+      ["INT", m.intelligence], ["WIS", m.wisdom], ["CHA", m.charisma],
+    ];
+    return `<ul class="shop-items">${stats.map(([n, v]) => `<li><strong>${n}</strong> ${v} (${mod(v)})</li>`).join("")}</ul>`;
+  }
+
+  function abilitySection(label, list) {
+    if (!list || !list.length) return "";
+    return `
+      <div style="margin-top:14px;">
+        <p class="meta">${escapeHtml(label)}</p>
+        ${list.map((a) => `<p class="body"><strong>${escapeHtml(a.name)}.</strong> ${escapeHtml(a.desc)}</p>`).join("")}
+      </div>`;
+  }
+
+  function monsterBodyText(m) {
+    const typeLine = [m.size, m.type + (m.subtype ? ` (${m.subtype})` : ""), m.alignment].filter(Boolean).join(", ");
+    const stats = `STR ${m.strength} (${mod(m.strength)})  DEX ${m.dexterity} (${mod(m.dexterity)})  CON ${m.constitution} (${mod(m.constitution)})  INT ${m.intelligence} (${mod(m.intelligence)})  WIS ${m.wisdom} (${mod(m.wisdom)})  CHA ${m.charisma} (${mod(m.charisma)})`;
+    const lines = [
+      `${m.name}`,
+      typeLine,
+      "",
+      `AC ${m.armor_class}${m.armor_desc ? ` (${m.armor_desc})` : ""}`,
+      `HP ${m.hit_points}${m.hit_dice ? ` (${m.hit_dice})` : ""}`,
+      `Speed ${speedText(m.speed)}`,
+      "",
+      stats,
+      "",
+    ];
+    if (m.senses) lines.push(`Senses: ${m.senses}`);
+    if (m.languages) lines.push(`Languages: ${m.languages}`);
+    lines.push(`Challenge ${m.challenge_rating}`);
+    const sections = [
+      ["Egenskaber", m.special_abilities],
+      ["Handlinger", m.actions],
+      ["Bonushandlinger", m.bonus_actions],
+      ["Reaktioner", m.reactions],
+      ["Legendariske handlinger", m.legendary_actions],
+    ];
+    sections.forEach(([label, list]) => {
+      if (list && list.length) {
+        lines.push("", `${label}:`);
+        list.forEach((a) => lines.push(`${a.name}. ${a.desc}`));
+      }
+    });
+    return lines.join("\n");
+  }
+
+  function monsterDetailHtml(m) {
+    const typeLine = [m.size, m.type + (m.subtype ? ` (${m.subtype})` : ""), m.alignment].filter(Boolean).join(", ");
+    const saveEntries = [
+      ["STR", m.strength_save], ["DEX", m.dexterity_save], ["CON", m.constitution_save],
+      ["INT", m.intelligence_save], ["WIS", m.wisdom_save], ["CHA", m.charisma_save],
+    ].filter(([, v]) => v !== null && v !== undefined);
+    const savesText = saveEntries.map(([k, v]) => `${k} +${v}`).join(", ");
+    const skillsText = m.skills && Object.keys(m.skills).length
+      ? Object.entries(m.skills).map(([k, v]) => `${k} +${v}`).join(", ")
+      : "";
+    const xp = CR_XP[m.cr];
+    return `
+      <div class="card">
+        <span class="badge">CR ${escapeHtml(m.challenge_rating)}${xp ? ` &middot; ${xp} XP` : ""}</span>
+        <h3 style="margin-top:8px;">${escapeHtml(m.name)}</h3>
+        <p class="meta">${escapeHtml(typeLine)}</p>
+        <p class="body">
+          <strong>AC</strong> ${m.armor_class}${m.armor_desc ? ` (${escapeHtml(m.armor_desc)})` : ""}<br>
+          <strong>HP</strong> ${m.hit_points}${m.hit_dice ? ` (${escapeHtml(m.hit_dice)})` : ""}<br>
+          <strong>Speed</strong> ${escapeHtml(speedText(m.speed))}
+        </p>
+        ${abilityListHtml(m)}
+        <p class="body" style="margin-top:14px;">
+          ${savesText ? `<strong>Saves</strong> ${escapeHtml(savesText)}<br>` : ""}
+          ${skillsText ? `<strong>Skills</strong> ${escapeHtml(skillsText)}<br>` : ""}
+          ${m.damage_vulnerabilities ? `<strong>Vulnerable</strong> ${escapeHtml(m.damage_vulnerabilities)}<br>` : ""}
+          ${m.damage_resistances ? `<strong>Resistant</strong> ${escapeHtml(m.damage_resistances)}<br>` : ""}
+          ${m.damage_immunities ? `<strong>Immune (skade)</strong> ${escapeHtml(m.damage_immunities)}<br>` : ""}
+          ${m.condition_immunities ? `<strong>Immune (tilstand)</strong> ${escapeHtml(m.condition_immunities)}<br>` : ""}
+          <strong>Senses</strong> ${escapeHtml(m.senses || "—")}<br>
+          <strong>Languages</strong> ${escapeHtml(m.languages || "—")}
+        </p>
+        ${abilitySection("Egenskaber", m.special_abilities)}
+        ${abilitySection("Handlinger", m.actions)}
+        ${abilitySection("Bonushandlinger", m.bonus_actions)}
+        ${abilitySection("Reaktioner", m.reactions)}
+        ${abilitySection("Legendariske handlinger", m.legendary_actions)}
+        <div class="card-actions" style="margin-top:14px;">
+          <button class="btn secondary" id="saveNpcBtn">Gem som lore-indgang (NPC)</button>
+          <span id="savedMsg" class="notice" style="display:none;">Gemt i Lore.</span>
+        </div>
+      </div>`;
+  }
+
+  function renderResultsList() {
+    document.getElementById("resultsList").innerHTML = lastResults
+      .map((m, i) => `<button type="button" data-idx="${i}">${escapeHtml(m.name)} (CR ${escapeHtml(m.challenge_rating)})</button>`)
+      .join("");
+  }
+
+  function selectMonster(idx) {
+    selected = lastResults[idx];
+    document.querySelectorAll("#resultsList button").forEach((b, i) => b.classList.toggle("active", i === idx));
+    document.getElementById("detail").innerHTML = monsterDetailHtml(selected);
+    document.getElementById("detailSection").hidden = false;
+    document.getElementById("saveNpcBtn").addEventListener("click", async () => {
+      const btn = document.getElementById("saveNpcBtn");
+      await withBusy(btn, "Gemmer…", async () => {
+        const { error } = await window.sb.from("lore_entries").insert({
+          title: selected.name,
+          category: "Monster",
+          body: monsterBodyText(selected),
+          created_by: session.user.email,
+        });
+        if (error) {
+          alert("Kunne ikke gemme: " + error.message);
+          return;
+        }
+        document.getElementById("savedMsg").style.display = "inline-block";
+      });
+    });
+  }
+
+  document.getElementById("resultsList").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-idx]");
+    if (!btn) return;
+    selectMonster(parseInt(btn.dataset.idx, 10));
+  });
+
+  document.getElementById("searchForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const term = document.getElementById("searchInput").value.trim();
+    if (!term) return;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    document.getElementById("detailSection").hidden = true;
+    await withBusy(submitBtn, "Søger…", async () => {
+      document.getElementById("resultsSection").hidden = false;
+      document.getElementById("resultsTitle").textContent = "Søger…";
+      document.getElementById("resultsList").innerHTML = "";
+      try {
+        const url = `https://api.open5e.com/v1/monsters/?document__slug=wotc-srd&search=${encodeURIComponent(term)}&limit=20`;
+        const res = await fetch(url);
+        const data = await res.json();
+        lastResults = data.results || [];
+        document.getElementById("resultsTitle").textContent = lastResults.length
+          ? `Resultater for "${term}"`
+          : `Ingen monstre fundet for "${term}"`;
+        renderResultsList();
+        if (lastResults.length === 1) selectMonster(0);
+      } catch (err) {
+        document.getElementById("resultsTitle").textContent = "Søgningen fejlede: " + err.message;
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

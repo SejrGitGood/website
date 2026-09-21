@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Besværgelsesopslag &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=4">
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">DM Tools</p>
+    <h1>Besværgelsesopslag</h1>
+    <p>Hurtigt opslag af en besværgelse, uden at forlade siden &mdash; direkte fra D&amp;D 5e's officielle regler.</p>
+  </div>
+
+  <div class="wrap" style="max-width:760px;">
+    <p style="margin:-8px 0 4px;"><a href="dmtools.html" class="back-link">&larr; Alle DM Tools</a></p>
+
+    <section class="section">
+      <div class="card">
+        <form class="form" id="searchForm">
+          <div class="row">
+            <div class="field" style="flex:2;">
+              <label for="searchInput">Søg efter besværgelse</label>
+              <input type="text" id="searchInput" placeholder="F.eks. fireball, healing word" required>
+            </div>
+          </div>
+          <div class="card-actions">
+            <button class="btn" type="submit">Søg</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="section" id="resultsSection" hidden>
+      <div class="section-title"><h2 id="resultsTitle">Resultater</h2></div>
+      <div class="tabs" id="resultsList"></div>
+    </section>
+
+    <section class="section" id="detailSection" hidden>
+      <div id="detail"></div>
+    </section>
+
+    <p class="paste-hint" style="text-align:center;margin-top:8px;">
+      Data er hentet fra <a href="https://open5e.com" target="_blank" rel="noopener">Open5e</a>,
+      Wizards of the Coasts officielle System Reference Document 5.1.
+    </p>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=4"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("dmtools.html");
+
+  let lastResults = [];
+  let selected = null;
+
+  function spellBodyText(s) {
+    const tags = [];
+    if (s.concentration === "yes") tags.push("Concentration");
+    if (s.ritual === "yes") tags.push("Ritual");
+    const lines = [
+      `${s.name} — ${s.level}, ${s.school}${tags.length ? ` (${tags.join(", ")})` : ""}`,
+      s.dnd_class ? `Klasser: ${s.dnd_class}` : "",
+      "",
+      `Kastetid: ${s.casting_time}`,
+      `Rækkevidde: ${s.range}`,
+      `Komponenter: ${s.components}${s.material ? ` (${s.material})` : ""}`,
+      `Varighed: ${s.duration}`,
+      "",
+      s.desc,
+    ];
+    if (s.higher_level) lines.push("", `Ved højere niveauer: ${s.higher_level}`);
+    return lines.filter((l) => l !== "").join("\n");
+  }
+
+  function spellDetailHtml(s) {
+    const tags = [];
+    if (s.concentration === "yes") tags.push("Concentration");
+    if (s.ritual === "yes") tags.push("Ritual");
+    return `
+      <div class="card">
+        <span class="badge">${escapeHtml(s.level)} &middot; ${escapeHtml(s.school)}</span>
+        <h3 style="margin-top:8px;">${escapeHtml(s.name)}</h3>
+        <p class="meta">${escapeHtml(s.dnd_class || "")}${tags.length ? ` &middot; ${tags.join(", ")}` : ""}</p>
+        <p class="body">
+          <strong>Kastetid</strong> ${escapeHtml(s.casting_time)}<br>
+          <strong>Rækkevidde</strong> ${escapeHtml(s.range)}<br>
+          <strong>Komponenter</strong> ${escapeHtml(s.components)}${s.material ? ` (${escapeHtml(s.material)})` : ""}<br>
+          <strong>Varighed</strong> ${escapeHtml(s.duration)}
+        </p>
+        <p class="body">${escapeHtml(s.desc)}</p>
+        ${s.higher_level ? `<p class="body"><strong>Ved højere niveauer.</strong> ${escapeHtml(s.higher_level)}</p>` : ""}
+        <div class="card-actions">
+          <button class="btn secondary" id="saveSpellBtn">Gem som lore-indgang</button>
+          <span id="savedMsg" class="notice" style="display:none;">Gemt i Lore.</span>
+        </div>
+      </div>`;
+  }
+
+  function renderResultsList() {
+    document.getElementById("resultsList").innerHTML = lastResults
+      .map((s, i) => `<button type="button" data-idx="${i}">${escapeHtml(s.name)} (${escapeHtml(s.level)})</button>`)
+      .join("");
+  }
+
+  function selectSpell(idx) {
+    selected = lastResults[idx];
+    document.querySelectorAll("#resultsList button").forEach((b, i) => b.classList.toggle("active", i === idx));
+    document.getElementById("detail").innerHTML = spellDetailHtml(selected);
+    document.getElementById("detailSection").hidden = false;
+    document.getElementById("saveSpellBtn").addEventListener("click", async () => {
+      const btn = document.getElementById("saveSpellBtn");
+      await withBusy(btn, "Gemmer…", async () => {
+        const { error } = await window.sb.from("lore_entries").insert({
+          title: selected.name,
+          category: "Besværgelse",
+          body: spellBodyText(selected),
+          created_by: session.user.email,
+        });
+        if (error) {
+          alert("Kunne ikke gemme: " + error.message);
+          return;
+        }
+        document.getElementById("savedMsg").style.display = "inline-block";
+      });
+    });
+  }
+
+  document.getElementById("resultsList").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-idx]");
+    if (!btn) return;
+    selectSpell(parseInt(btn.dataset.idx, 10));
+  });
+
+  document.getElementById("searchForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const term = document.getElementById("searchInput").value.trim();
+    if (!term) return;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    document.getElementById("detailSection").hidden = true;
+    await withBusy(submitBtn, "Søger…", async () => {
+      document.getElementById("resultsSection").hidden = false;
+      document.getElementById("resultsTitle").textContent = "Søger…";
+      document.getElementById("resultsList").innerHTML = "";
+      try {
+        const url = `https://api.open5e.com/v1/spells/?document__slug=wotc-srd&search=${encodeURIComponent(term)}&limit=20`;
+        const res = await fetch(url);
+        const data = await res.json();
+        lastResults = data.results || [];
+        document.getElementById("resultsTitle").textContent = lastResults.length
+          ? `Resultater for "${term}"`
+          : `Ingen besværgelser fundet for "${term}"`;
+        renderResultsList();
+        if (lastResults.length === 1) selectSpell(0);
+      } catch (err) {
+        document.getElementById("resultsTitle").textContent = "Søgningen fejlede: " + err.message;
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

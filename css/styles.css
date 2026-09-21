@@ -184,6 +184,16 @@ a.card:hover{text-decoration:none;box-shadow:0 12px 30px -12px rgba(43,32,22,0.5
   background:rgba(255,255,255,0.12);color:#F3E7D8;border:none;cursor:pointer;font-size:1.6rem;line-height:1;
 }
 
+.hp-row{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px dashed var(--line);}
+.hp-row:last-child{border-bottom:none;}
+.hp-row .hp-name{flex:0 0 150px;font-family:"Cinzel",serif;font-size:0.82rem;color:var(--ink);}
+.hp-row .hp-track{flex:1;height:10px;border-radius:999px;background:var(--line);overflow:hidden;}
+.hp-row .hp-fill{height:100%;border-radius:999px;background:var(--gold);transition:width .3s ease;}
+.hp-row .hp-fill.wounded{background:var(--ember);}
+.hp-row .hp-fill.critical{background:var(--blood);}
+.hp-row .hp-text{flex:0 0 auto;min-width:76px;text-align:right;font-size:0.85rem;color:var(--ink-soft);}
+.hp-row .hp-unknown{flex:1;font-style:italic;color:var(--ink-faint);font-size:0.85rem;}
+
 .back-link{
   display:inline-flex;align-items:center;gap:6px;
   font-family:"Cinzel",serif;font-size:0.75rem;letter-spacing:0.05em;text-transform:uppercase;
