@@ -4,7 +4,7 @@ window.sb = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CO
 
 const NAV_LINKS = [
   { href: "index.html", label: "Forside" },
-  { href: "sessions.html", label: "Sessioner" },
+  { href: "sessions.html", label: "Sessions" },
   { href: "lore.html", label: "Lore" },
   { href: "logistics.html", label: "Logistik" },
 ];
@@ -81,7 +81,7 @@ async function renderNav(activeHref) {
   }
 }
 
-// --- Billeder: indsæt med Ctrl+V direkte i et tekstfelt ---
+// --- Billeder: indsæt med Ctrl+V direkte i teksten, der hvor markøren står ---
 
 async function uploadPastedImage(blob) {
   const ext = (blob.type.split("/")[1] || "png").replace("jpeg", "jpg");
@@ -91,63 +91,55 @@ async function uploadPastedImage(blob) {
   return window.sb.storage.from("photos").getPublicUrl(path).data.publicUrl;
 }
 
-function galleryStaticHtml(urls) {
-  return (urls || [])
-    .map(
-      (u) => `<a href="${u}" target="_blank" rel="noopener" class="thumb"><img src="${u}" alt="Vedhæftet billede" loading="lazy"></a>`
-    )
-    .join("");
+function insertAtCursor(textareaEl, text) {
+  const start = textareaEl.selectionStart ?? textareaEl.value.length;
+  const end = textareaEl.selectionEnd ?? textareaEl.value.length;
+  textareaEl.value = textareaEl.value.slice(0, start) + text + textareaEl.value.slice(end);
+  const newPos = start + text.length;
+  textareaEl.selectionStart = textareaEl.selectionEnd = newPos;
 }
 
-function galleryHtml(urls) {
-  return (urls || [])
-    .map(
-      (u) => `
-    <span class="thumb">
-      <a href="${u}" target="_blank" rel="noopener"><img src="${u}" alt="Vedhæftet billede" loading="lazy"></a>
-      <button type="button" class="thumb-remove" data-url="${u}" aria-label="Fjern billede">&times;</button>
-    </span>`
-    )
-    .join("");
-}
-
-// Lytter efter Ctrl+V med et billede i `textareaEl`, uploader det, tilføjer
-// URL'en til `urls` (en almindelig array, muteres direkte), og tegner en
-// thumbnail i `galleryEl`. Kald `wireGalleryRemove` én gang pr. galleryEl.
-function wirePasteUpload(textareaEl, galleryEl, urls) {
+// Lytter efter Ctrl+V med et billede i `textareaEl`. Indsætter et
+// midlertidigt "uploader..."-mærke ved markøren, uploader billedet, og
+// erstatter mærket med `![billede](url)` samme sted i teksten.
+function wireInlinePasteUpload(textareaEl) {
   textareaEl.addEventListener("paste", async (e) => {
     const items = Array.from(e.clipboardData?.items || []);
     const imageItem = items.find((it) => it.type.startsWith("image/"));
     if (!imageItem) return;
     e.preventDefault();
     const blob = imageItem.getAsFile();
-    const placeholder = document.createElement("span");
-    placeholder.className = "thumb-uploading";
-    placeholder.textContent = "Uploader billede…";
-    galleryEl.appendChild(placeholder);
+    const token = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const marker = `[uploader billede ${token}…]`;
+    insertAtCursor(textareaEl, marker);
     try {
       const url = await uploadPastedImage(blob);
-      urls.push(url);
-      placeholder.remove();
-      galleryEl.insertAdjacentHTML(
-        "beforeend",
-        `<span class="thumb">
-          <a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="Vedhæftet billede" loading="lazy"></a>
-          <button type="button" class="thumb-remove" data-url="${url}" aria-label="Fjern billede">&times;</button>
-        </span>`
-      );
+      textareaEl.value = textareaEl.value.replace(marker, `![billede](${url})`);
     } catch (err) {
-      placeholder.textContent = "Upload fejlede: " + err.message;
+      textareaEl.value = textareaEl.value.replace(marker, `[billede-upload fejlede: ${err.message}]`);
     }
   });
 }
 
-function wireGalleryRemove(galleryEl, urls) {
-  galleryEl.addEventListener("click", (e) => {
-    const btn = e.target.closest(".thumb-remove");
-    if (!btn) return;
-    const idx = urls.indexOf(btn.dataset.url);
-    if (idx > -1) urls.splice(idx, 1);
-    btn.closest(".thumb").remove();
-  });
+const IMAGE_MARKDOWN_RE = /!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/g;
+
+// Escaper almindelig tekst, men gengiver `![billede](url)`-mærker som rigtige
+// billeder, der hvor de står i teksten.
+function renderBodyHtml(text) {
+  const parts = (text || "").split(new RegExp(`(${IMAGE_MARKDOWN_RE.source})`, "g"));
+  return parts
+    .map((part) => {
+      const m = part.match(/^!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)$/);
+      if (m) {
+        const url = m[1];
+        return `<a class="inline-thumb" href="${escapeHtml(url)}" target="_blank" rel="noopener"><img src="${escapeHtml(url)}" alt="Vedhæftet billede" loading="lazy"></a>`;
+      }
+      return escapeHtml(part);
+    })
+    .join("");
+}
+
+// Til korte, afkortede tekstuddrag (forsiden): fjern billedmærker helt.
+function stripImageMarkdown(text) {
+  return (text || "").replace(IMAGE_MARKDOWN_RE, "[billede]");
 }
