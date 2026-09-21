@@ -4,7 +4,7 @@ Live and working: Supabase project, shared login, public repo, GitHub Pages, ima
 
 **One-time step needed**: run the latest `schema.sql` once in Supabase → SQL Editor → New query → Run. Safe to re-run any time. It adds (among earlier additions) `loot_items`, `party_treasury`, the campaign-day counter on `logistics`, and the NPC attitude field on `lore_entries`.
 
-**Pending**: automatic D&D Beyond refresh needs a one-time Edge Function deploy — see `CHARACTERS_SETUP.md`. Until that's done, the "Opdater nu" button on the Karakterer page won't work yet, but the page itself and the seeded data work fine.
+Automatic D&D Beyond refresh is fully set up: the Edge Function is deployed, the "Opdater nu" button on Karakterer works, and a `pg_cron` job (`refresh-characters-nightly`) refreshes every character automatically at 03:00 UTC. See `CHARACTERS_SETUP.md` if it ever needs to be redeployed or rescheduled.
 
 ## Day to day
 
