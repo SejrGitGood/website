@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sessioner &middot; Daggerford-Krøniken</title>
+<title>Sessioner &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
 <link rel="stylesheet" href="css/styles.css">
@@ -53,6 +53,8 @@
           <div class="field">
             <label for="summary">Referat</label>
             <textarea id="summary" required placeholder="Hvad skete der?"></textarea>
+            <p class="paste-hint">Tip: klik i feltet og indsæt et billede med Ctrl+V.</p>
+            <div class="gallery" id="addGallery"></div>
           </div>
           <button class="btn" type="submit">Gem session</button>
         </form>
@@ -66,7 +68,7 @@
   </div>
 </main>
 
-<footer class="site-footer">Daggerford-Krøniken &middot; skrevet af os, for os.</footer>
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
@@ -95,12 +97,13 @@
 
   function rowHtml(s) {
     return `
-      <div class="card" data-id="${s.id}">
+      <div class="card" id="session-${s.id}" data-id="${s.id}">
         <div class="view">
           <span class="badge">Session ${s.number}</span>
           <h3 style="margin-top:8px;">${escapeHtml(s.title)}</h3>
           <p class="meta">${formatDate(s.session_date)}</p>
           <p class="body">${escapeHtml(s.summary)}</p>
+          ${s.images && s.images.length ? `<div class="gallery">${galleryStaticHtml(s.images)}</div>` : ""}
           <div class="card-actions">
             <button class="btn secondary editBtn">Rediger</button>
             <button class="btn danger deleteBtn">Slet</button>
@@ -125,6 +128,8 @@
             <div class="field">
               <label>Referat</label>
               <textarea class="f-summary" required>${escapeHtml(s.summary)}</textarea>
+              <p class="paste-hint">Tip: klik i feltet og indsæt et billede med Ctrl+V.</p>
+              <div class="gallery editGallery">${galleryHtml(s.images)}</div>
             </div>
             <div class="card-actions">
               <button class="btn" type="submit">Gem</button>
@@ -139,6 +144,10 @@
     const card = list.querySelector(`.card[data-id="${row.id}"]`);
     const viewEl = card.querySelector(".view");
     const editEl = card.querySelector(".edit");
+    const editImages = [...(row.images || [])];
+    const editGallery = card.querySelector(".editGallery");
+    wirePasteUpload(card.querySelector(".f-summary"), editGallery, editImages);
+    wireGalleryRemove(editGallery, editImages);
 
     card.querySelector(".editBtn").addEventListener("click", () => {
       viewEl.hidden = true;
@@ -161,11 +170,16 @@
       const summary = card.querySelector(".f-summary").value.trim();
       await window.sb
         .from("sessions")
-        .update({ number, title, session_date: sessionDate, summary, updated_at: new Date().toISOString() })
+        .update({ number, title, session_date: sessionDate, summary, images: editImages, updated_at: new Date().toISOString() })
         .eq("id", row.id);
       load();
     });
   }
+
+  const addGallery = document.getElementById("addGallery");
+  const addImages = [];
+  wirePasteUpload(document.getElementById("summary"), addGallery, addImages);
+  wireGalleryRemove(addGallery, addImages);
 
   document.getElementById("addForm").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -178,6 +192,7 @@
       title,
       session_date: sessionDate,
       summary,
+      images: addImages,
       created_by: session.user.email,
     });
     if (error) {
@@ -185,6 +200,8 @@
       return;
     }
     e.target.reset();
+    addImages.length = 0;
+    addGallery.innerHTML = "";
     load();
   });
 

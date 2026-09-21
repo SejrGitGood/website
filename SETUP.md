@@ -1,33 +1,16 @@
-# Daggerford-Krøniken — setup
+# Blessings of Valkyriegade — setup
 
-Where things stand: Supabase project created, `schema.sql` run once, `js/config.js` filled in, code pushed to GitHub (`SejrGitGood/website`, currently **private**). What's left:
+Live and working: Supabase project, shared login, public repo, GitHub Pages. One new thing to run:
 
-## 1. Switch to one shared login
+## Enable image pasting
 
-Instead of each of you logging in separately, everyone uses the same email+password.
+`schema.sql` now adds an `images` column to sessions/lore, plus a public `photos` storage bucket that only the shared account can upload to. Paste the current `schema.sql` into Supabase's **SQL Editor** and run it — safe to run again on top of what's already there.
 
-1. In Supabase: **Authentication → Users → Add user**. Enter an email — it doesn't need to be real or receive mail, e.g. `gruppe@daggerford.local` — and a password you'll all share. **Tick "Auto Confirm User"** so it's usable immediately with no verification email.
-2. If you used a different email than `gruppe@daggerford.local`, update it in two places to match exactly:
-   - `js/config.js` → `sharedEmail`
-   - `schema.sql` → the `insert into allowed_users` line
-3. Paste the current `schema.sql` (in this folder) into the SQL Editor and run it — it's written to be safe to run again even if you already ran an earlier version, and it'll set `allowed_users` to just the one email above.
-4. Commit and push the `js/config.js` change (and `schema.sql` if you edited the email there too).
-
-Share the password with the group however you'd share anything else — group chat, whatever. Nobody needs their own account anymore.
-
-## 2. Make the repo public, turn on Pages
-
-GitHub Pages needs a public repo on the free plan.
-
-1. Repo → **Settings → General → Danger Zone → Change visibility → Public**.
-   - This exposes the site's code and the three static Session 1 pages to anyone with the exact link (not indexed or listed anywhere). The actual session/lore/logistics data stays private — it lives in Supabase, gated by the login above.
-   - Keep real secrets out of what's committed: `schema.sql` in the repo should only ever contain the one shared/fake-looking login email, never anything sensitive.
-2. **Settings → Pages** → Source: **Deploy from a branch** → Branch **master**, folder **/ (root)** → Save.
-3. After a minute, open the URL GitHub gives you (`https://sejrgitgood.github.io/website/`). You should land on the login page; log in with the shared password from step 1.
-
-That's it — no domain needed for now. If you want one later, just ask and I'll walk through pointing it at this same GitHub Pages site.
+That's it — after that, pasting an image (Ctrl+V) directly into a session or lore text field on the live site uploads it and attaches it to that entry.
 
 ## Day to day
 
 - Adding a session, lore entry, or updating logistics: log into the live site and use the forms — no redeploy needed, it reads/writes straight from Supabase.
+- Attaching a picture: click into the session/lore text field you're editing and paste (Ctrl+V) an image straight from your clipboard. A small "×" on each thumbnail removes it before saving.
 - Changing the site's design or adding pages: edit the files here and `git push` — GitHub Pages redeploys automatically within a minute or two.
+- No domain yet — you're on the `sejrgitgood.github.io/website/` URL. Ask any time if you want one added later.

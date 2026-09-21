@@ -66,7 +66,7 @@ async function renderNav(activeHref) {
 
   mount.innerHTML = `
     <div class="wrap">
-      <a class="brand" href="index.html">${navSvg()}Daggerford-Krøniken</a>
+      <a class="brand" href="index.html">${navSvg()}Blessings of Valkyriegade</a>
       <div class="nav-links">${links}</div>
       <div class="nav-auth">${authHtml}</div>
     </div>
@@ -79,4 +79,75 @@ async function renderNav(activeHref) {
       location.href = "login.html";
     });
   }
+}
+
+// --- Billeder: indsæt med Ctrl+V direkte i et tekstfelt ---
+
+async function uploadPastedImage(blob) {
+  const ext = (blob.type.split("/")[1] || "png").replace("jpeg", "jpg");
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await window.sb.storage.from("photos").upload(path, blob, { contentType: blob.type });
+  if (error) throw error;
+  return window.sb.storage.from("photos").getPublicUrl(path).data.publicUrl;
+}
+
+function galleryStaticHtml(urls) {
+  return (urls || [])
+    .map(
+      (u) => `<a href="${u}" target="_blank" rel="noopener" class="thumb"><img src="${u}" alt="Vedhæftet billede" loading="lazy"></a>`
+    )
+    .join("");
+}
+
+function galleryHtml(urls) {
+  return (urls || [])
+    .map(
+      (u) => `
+    <span class="thumb">
+      <a href="${u}" target="_blank" rel="noopener"><img src="${u}" alt="Vedhæftet billede" loading="lazy"></a>
+      <button type="button" class="thumb-remove" data-url="${u}" aria-label="Fjern billede">&times;</button>
+    </span>`
+    )
+    .join("");
+}
+
+// Lytter efter Ctrl+V med et billede i `textareaEl`, uploader det, tilføjer
+// URL'en til `urls` (en almindelig array, muteres direkte), og tegner en
+// thumbnail i `galleryEl`. Kald `wireGalleryRemove` én gang pr. galleryEl.
+function wirePasteUpload(textareaEl, galleryEl, urls) {
+  textareaEl.addEventListener("paste", async (e) => {
+    const items = Array.from(e.clipboardData?.items || []);
+    const imageItem = items.find((it) => it.type.startsWith("image/"));
+    if (!imageItem) return;
+    e.preventDefault();
+    const blob = imageItem.getAsFile();
+    const placeholder = document.createElement("span");
+    placeholder.className = "thumb-uploading";
+    placeholder.textContent = "Uploader billede…";
+    galleryEl.appendChild(placeholder);
+    try {
+      const url = await uploadPastedImage(blob);
+      urls.push(url);
+      placeholder.remove();
+      galleryEl.insertAdjacentHTML(
+        "beforeend",
+        `<span class="thumb">
+          <a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="Vedhæftet billede" loading="lazy"></a>
+          <button type="button" class="thumb-remove" data-url="${url}" aria-label="Fjern billede">&times;</button>
+        </span>`
+      );
+    } catch (err) {
+      placeholder.textContent = "Upload fejlede: " + err.message;
+    }
+  });
+}
+
+function wireGalleryRemove(galleryEl, urls) {
+  galleryEl.addEventListener("click", (e) => {
+    const btn = e.target.closest(".thumb-remove");
+    if (!btn) return;
+    const idx = urls.indexOf(btn.dataset.url);
+    if (idx > -1) urls.splice(idx, 1);
+    btn.closest(".thumb").remove();
+  });
 }

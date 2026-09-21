@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lore &middot; Daggerford-Krøniken</title>
+<title>Lore &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
 <link rel="stylesheet" href="css/styles.css">
@@ -42,6 +42,8 @@
           <div class="field">
             <label for="body">Beskrivelse</label>
             <textarea id="body" required></textarea>
+            <p class="paste-hint">Tip: klik i feltet og indsæt et billede med Ctrl+V.</p>
+            <div class="gallery" id="addGallery"></div>
           </div>
           <button class="btn" type="submit">Gem</button>
         </form>
@@ -65,7 +67,7 @@
   </div>
 </main>
 
-<footer class="site-footer">Daggerford-Krøniken &middot; skrevet af os, for os.</footer>
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
@@ -102,11 +104,12 @@
 
   function rowHtml(l) {
     return `
-      <div class="card" data-id="${l.id}">
+      <div class="card" id="lore-${l.id}" data-id="${l.id}">
         <div class="view">
           <span class="badge">${escapeHtml(l.category)}</span>
           <h3 style="margin-top:8px;">${escapeHtml(l.title)}</h3>
           <p class="body">${escapeHtml(l.body)}</p>
+          ${l.images && l.images.length ? `<div class="gallery">${galleryStaticHtml(l.images)}</div>` : ""}
           <div class="card-actions">
             <button class="btn secondary editBtn">Rediger</button>
             <button class="btn danger deleteBtn">Slet</button>
@@ -131,6 +134,8 @@
             <div class="field">
               <label>Beskrivelse</label>
               <textarea class="f-body" required>${escapeHtml(l.body)}</textarea>
+              <p class="paste-hint">Tip: klik i feltet og indsæt et billede med Ctrl+V.</p>
+              <div class="gallery editGallery">${galleryHtml(l.images)}</div>
             </div>
             <div class="card-actions">
               <button class="btn" type="submit">Gem</button>
@@ -145,6 +150,10 @@
     const card = list.querySelector(`.card[data-id="${row.id}"]`);
     const viewEl = card.querySelector(".view");
     const editEl = card.querySelector(".edit");
+    const editImages = [...(row.images || [])];
+    const editGallery = card.querySelector(".editGallery");
+    wirePasteUpload(card.querySelector(".f-body"), editGallery, editImages);
+    wireGalleryRemove(editGallery, editImages);
 
     card.querySelector(".editBtn").addEventListener("click", () => {
       viewEl.hidden = true;
@@ -166,7 +175,7 @@
       const body = card.querySelector(".f-body").value.trim();
       await window.sb
         .from("lore_entries")
-        .update({ title, category, body, updated_at: new Date().toISOString() })
+        .update({ title, category, body, images: editImages, updated_at: new Date().toISOString() })
         .eq("id", row.id);
       load();
     });
@@ -180,6 +189,11 @@
     render();
   });
 
+  const addGallery = document.getElementById("addGallery");
+  const addImages = [];
+  wirePasteUpload(document.getElementById("body"), addGallery, addImages);
+  wireGalleryRemove(addGallery, addImages);
+
   document.getElementById("addForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const title = document.getElementById("title").value.trim();
@@ -189,6 +203,7 @@
       title,
       category,
       body,
+      images: addImages,
       created_by: session.user.email,
     });
     if (error) {
@@ -196,6 +211,8 @@
       return;
     }
     e.target.reset();
+    addImages.length = 0;
+    addGallery.innerHTML = "";
     load();
   });
 
