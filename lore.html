@@ -20,7 +20,7 @@
 
   <div class="wrap">
     <section class="section" id="addSection">
-      <div class="section-title"><h2>Ny indgang</h2></div>
+      <div class="section-title"><h2>Ny lore</h2></div>
       <div class="card">
         <form class="form" id="addForm">
           <div class="row">
@@ -51,7 +51,7 @@
 
     <section class="section">
       <div class="section-title">
-        <h2 id="listTitle">Alle indgange</h2>
+        <h2 id="listTitle">Al lore</h2>
         <a href="lore.html" id="backLink" hidden>&larr; Se al lore</a>
         <div class="tabs" id="tabs">
           <button data-cat="all" class="active">Alle</button>
@@ -127,7 +127,7 @@
       <div class="card" id="lore-${l.id}" data-id="${l.id}">
         <div class="view">
           <span class="badge">${escapeHtml(l.category)}</span>
-          <h3 style="margin-top:8px;">${escapeHtml(l.title)}</h3>
+          <h3 style="margin-top:8px;"><a href="lore.html?id=${l.id}">${escapeHtml(l.title)}</a></h3>
           <div class="body">${renderBodyHtml(l.body)}</div>
           <div class="card-actions">
             <button class="btn secondary editBtn">Rediger</button>

@@ -114,7 +114,7 @@
       <div class="card" id="session-${s.id}" data-id="${s.id}">
         <div class="view">
           <span class="badge">Session ${s.number}</span>
-          <h3 style="margin-top:8px;">${escapeHtml(s.title)}</h3>
+          <h3 style="margin-top:8px;"><a href="sessions.html?id=${s.id}">${escapeHtml(s.title)}</a></h3>
           <p class="meta">${formatDate(s.session_date)}</p>
           <div class="body">${renderBodyHtml(s.summary)}</div>
           <div class="card-actions">
