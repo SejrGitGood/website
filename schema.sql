@@ -51,6 +51,16 @@ alter table lore_entries enable row level security;
 alter table logistics enable row level security;
 alter table allowed_users enable row level security;
 
+-- Rydder op efter en evt. tidligere, mere åben version af dette skema,
+-- så denne fil altid trygt kan køres igen fra toppen.
+drop policy if exists "authenticated full access" on sessions;
+drop policy if exists "authenticated full access" on lore_entries;
+drop policy if exists "authenticated full access" on logistics;
+drop policy if exists "read own membership" on allowed_users;
+drop policy if exists "allow-listed users only" on sessions;
+drop policy if exists "allow-listed users only" on lore_entries;
+drop policy if exists "allow-listed users only" on logistics;
+
 -- Enhver logget-ind bruger må slå sin egen mail op (nødvendigt for at policies nedenfor kan tjekke den).
 create policy "read own membership" on allowed_users
   for select using (auth.jwt() ->> 'email' = email);

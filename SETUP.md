@@ -10,12 +10,7 @@ Instead of each of you logging in separately, everyone uses the same email+passw
 2. If you used a different email than `gruppe@daggerford.local`, update it in two places to match exactly:
    - `js/config.js` → `sharedEmail`
    - `schema.sql` → the `insert into allowed_users` line
-3. Since `schema.sql`'s tables and policies already exist from your first run, don't re-run the whole file — just run this in the SQL Editor to swap who's allowed in:
-   ```sql
-   delete from allowed_users;
-   insert into allowed_users (email) values ('gruppe@daggerford.local');
-   ```
-   (use whatever email you actually picked in step 1)
+3. Paste the current `schema.sql` (in this folder) into the SQL Editor and run it — it's written to be safe to run again even if you already ran an earlier version, and it'll set `allowed_users` to just the one email above.
 4. Commit and push the `js/config.js` change (and `schema.sql` if you edited the email there too).
 
 Share the password with the group however you'd share anything else — group chat, whatever. Nobody needs their own account anymore.
