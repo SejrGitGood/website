@@ -1,0 +1,7 @@
+# Aldrig commit filer med rigtige nøgler i — service_role-nøglen har fuld
+# adgang til databasen og må aldrig havne i det offentlige repo.
+*.secrets.sql
+*.local.sql
+cron-setup-filled.sql
+.env
+.env.*

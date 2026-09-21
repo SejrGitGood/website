@@ -1,6 +1,8 @@
 # Blessings of Valkyriegade — setup
 
-Live and working: Supabase project, shared login, public repo, GitHub Pages, image pasting, the shop generator. Nothing pending right now.
+Live and working: Supabase project, shared login, public repo, GitHub Pages, image pasting, the shop generator, the character roster (Karakterer, under DM Tools).
+
+**Pending**: automatic D&D Beyond refresh needs a one-time Edge Function deploy — see `CHARACTERS_SETUP.md`. Until that's done, the "Opdater nu" button on the Karakterer page won't work yet, but the page itself and the seeded data work fine.
 
 ## Day to day
 

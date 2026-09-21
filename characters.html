@@ -14,18 +14,24 @@
 
 <main>
   <div class="page-head">
-    <p class="eyebrow">Selskabet</p>
+    <p class="eyebrow">DM Tools</p>
     <h1>Karakterer</h1>
     <p>Hentet fra D&amp;D Beyond, når karakteren er sat til offentlig &mdash; ellers vises bare navnet.</p>
   </div>
 
   <div class="wrap">
+    <p style="margin:-8px 0 4px;"><a href="dmtools.html" class="back-link">&larr; Alle DM Tools</a></p>
+
     <section class="section">
+      <div class="card-actions" style="margin-bottom:16px;">
+        <button class="btn secondary" id="refreshBtn">Opdater nu fra D&amp;D Beyond</button>
+        <span id="refreshMsg" class="notice" style="display:none;"></span>
+      </div>
       <div class="grid" id="grid"><div class="empty">Indlæser&hellip;</div></div>
     </section>
 
     <p class="paste-hint" style="text-align:center;">
-      Data er en øjebliksbillede, ikke live &mdash; bed Claude om at opdatere en karakter, når den ændrer sig eller bliver gjort offentlig.
+      Opdateres automatisk hver nat, eller klik "Opdater nu" for at hente frisk data med det samme. Kun karakterer sat til offentlig på D&amp;D Beyond vises med fulde detaljer.
     </p>
   </div>
 </main>
@@ -34,12 +40,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=3"></script>
+<script src="js/app.js?v=4"></script>
 <script>
 (async function () {
   const session = await guardPage();
   if (!session) return;
-  renderNav("characters.html");
+  renderNav("dmtools.html");
   wireLightbox();
 
   const grid = document.getElementById("grid");
@@ -96,6 +102,23 @@
     }
     grid.innerHTML = data.map((c) => (c.is_public && c.data ? publicCardHtml(c) : privateCardHtml(c))).join("");
   }
+
+  document.getElementById("refreshBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("refreshBtn");
+    const msg = document.getElementById("refreshMsg");
+    msg.style.display = "none";
+    await withBusy(btn, "Henter fra D&D Beyond…", async () => {
+      const { data, error } = await window.sb.functions.invoke("refresh-characters");
+      msg.style.display = "inline-block";
+      if (error) {
+        msg.textContent = "Kunne ikke opdatere: " + error.message;
+      } else {
+        const updated = Object.values(data.results || {}).filter((v) => v === "opdateret").length;
+        msg.textContent = `Opdateret ${updated} af ${Object.keys(data.results || {}).length} karakterer.`;
+        await load();
+      }
+    });
+  });
 
   load();
 })();
