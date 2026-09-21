@@ -1,64 +1,38 @@
 # Daggerford-Krøniken — setup
 
-Everything the code needs is written. These are the one-time steps only you can do (account creation and payment aren't things I'm able to do on your behalf).
+Where things stand: Supabase project created, `schema.sql` run once, `js/config.js` filled in, code pushed to GitHub (`SejrGitGood/website`, currently **private**). What's left:
 
-## 1. Supabase (database + login) — free
+## 1. Switch to one shared login
 
-1. Go to supabase.com, sign up, click **New project**. Pick any name/region, set a database password (save it somewhere, you likely won't need it again).
-2. Open `schema.sql` (in this folder) and edit the five placeholder emails near the top (`spiller1@eksempel.dk` etc.) to your and your four friends' real addresses. This list is what locks the site to just your group — nobody else can read or write anything, even if they somehow get a login link.
-3. In Supabase, open **SQL Editor → New query**, paste the edited file, and click **Run**.
-4. Confirm **Email** sign-in is on: look under **Authentication** in the left sidebar for a "Providers" or "Sign In / Providers" page and check Email is enabled (it's on by default on a new project, so this is usually already done).
-5. Go to **Project Settings → API Keys** (Supabase renamed this from plain "API" — if you only see "API", that's the same page). Copy the **Project URL** and the **publishable key** (starts with `sb_publishable_...`; if your project instead shows a legacy **anon public** key starting with `eyJ...`, that works exactly the same way — use whichever one is there).
+Instead of each of you logging in separately, everyone uses the same email+password.
 
-You do *not* need to find any "invite user" or "disable signups" screen — the email allow-list in `schema.sql` does that job instead, and it's easy to edit later (see the bottom of that file).
+1. In Supabase: **Authentication → Users → Add user**. Enter an email — it doesn't need to be real or receive mail, e.g. `gruppe@daggerford.local` — and a password you'll all share. **Tick "Auto Confirm User"** so it's usable immediately with no verification email.
+2. If you used a different email than `gruppe@daggerford.local`, update it in two places to match exactly:
+   - `js/config.js` → `sharedEmail`
+   - `schema.sql` → the `insert into allowed_users` line
+3. Since `schema.sql`'s tables and policies already exist from your first run, don't re-run the whole file — just run this in the SQL Editor to swap who's allowed in:
+   ```sql
+   delete from allowed_users;
+   insert into allowed_users (email) values ('gruppe@daggerford.local');
+   ```
+   (use whatever email you actually picked in step 1)
+4. Commit and push the `js/config.js` change (and `schema.sql` if you edited the email there too).
 
-## 2. Fill in the config
+Share the password with the group however you'd share anything else — group chat, whatever. Nobody needs their own account anymore.
 
-Open `js/config.js` and replace the two placeholder values with the ones from step 1.5:
+## 2. Make the repo public, turn on Pages
 
-```js
-window.SUPABASE_CONFIG = {
-  url: "https://xxxxxxxx.supabase.co",
-  anonKey: "sb_publishable_..."   // or the eyJ... anon key, either works
-};
-```
+GitHub Pages needs a public repo on the free plan.
 
-This key is meant to be public (it ships in every Supabase frontend) — the real protection is the row-level security policies in `schema.sql`, which check the logged-in user's email against your `allowed_users` list.
+1. Repo → **Settings → General → Danger Zone → Change visibility → Public**.
+   - This exposes the site's code and the three static Session 1 pages to anyone with the exact link (not indexed or listed anywhere). The actual session/lore/logistics data stays private — it lives in Supabase, gated by the login above.
+   - Keep real secrets out of what's committed: `schema.sql` in the repo should only ever contain the one shared/fake-looking login email, never anything sensitive.
+2. **Settings → Pages** → Source: **Deploy from a branch** → Branch **master**, folder **/ (root)** → Save.
+3. After a minute, open the URL GitHub gives you (`https://sejrgitgood.github.io/website/`). You should land on the login page; log in with the shared password from step 1.
 
-## 3. Put it on GitHub
-
-From this `website` folder:
-
-```bash
-git init
-git add .
-git commit -m "Daggerford-Krøniken v1"
-```
-
-Then create a new **empty** repository on github.com (no README/license — just an empty repo), and push:
-
-```bash
-git remote add origin https://github.com/<your-username>/<repo-name>.git
-git branch -M main
-git push -u origin main
-```
-
-## 4. Turn on GitHub Pages
-
-1. In the repo on GitHub: **Settings → Pages**.
-2. Under "Build and deployment", set **Source: Deploy from a branch**, branch **main**, folder **/ (root)**. Save.
-3. After a minute, GitHub gives you a URL like `https://<your-username>.github.io/<repo-name>/`. Open it and confirm the login page loads.
-
-## 5. Point your domain at it
-
-1. Buy the domain wherever you like (Cloudflare Registrar, Namecheap, Porkbun — all fine, all cheap).
-2. Back in **Settings → Pages** on GitHub, under "Custom domain", enter your domain (e.g. `daggerford.dk` or `www.daggerford.dk`) and save. GitHub will add a `CNAME` file to the repo automatically.
-3. At your domain registrar's DNS settings, add the records GitHub Pages asks for — typically:
-   - If using the root domain (`daggerford.dk`): four **A** records pointing at GitHub's IPs (GitHub's docs page, linked from the Pages settings screen, lists the current IPs).
-   - If using a subdomain (`www.daggerford.dk`): one **CNAME** record pointing at `<your-username>.github.io`.
-4. Back in GitHub Pages settings, tick **Enforce HTTPS** once it becomes available (can take up to ~24h after DNS propagates).
+That's it — no domain needed for now. If you want one later, just ask and I'll walk through pointing it at this same GitHub Pages site.
 
 ## Day to day
 
-- Adding a session, lore entry, or updating logistics: just log into the live site and use the forms — no redeploy needed, it all reads/writes straight from Supabase.
-- Changing the site's design or adding new pages: edit the files here and `git push` — GitHub Pages redeploys automatically within a minute or two.
+- Adding a session, lore entry, or updating logistics: log into the live site and use the forms — no redeploy needed, it reads/writes straight from Supabase.
+- Changing the site's design or adding pages: edit the files here and `git push` — GitHub Pages redeploys automatically within a minute or two.

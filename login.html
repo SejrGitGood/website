@@ -14,16 +14,16 @@
     <div class="page-head" style="padding-top:0;">
       <p class="eyebrow">Daggerford-Krøniken</p>
       <h1>Log ind</h1>
-      <p>Skriv din mail, så sender vi et login-link. Ingen kodeord at huske.</p>
+      <p>Én adgangskode, delt af hele selskabet.</p>
     </div>
 
     <div class="card">
       <form class="form" id="loginForm">
         <div class="field">
-          <label for="email">E-mail</label>
-          <input type="email" id="email" required placeholder="dig@eksempel.dk" autocomplete="email">
+          <label for="password">Adgangskode</label>
+          <input type="password" id="password" required autocomplete="current-password">
         </div>
-        <button class="btn" type="submit" id="sendBtn">Send login-link</button>
+        <button class="btn" type="submit" id="loginBtn">Log ind</button>
       </form>
       <p class="notice" id="statusMsg" hidden style="margin-top:14px;"></p>
     </div>
@@ -44,25 +44,25 @@
 
   const form = document.getElementById("loginForm");
   const statusMsg = document.getElementById("statusMsg");
-  const sendBtn = document.getElementById("sendBtn");
+  const loginBtn = document.getElementById("loginBtn");
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const email = document.getElementById("email").value.trim();
-    sendBtn.disabled = true;
-    sendBtn.textContent = "Sender...";
-    const { error } = await window.sb.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: location.origin + location.pathname.replace("login.html", redirectTarget) }
+    const password = document.getElementById("password").value;
+    loginBtn.disabled = true;
+    loginBtn.textContent = "Logger ind...";
+    const { error } = await window.sb.auth.signInWithPassword({
+      email: window.SUPABASE_CONFIG.sharedEmail,
+      password,
     });
-    statusMsg.hidden = false;
     if (error) {
-      statusMsg.textContent = "Noget gik galt: " + error.message;
+      statusMsg.hidden = false;
+      statusMsg.textContent = "Forkert adgangskode, eller kontoen er ikke sat op endnu.";
+      loginBtn.disabled = false;
+      loginBtn.textContent = "Log ind";
     } else {
-      statusMsg.textContent = "Tjek din indbakke — vi har sendt et login-link til " + email + ".";
+      location.href = redirectTarget;
     }
-    sendBtn.disabled = false;
-    sendBtn.textContent = "Send login-link";
   });
 </script>
 </body>

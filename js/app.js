@@ -59,7 +59,7 @@ async function renderNav(activeHref) {
 
   let authHtml;
   if (session) {
-    authHtml = `<span>${escapeHtml(session.user.email)}</span><button class="linklike" id="signOutBtn">Log ud</button>`;
+    authHtml = `<span>Logget ind</span><button class="linklike" id="signOutBtn">Log ud</button>`;
   } else {
     authHtml = `<a href="login.html">Log ind</a>`;
   }

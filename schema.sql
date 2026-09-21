@@ -3,18 +3,15 @@
 
 create extension if not exists pgcrypto;
 
--- Kun mails i denne tabel må læse/skrive noget som helst.
--- Ret listen herunder til jeres fem rigtige mailadresser, FØR du trykker Run.
+-- Kun mailen i denne tabel må læse/skrive noget som helst.
+-- Skal være PRÆCIS den samme adresse som den delte konto, du opretter i
+-- Supabase (Authentication -> Users), og som står i js/config.js.
 create table if not exists allowed_users (
   email text primary key
 );
 
 insert into allowed_users (email) values
-  ('spiller1@eksempel.dk'),
-  ('spiller2@eksempel.dk'),
-  ('spiller3@eksempel.dk'),
-  ('spiller4@eksempel.dk'),
-  ('spiller5@eksempel.dk')
+  ('gruppe@daggerford.local')
 on conflict (email) do nothing;
 
 create table if not exists sessions (
