@@ -299,3 +299,40 @@ async function attachShopItems(shops) {
   );
   return shops;
 }
+
+// --- Delt kort-visning: bruges både af generatoren og af gemte Lore-indgange ---
+// Rendering sker altid ud fra data, der allerede er hentet/gemt — aldrig ved
+// selv at kalde Open5e igen.
+
+function shopCardHtml(s) {
+  const itemsHtml =
+    s.items && s.items.length
+      ? `<ul class="shop-items">${s.items
+          .map(
+            (i) =>
+              `<li><strong>${escapeHtml(i.name)}</strong> &mdash; ${escapeHtml(i.cost)}${
+                i.stat ? ` &middot; ${escapeHtml(i.stat)}` : ""
+              }</li>`
+          )
+          .join("")}</ul>`
+      : "";
+  return `
+    <div class="card">
+      <span class="badge">${escapeHtml(s.type)}</span>
+      <h3 style="margin-top:8px;">${escapeHtml(s.name)}</h3>
+      <p class="body">${escapeHtml(s.flavor)}</p>
+      ${itemsHtml}
+    </div>`;
+}
+
+function shopGridHtml(shops) {
+  return (shops || []).map(shopCardHtml).join("");
+}
+
+// Fuld visning af en gemt by: undertekst med størrelse/befolkning + kortgitter.
+function shopEntryHtml(shopData) {
+  if (!shopData) return "";
+  return `
+    <p class="meta">${escapeHtml(shopData.tierName)}, ca. ${shopData.population} indbyggere</p>
+    <div class="grid" style="margin-top:12px;">${shopGridHtml(shopData.shops)}</div>`;
+}

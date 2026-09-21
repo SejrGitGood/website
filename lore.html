@@ -75,6 +75,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
 <script src="js/app.js?v=1"></script>
+<script src="js/shops.js?v=3"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -126,12 +127,13 @@
   }
 
   function rowHtml(l) {
+    const bodyHtml = l.shop_data ? shopEntryHtml(l.shop_data) : `<div class="body">${renderBodyHtml(l.body)}</div>`;
     return `
       <div class="card" id="lore-${l.id}" data-id="${l.id}">
         <div class="view">
           <span class="badge">${escapeHtml(l.category)}</span>
           <h3 style="margin-top:8px;"><a href="lore.html?id=${l.id}">${escapeHtml(l.title)}</a></h3>
-          <div class="body">${renderBodyHtml(l.body)}</div>
+          ${bodyHtml}
           <div class="card-actions">
             <button class="btn secondary editBtn">Rediger</button>
             <button class="btn danger deleteBtn">Slet</button>

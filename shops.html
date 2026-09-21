@@ -62,7 +62,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
 <script src="js/app.js?v=1"></script>
-<script src="js/shops.js?v=2"></script>
+<script src="js/shops.js?v=3"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -71,30 +71,20 @@
 
   let lastResult = null;
 
-  function shopCardHtml(s, loadingItems) {
-    let itemsHtml = "";
-    if (loadingItems) {
-      itemsHtml = `<p class="paste-hint" style="margin-top:10px;">Henter varer…</p>`;
-    } else if (s.items && s.items.length) {
-      itemsHtml = `<ul class="shop-items">${s.items
-        .map(
-          (i) => `<li><strong>${escapeHtml(i.name)}</strong> &mdash; ${escapeHtml(i.cost)}${
-            i.stat ? ` &middot; ${escapeHtml(i.stat)}` : ""
-          }</li>`
-        )
-        .join("")}</ul>`;
-    }
+  function loadingCardHtml(s) {
     return `
       <div class="card">
         <span class="badge">${escapeHtml(s.type)}</span>
         <h3 style="margin-top:8px;">${escapeHtml(s.name)}</h3>
         <p class="body">${escapeHtml(s.flavor)}</p>
-        ${itemsHtml}
+        <p class="paste-hint" style="margin-top:10px;">Henter varer…</p>
       </div>`;
   }
 
   function renderShops(shops, loadingItems) {
-    document.getElementById("resultGrid").innerHTML = shops.map((s) => shopCardHtml(s, loadingItems)).join("");
+    document.getElementById("resultGrid").innerHTML = loadingItems
+      ? shops.map(loadingCardHtml).join("")
+      : shopGridHtml(shops);
   }
 
   async function runGeneration() {
@@ -141,6 +131,11 @@
         title: lastResult.townName,
         category: "Butik",
         body,
+        shop_data: {
+          tierName: lastResult.tierName,
+          population: lastResult.population,
+          shops: lastResult.shops,
+        },
         created_by: session.user.email,
       });
       if (error) {

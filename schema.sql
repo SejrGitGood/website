@@ -33,10 +33,15 @@ create table if not exists lore_entries (
   category text not null default 'Andet',
   body text not null,
   images text[] not null default '{}',
+  shop_data jsonb,
   created_by text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- Struktureret data for gemte butiksgenerator-resultater (tier, befolkning,
+-- butikker med varer) — så en gemt by kan tegnes som kort igen uden at
+-- spørge Open5e på ny. Almindelige lore-indgange lader denne stå tom (null).
+alter table lore_entries add column if not exists shop_data jsonb;
 alter table lore_entries add column if not exists images text[] not null default '{}';
 
 create table if not exists logistics (
