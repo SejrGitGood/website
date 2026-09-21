@@ -264,6 +264,28 @@ a.card:hover{text-decoration:none;box-shadow:0 12px 30px -12px rgba(43,32,22,0.5
 .hp-row .hp-text{flex:0 0 auto;min-width:76px;text-align:right;font-size:0.85rem;color:var(--ink-soft);}
 .hp-row .hp-unknown{flex:1;font-style:italic;color:var(--ink-faint);font-size:0.85rem;}
 
+.inspiration-btn{
+  flex:0 0 auto;width:28px;height:28px;padding:0;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:none;border:1px solid var(--line);border-radius:999px;color:var(--ink-faint);cursor:pointer;
+}
+.inspiration-btn svg{width:14px;height:14px;}
+.inspiration-btn.active{border-color:var(--gold);color:var(--gold);background:color-mix(in srgb, var(--gold) 16%, transparent);}
+
+.card.done{opacity:0.7;}
+.card.done h3{text-decoration:line-through;color:var(--ink-faint);}
+
+.timeline{position:relative;margin:8px 0;}
+.timeline::before{content:"";position:absolute;left:5px;top:4px;bottom:4px;width:2px;background:var(--line);}
+.timeline-item{position:relative;padding-left:34px;}
+.timeline-item + .timeline-item{margin-top:18px;}
+.timeline-dot{position:absolute;left:0;top:8px;width:12px;height:12px;border-radius:50%;background:var(--ember);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--ember);}
+.timeline-item.event .timeline-dot{background:var(--mist);box-shadow:0 0 0 1px var(--mist);}
+.timeline-date{
+  font-family:"Cinzel",serif;font-size:0.7rem;letter-spacing:0.05em;text-transform:uppercase;
+  color:var(--ink-faint);margin:0 0 6px;
+}
+
 .back-link{
   display:inline-flex;align-items:center;gap:6px;
   font-family:"Cinzel",serif;font-size:0.75rem;letter-spacing:0.05em;text-transform:uppercase;

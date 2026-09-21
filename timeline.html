@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Tidslinje &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=7">
+<script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">Historien</p>
+    <h1>Tidslinje</h1>
+    <p>Sessions og store begivenheder, i den rækkefølge de skete.</p>
+  </div>
+
+  <div class="wrap" style="max-width:700px;">
+    <div class="tabs" id="filterTabs" style="margin-bottom:20px;">
+      <button data-filter="all" class="active">Alle</button>
+      <button data-filter="session">Sessions</button>
+      <button data-filter="event">Begivenheder</button>
+    </div>
+    <div class="timeline" id="timelineList"><div class="empty">Indlæser&hellip;</div></div>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=6"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("timeline.html");
+
+  let items = [];
+  let activeFilter = "all";
+
+  const PILOT_SESSION = {
+    type: "session",
+    sortKey: "2000-01-01T00:00:00Z",
+    title: "For at Finde Fortiden",
+    label: "Session 1",
+    excerpt: "Den store, illustrerede pilotudgave.",
+    href: "sessions/session-1/for-at-finde-fortiden.html",
+  };
+
+  function sessionItem(s) {
+    return {
+      type: "session",
+      sortKey: s.session_date || s.created_at,
+      title: s.title,
+      label: `Session ${s.number}`,
+      excerpt: stripImageMarkdown(s.summary || "").slice(0, 160),
+      href: `sessions.html?id=${s.id}`,
+    };
+  }
+
+  function eventItem(l) {
+    return {
+      type: "event",
+      sortKey: l.created_at,
+      title: l.title,
+      label: "Begivenhed",
+      excerpt: stripImageMarkdown(l.body || "").slice(0, 160),
+      href: `lore.html?id=${l.id}`,
+    };
+  }
+
+  function dateLabel(sortKey) {
+    const d = new Date(sortKey);
+    if (isNaN(d)) return "";
+    return d.toLocaleDateString("da-DK", { year: "numeric", month: "long", day: "numeric" });
+  }
+
+  function itemHtml(it) {
+    const cut = it.excerpt.length >= 160 ? "…" : "";
+    return `
+      <div class="timeline-item ${it.type}">
+        <span class="timeline-dot"></span>
+        <p class="timeline-date">${escapeHtml(it.label)} &middot; ${dateLabel(it.sortKey)}</p>
+        <a class="card" href="${it.href}" style="display:block;">
+          <h3>${escapeHtml(it.title)}</h3>
+          ${it.excerpt ? `<p class="body">${escapeHtml(it.excerpt)}${cut}</p>` : ""}
+        </a>
+      </div>`;
+  }
+
+  function render() {
+    const list = document.getElementById("timelineList");
+    const filtered = activeFilter === "all" ? items : items.filter((i) => i.type === activeFilter);
+    list.innerHTML = filtered.length ? filtered.map(itemHtml).join("") : `<div class="empty">Intet at vise endnu.</div>`;
+  }
+
+  document.getElementById("filterTabs").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-filter]");
+    if (!btn) return;
+    activeFilter = btn.dataset.filter;
+    document.querySelectorAll("#filterTabs button").forEach((b) => b.classList.toggle("active", b === btn));
+    render();
+  });
+
+  const [{ data: sessionRows }, { data: eventRows }] = await Promise.all([
+    window.sb.from("sessions").select("*"),
+    window.sb.from("lore_entries").select("*").eq("category", "Begivenhed"),
+  ]);
+
+  items = [PILOT_SESSION, ...(sessionRows || []).map(sessionItem), ...(eventRows || []).map(eventItem)];
+  items.sort((a, b) => new Date(a.sortKey) - new Date(b.sortKey));
+  render();
+})();
+</script>
+</body>
+</html>

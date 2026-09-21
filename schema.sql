@@ -63,6 +63,9 @@ create table if not exists characters (
   data jsonb,
   updated_at timestamptz not null default now()
 );
+-- Inspiration er tracket her, ikke i `data` — `data` bliver overskrevet ved
+-- hver D&D Beyond-synk, så den ville forsvinde igen ved næste "Opdater nu".
+alter table characters add column if not exists has_inspiration boolean not null default false;
 
 create table if not exists logistics (
   id int primary key default 1,
@@ -101,6 +104,17 @@ create table if not exists party_treasury (
 
 insert into party_treasury (id) values (1) on conflict (id) do nothing;
 
+-- Kort liste over aktive/fuldførte mål, adskilt fra Lore's opslagsværk.
+create table if not exists quests (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  notes text,
+  done boolean not null default false,
+  created_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 alter table sessions enable row level security;
 alter table lore_entries enable row level security;
 alter table logistics enable row level security;
@@ -108,6 +122,7 @@ alter table allowed_users enable row level security;
 alter table characters enable row level security;
 alter table loot_items enable row level security;
 alter table party_treasury enable row level security;
+alter table quests enable row level security;
 
 -- Rydder op efter en evt. tidligere, mere åben version af dette skema,
 -- så denne fil altid trygt kan køres igen fra toppen.
@@ -153,6 +168,12 @@ create policy "allow-listed users only" on loot_items
 
 drop policy if exists "allow-listed users only" on party_treasury;
 create policy "allow-listed users only" on party_treasury
+  for all
+  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
+  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+
+drop policy if exists "allow-listed users only" on quests;
+create policy "allow-listed users only" on quests
   for all
   using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
   with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
