@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Karakterer &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=3">
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">Selskabet</p>
+    <h1>Karakterer</h1>
+    <p>Hentet fra D&amp;D Beyond, når karakteren er sat til offentlig &mdash; ellers vises bare navnet.</p>
+  </div>
+
+  <div class="wrap">
+    <section class="section">
+      <div class="grid" id="grid"><div class="empty">Indlæser&hellip;</div></div>
+    </section>
+
+    <p class="paste-hint" style="text-align:center;">
+      Data er en øjebliksbillede, ikke live &mdash; bed Claude om at opdatere en karakter, når den ændrer sig eller bliver gjort offentlig.
+    </p>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=3"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("characters.html");
+  wireLightbox();
+
+  const grid = document.getElementById("grid");
+
+  function publicCardHtml(c) {
+    const d = c.data;
+    const classLine = (d.classes || [])
+      .map((cl) => `${escapeHtml(cl.name)} ${cl.level}${cl.subclass ? ` (${escapeHtml(cl.subclass)})` : ""}`)
+      .join(" / ");
+    const hpLine = `HP ${d.hp.current}/${d.hp.max}` + (d.hp.temp ? ` (+${d.hp.temp} midlertidig)` : "");
+    const statsHtml = (d.stats || [])
+      .map((s) => `<li><strong>${escapeHtml(s.name)}</strong> ${s.score} (${s.mod >= 0 ? "+" : ""}${s.mod})</li>`)
+      .join("");
+    const equippedHtml = (d.equipped || []).map((i) => escapeHtml(i.name)).join(", ");
+    const portrait = d.portraitUrl
+      ? `<img class="inline-thumb" style="max-height:220px;margin:0 0 10px;" src="${escapeHtml(d.portraitUrl)}" alt="${escapeHtml(d.name)}">`
+      : "";
+    return `
+      <div class="card">
+        ${portrait}
+        <span class="badge">${escapeHtml(c.player_name)}</span>
+        <h3 style="margin-top:8px;">${escapeHtml(d.name || c.character_name)}</h3>
+        <p class="meta">${escapeHtml(d.race || "")} &middot; ${classLine}</p>
+        <p class="body">${hpLine}${d.background ? ` &middot; ${escapeHtml(d.background)}` : ""}${d.alignment ? ` &middot; ${escapeHtml(d.alignment)}` : ""}</p>
+        <ul class="shop-items">${statsHtml}</ul>
+        ${equippedHtml ? `<p class="meta" style="margin-top:10px;">Udstyr: ${equippedHtml}</p>` : ""}
+        <div class="card-actions">
+          <a class="btn secondary" href="${escapeHtml(d.sheetUrl || "https://www.dndbeyond.com/characters/" + c.ddb_character_id)}" target="_blank" rel="noopener">Åbn på D&amp;D Beyond</a>
+        </div>
+      </div>`;
+  }
+
+  function privateCardHtml(c) {
+    return `
+      <div class="card">
+        <span class="badge">${escapeHtml(c.player_name)}</span>
+        <h3 style="margin-top:8px;">${escapeHtml(c.character_name)}</h3>
+        <p class="body">Karakterarket er endnu ikke gjort offentligt på D&amp;D Beyond.</p>
+        <div class="card-actions">
+          <a class="btn secondary" href="https://www.dndbeyond.com/characters/${c.ddb_character_id}" target="_blank" rel="noopener">Åbn på D&amp;D Beyond</a>
+        </div>
+      </div>`;
+  }
+
+  async function load() {
+    const { data, error } = await window.sb.from("characters").select("*").order("sort_order", { ascending: true });
+    if (error) {
+      grid.innerHTML = `<div class="empty">Kunne ikke hente karakterer: ${escapeHtml(error.message)}</div>`;
+      return;
+    }
+    if (!data || !data.length) {
+      grid.innerHTML = `<div class="empty">Ingen karakterer i rosteret endnu.</div>`;
+      return;
+    }
+    grid.innerHTML = data.map((c) => (c.is_public && c.data ? publicCardHtml(c) : privateCardHtml(c))).join("");
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

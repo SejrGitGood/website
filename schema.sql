@@ -44,6 +44,20 @@ create table if not exists lore_entries (
 alter table lore_entries add column if not exists shop_data jsonb;
 alter table lore_entries add column if not exists images text[] not null default '{}';
 
+-- Karakterroster, hentet fra D&D Beyond. `data` er en renset opsummering
+-- (klasse, HP, ability scores, udstyr, portræt) — kun sat, når karakteren er
+-- gjort offentlig på D&D Beyond og hentet. Ellers viser siden bare navnet.
+create table if not exists characters (
+  id uuid primary key default gen_random_uuid(),
+  player_name text not null,
+  character_name text not null,
+  ddb_character_id bigint not null unique,
+  sort_order int not null default 0,
+  is_public boolean not null default false,
+  data jsonb,
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists logistics (
   id int primary key default 1,
   next_session_date timestamptz,
@@ -59,6 +73,7 @@ alter table sessions enable row level security;
 alter table lore_entries enable row level security;
 alter table logistics enable row level security;
 alter table allowed_users enable row level security;
+alter table characters enable row level security;
 
 -- Rydder op efter en evt. tidligere, mere åben version af dette skema,
 -- så denne fil altid trygt kan køres igen fra toppen.
@@ -86,6 +101,12 @@ create policy "allow-listed users only" on lore_entries
   with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
 
 create policy "allow-listed users only" on logistics
+  for all
+  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
+  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+
+drop policy if exists "allow-listed users only" on characters;
+create policy "allow-listed users only" on characters
   for all
   using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
   with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
