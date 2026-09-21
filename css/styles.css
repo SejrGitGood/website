@@ -162,6 +162,9 @@ a.card:hover{text-decoration:none;box-shadow:0 12px 30px -12px rgba(43,32,22,0.5
 .shop-items li{padding:6px 0;border-bottom:1px dashed var(--line);font-size:0.9rem;color:var(--ink-soft);}
 .shop-items li:last-child{border-bottom:none;}
 .shop-items strong{color:var(--ink);font-family:"Cinzel",serif;font-weight:600;font-size:0.92rem;}
+.shop-items summary{cursor:pointer;}
+.shop-items summary:hover strong{color:var(--ember);}
+.item-desc{margin:8px 0 0;font-size:0.85rem;font-style:italic;color:var(--ink-faint);}
 
 .paste-hint{font-size:0.78rem;color:var(--ink-faint);font-style:italic;margin-top:-4px;}
 .inline-thumb{

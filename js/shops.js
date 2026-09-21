@@ -222,16 +222,26 @@ function generateShopList(population) {
 // aldrig tredjeparts- eller homebrew-indhold fra Open5e's øvrige dokumenter.
 const OPEN5E_DOCUMENT = "srd-2014";
 
+// Kun typer, hvor det giver mening at der er varer på hylderne, har en
+// mapning her. En kro, en helligdom, et akademi, en ambassade eller et
+// magibutik (SRD'en har reelt ingen prissatte magiske genstande) har med
+// vilje ingen — deres kort viser bare smagsprøven, ingen tom "ingen varer"-besked.
 const SHOP_ITEM_CATEGORIES = {
+  "Købmand": ["adventuring-gear", "trade-good"],
   "Smed": ["weapon", "tools"],
+  "Stald": ["trade-good"],
+  "Urtekræmmer": ["poison", "adventuring-gear"],
+  "Tempel": ["adventuring-gear"],
   "Våbensmed": ["weapon"],
   "Rustningssmed": ["armor", "shield"],
-  "Købmand": ["adventuring-gear", "trade-good"],
-  "Urtekræmmer": ["poison", "adventuring-gear"],
+  "Juveler": ["trade-good"],
+  "Boghandler": ["adventuring-gear"],
+  "Pengeudlåner": ["trade-good"],
   "Alkymist": ["poison", "adventuring-gear"],
   "Eksotisk Handler": ["trade-good"],
   "Gildehus": ["tools"],
   "Sortebørs": ["poison"],
+  "Auktionshus": ["trade-good"],
 };
 
 const itemCategoryCache = new Map();
@@ -260,7 +270,7 @@ function normalizeItem(raw) {
   } else if (raw.weight) {
     stat = `${parseFloat(raw.weight)} lb.`;
   }
-  return { name: raw.name, cost: formatCost(raw.cost), stat };
+  return { name: raw.name, cost: formatCost(raw.cost), stat, desc: raw.desc || "" };
 }
 
 async function fetchCategoryItems(category) {
@@ -304,18 +314,17 @@ async function attachShopItems(shops) {
 // Rendering sker altid ud fra data, der allerede er hentet/gemt — aldrig ved
 // selv at kalde Open5e igen.
 
+function itemLineHtml(i) {
+  const summary = `<strong>${escapeHtml(i.name)}</strong> &mdash; ${escapeHtml(i.cost)}${
+    i.stat ? ` &middot; ${escapeHtml(i.stat)}` : ""
+  }`;
+  if (!i.desc) return `<li>${summary}</li>`;
+  return `<li><details><summary>${summary}</summary><p class="item-desc">${escapeHtml(i.desc)}</p></details></li>`;
+}
+
 function shopCardHtml(s) {
   const itemsHtml =
-    s.items && s.items.length
-      ? `<ul class="shop-items">${s.items
-          .map(
-            (i) =>
-              `<li><strong>${escapeHtml(i.name)}</strong> &mdash; ${escapeHtml(i.cost)}${
-                i.stat ? ` &middot; ${escapeHtml(i.stat)}` : ""
-              }</li>`
-          )
-          .join("")}</ul>`
-      : "";
+    s.items && s.items.length ? `<ul class="shop-items">${s.items.map(itemLineHtml).join("")}</ul>` : "";
   return `
     <div class="card">
       <span class="badge">${escapeHtml(s.type)}</span>
