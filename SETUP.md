@@ -1,6 +1,8 @@
 # Blessings of Valkyriegade — setup
 
-Live and working: Supabase project, shared login, public repo, GitHub Pages, image pasting, the shop generator, the character roster (Karakterer), monster/spell/condition lookup, the party health widget with an Inspiration toggle, the campaign day counter, the loot/gold tracker (Skattekammer), NPC attitude and status tracking on Lore, the quest board (Mål), the interactive timeline (Tidslinje), site-wide search, and a manual theme switcher (Auto/Lys/Mørk/Blodmåne) in the nav.
+Live and working: Supabase project, shared login, public repo, GitHub Pages, image pasting, the shop generator, the character roster (Karakterer), monster/spell/condition lookup, the party health widget with an Inspiration toggle, the campaign day counter, the loot/gold tracker (Skattekammer), NPC attitude and status tracking on Lore, the quest board (Mål), the interactive timeline (Tidslinje), site-wide search, a manual theme switcher (Auto/Lys/Mørk/Blodmåne) in the nav, and automatic lore cross-linking with hover previews in Sessions/Lore text.
+
+**Lore auto-linking**: any text in a session recap or Lore entry that matches another Lore entry's title exactly (case-sensitive, whole word/phrase) becomes a clickable link automatically, with a hover preview card. No setup needed — it just reads whatever titles already exist. Rename a Lore entry and old mentions of the new name start linking automatically; nothing needs to be re-saved.
 
 **Nav structure**: the top nav is just Forside / Historien / DM Tools / Logistik. Sessions, Lore, Mål and Tidslinje live behind the "Historien" hub page (same pattern as DM Tools). The homepage still deep-links straight to Sessions/Lore/Mål previews, same as it deep-links to Karakterer under DM Tools.
 
