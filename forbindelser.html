@@ -7,7 +7,7 @@
 <title>Forbindelser &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=14">
+<link rel="stylesheet" href="css/styles.css?v=15">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -138,7 +138,7 @@
         const s = posById.get(e.source);
         const t = posById.get(e.target);
         if (!s || !t) return "";
-        return `<line x1="${s.x.toFixed(1)}" y1="${s.y.toFixed(1)}" x2="${t.x.toFixed(1)}" y2="${t.y.toFixed(1)}" stroke="var(--line)" stroke-width="1.5" opacity="0.7"/>`;
+        return `<line class="graph-edge" data-source="${e.source}" data-target="${e.target}" x1="${s.x.toFixed(1)}" y1="${s.y.toFixed(1)}" x2="${t.x.toFixed(1)}" y2="${t.y.toFixed(1)}" stroke="var(--line)" stroke-width="1.5" opacity="0.7"/>`;
       })
       .join("");
 
@@ -155,13 +155,53 @@
       })
       .join("");
 
-    document.getElementById("graphHolder").innerHTML =
-      `<svg viewBox="0 0 ${SIZE} ${SIZE}" class="graph-svg">${edgeLines}${nodeEls}</svg>`;
+    const graphHolder = document.getElementById("graphHolder");
+    graphHolder.innerHTML = `<svg viewBox="0 0 ${SIZE} ${SIZE}" class="graph-svg">${edgeLines}${nodeEls}</svg>`;
 
     const usedCategories = [...new Set(nodes.map((n) => n.category))];
     document.getElementById("graphLegend").innerHTML = usedCategories
       .map((c) => `<span><span class="graph-legend-swatch" style="background:${categoryColor(c)};"></span>${escapeHtml(c)}</span>`)
       .join("");
+
+    // Hover/fokus på en node fremhæver den selv og dens direkte forbindelser,
+    // og dæmper alt andet — gør det muligt at følge en enkelt tråd i et
+    // ellers tæt net af streger uden at skulle taste alle titler ud.
+    const adjacency = new Map();
+    edges.forEach((e) => {
+      if (!adjacency.has(e.source)) adjacency.set(e.source, new Set());
+      if (!adjacency.has(e.target)) adjacency.set(e.target, new Set());
+      adjacency.get(e.source).add(e.target);
+      adjacency.get(e.target).add(e.source);
+    });
+
+    function setFocusNode(id) {
+      const related = id ? adjacency.get(id) || new Set() : null;
+      graphHolder.querySelectorAll(".graph-node").forEach((el) => {
+        const nodeId = el.dataset.loreId;
+        el.classList.toggle("graph-node-active", nodeId === id);
+        el.classList.toggle("graph-node-dimmed", !!id && nodeId !== id && !related.has(nodeId));
+      });
+      graphHolder.querySelectorAll(".graph-edge").forEach((el) => {
+        const touches = el.dataset.source === id || el.dataset.target === id;
+        el.classList.toggle("graph-edge-active", touches);
+        el.classList.toggle("graph-edge-dimmed", !!id && !touches);
+      });
+    }
+
+    graphHolder.addEventListener("mouseover", (e) => {
+      const node = e.target.closest(".graph-node");
+      if (node) setFocusNode(node.dataset.loreId);
+    });
+    graphHolder.addEventListener("mouseout", (e) => {
+      if (e.target.closest(".graph-node") && !e.relatedTarget?.closest?.(".graph-node")) setFocusNode(null);
+    });
+    graphHolder.addEventListener("focusin", (e) => {
+      const node = e.target.closest(".graph-node");
+      if (node) setFocusNode(node.dataset.loreId);
+    });
+    graphHolder.addEventListener("focusout", (e) => {
+      if (e.target.closest(".graph-node") && !e.relatedTarget?.closest?.(".graph-node")) setFocusNode(null);
+    });
   }
 
   if (orphans.length) {
