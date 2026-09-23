@@ -7,7 +7,7 @@
 <title>Historien &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=10">
+<link rel="stylesheet" href="css/styles.css?v=11">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -22,7 +22,7 @@
   <div class="page-head">
     <p class="eyebrow">Kampagnen</p>
     <h1>Historien</h1>
-    <p>Sessions, Lore, mål og tidslinjen &mdash; alt det, kampagnen består af.</p>
+    <p>Sessions, Lore, mål, tidslinjen, kortet og forbindelserne &mdash; alt det, kampagnen består af.</p>
   </div>
 
   <div class="wrap">
@@ -48,6 +48,16 @@
           <h3 style="margin-top:8px;">Tidslinje</h3>
           <p class="body">Sessions og store begivenheder, i den rækkefølge de skete.</p>
         </a>
+        <a class="card" href="kort.html" style="display:block;">
+          <span class="badge">Verden</span>
+          <h3 style="margin-top:8px;">Kort</h3>
+          <p class="body">Barovia, tegnet op &mdash; klik en markør for at se stedet.</p>
+        </a>
+        <a class="card" href="forbindelser.html" style="display:block;">
+          <span class="badge">Overblik</span>
+          <h3 style="margin-top:8px;">Forbindelser</h3>
+          <p class="body">Hvem og hvad hænger sammen, udledt automatisk af hvornår lore nævner hinanden.</p>
+        </a>
       </div>
     </section>
   </div>
@@ -57,7 +67,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=9"></script>
+<script src="js/app.js?v=10"></script>
 <script>
 (async function () {
   const session = await guardPage();

@@ -132,6 +132,30 @@ create table if not exists quests (
   updated_at timestamptz not null default now()
 );
 
+-- Interaktivt kort: et eller flere kortbilleder (uploades via samme
+-- billed-pipeline som Ctrl+V-indsætning), med markører der kan linke til en
+-- lore-indgang. x/y er procent (0-100) af billedets bredde/højde, så
+-- markøren altid rammer rigtigt uanset hvor stort billedet vises.
+create table if not exists maps (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  image_url text not null,
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists map_markers (
+  id uuid primary key default gen_random_uuid(),
+  map_id uuid not null references maps(id) on delete cascade,
+  x numeric not null,
+  y numeric not null,
+  label text not null,
+  lore_id uuid references lore_entries(id) on delete set null,
+  notes text,
+  created_by text,
+  created_at timestamptz not null default now()
+);
+
 alter table sessions enable row level security;
 alter table lore_entries enable row level security;
 alter table logistics enable row level security;
@@ -141,6 +165,8 @@ alter table loot_items enable row level security;
 alter table party_treasury enable row level security;
 alter table quests enable row level security;
 alter table character_private_notes enable row level security;
+alter table maps enable row level security;
+alter table map_markers enable row level security;
 
 -- Rydder op efter en evt. tidligere, mere åben version af dette skema,
 -- så denne fil altid trygt kan køres igen fra toppen.
@@ -192,6 +218,18 @@ create policy "allow-listed users only" on party_treasury
 
 drop policy if exists "allow-listed users only" on quests;
 create policy "allow-listed users only" on quests
+  for all
+  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
+  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+
+drop policy if exists "allow-listed users only" on maps;
+create policy "allow-listed users only" on maps
+  for all
+  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
+  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+
+drop policy if exists "allow-listed users only" on map_markers;
+create policy "allow-listed users only" on map_markers
   for all
   using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
   with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));

@@ -204,10 +204,12 @@ a.card:hover{text-decoration:none;box-shadow:0 12px 30px -12px rgba(43,32,22,0.5
 .btn:disabled{opacity:0.5;cursor:not-allowed;}
 
 .tabs{display:flex;gap:8px;flex-wrap:wrap;}
-.tabs button{
+.tabs button, .tabs a{
   font-family:"Cinzel",serif;font-size:0.72rem;letter-spacing:0.05em;text-transform:uppercase;
   padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--ink-soft);cursor:pointer;
 }
+.tabs a{text-decoration:none;}
+.tabs a:hover{color:var(--ember);text-decoration:none;}
 .tabs button.active{background:var(--ember);border-color:var(--ember);color:var(--surface);}
 
 .empty{
@@ -311,6 +313,30 @@ a.card:hover{text-decoration:none;box-shadow:0 12px 30px -12px rgba(43,32,22,0.5
   color:var(--ink-soft);
 }
 .back-link svg{width:14px;height:14px;}
+
+.map-container{
+  position:relative;display:block;width:100%;border-radius:10px;overflow:hidden;
+  border:1px solid var(--line);box-shadow:var(--shadow);background:var(--bg);line-height:0;
+}
+.map-container img{display:block;width:100%;height:auto;}
+.map-container.placing{cursor:crosshair;}
+#markersLayer{position:absolute;inset:0;}
+.map-marker{
+  position:absolute;transform:translate(-50%,-100%);width:26px;height:26px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;text-decoration:none;
+}
+.map-marker svg{width:26px;height:26px;color:var(--ember);filter:drop-shadow(0 2px 3px rgba(0,0,0,0.55));}
+.map-marker:hover svg{color:var(--gold);}
+.map-marker-plain svg{color:var(--ink-faint);}
+.map-marker-plain:hover svg{color:var(--ink-soft);}
+
+.graph-svg{width:100%;height:auto;display:block;}
+.graph-node{cursor:pointer;}
+.graph-node .graph-label{font-family:"Cinzel",serif;font-size:11px;fill:var(--ink-soft);}
+.graph-node:hover .graph-label{fill:var(--ember);}
+.graph-node:hover circle{filter:brightness(1.25);}
+.graph-legend{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:14px;font-size:0.82rem;color:var(--ink-soft);}
+.graph-legend-swatch{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;}
 
 [hidden]{display:none !important;}
 

@@ -373,31 +373,53 @@ function escapeRegExp(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// Bygger et regex, der matcher alle kendte lore-titler (længste først, så
+// "Ireena Kolyana" ikke bliver til "Ireena" + " Kolyana"), plus et opslag
+// fra matchet tekst til lore-id. Delt af linkifyLoreMentions (tekst → HTML
+// med links) og findMentionedLoreIds (tekst → liste af id'er, bruges af
+// forbindelsesgrafen). Unicode-bevidste ordgrænser i stedet for \b, som ikke
+// regner æ/ø/å for ordtegn.
+function buildMentionMatcher(loreEntries, excludeId) {
+  const candidates = (loreEntries || [])
+    .filter((l) => l.id !== excludeId && l.title && l.title.trim())
+    .sort((a, b) => b.title.length - a.title.length);
+  if (!candidates.length) return null;
+  const idByTitle = new Map();
+  candidates.forEach((l) => {
+    if (!idByTitle.has(l.title)) idByTitle.set(l.title, l.id);
+  });
+  const pattern = candidates.map((l) => escapeRegExp(l.title)).join("|");
+  const re = new RegExp(`(?<![\\p{L}\\p{N}_])(${pattern})(?![\\p{L}\\p{N}_])`, "gu");
+  return { re, idByTitle };
+}
+
 // Omslutter forekomster af kendte lore-titler i allerede-renderet HTML (fra
 // renderBodyHtml) med links til den pågældende lore-indgang. Køres EFTER
 // renderBodyHtml — rører aldrig <img>-tags, da deres alt-tekst altid er fast
 // ("Vedhæftet billede"), ingen titel kan matche den ved et uheld.
 // `excludeId` lader en lore-indgang undgå at linke til sig selv.
 function linkifyLoreMentions(html, loreEntries, excludeId) {
-  const candidates = (loreEntries || [])
-    .filter((l) => l.id !== excludeId && l.title && l.title.trim())
-    .sort((a, b) => b.title.length - a.title.length); // længste titel først, så "Ireena Kolyana" ikke bliver til "Ireena" + " Kolyana"
-  if (!candidates.length) return html;
-
-  const idByTitle = new Map();
-  candidates.forEach((l) => {
-    if (!idByTitle.has(l.title)) idByTitle.set(l.title, l.id);
+  const matcher = buildMentionMatcher(loreEntries, excludeId);
+  if (!matcher) return html;
+  return html.replace(matcher.re, (match) => {
+    const id = matcher.idByTitle.get(match);
+    return id === undefined ? match : `<a href="lore.html?id=${id}" class="lore-mention" data-lore-id="${id}">${match}</a>`;
   });
+}
 
-  const pattern = candidates.map((l) => escapeRegExp(l.title)).join("|");
-  // Unicode-bevidste ordgrænser i stedet for \b, som ikke regner æ/ø/å for ordtegn.
-  const re = new RegExp(`(?<![\\p{L}\\p{N}_])(${pattern})(?![\\p{L}\\p{N}_])`, "gu");
-
-  return html.replace(re, (match) => {
-    const id = idByTitle.get(match);
-    if (id === undefined) return match;
-    return `<a href="lore.html?id=${id}" class="lore-mention" data-lore-id="${id}">${match}</a>`;
-  });
+// Samme genkendelse som linkifyLoreMentions, men på rå tekst og returnerer
+// bare de fundne id'er i stedet for HTML — bruges til at udlede kanterne i
+// forbindelsesgrafen (hvilke lore-indgange nævner hinanden).
+function findMentionedLoreIds(text, loreEntries, excludeId) {
+  const matcher = buildMentionMatcher(loreEntries, excludeId);
+  if (!matcher || !text) return [];
+  const found = new Set();
+  let m;
+  while ((m = matcher.re.exec(text))) {
+    const id = matcher.idByTitle.get(m[1]);
+    if (id !== undefined) found.add(id);
+  }
+  return [...found];
 }
 
 const LORE_PREVIEW_DATA = new Map();

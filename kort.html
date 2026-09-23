@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Kort &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=11">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#A6461C">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Valkyriegade">
+<script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">Historien</p>
+    <h1>Kort</h1>
+    <p>Barovia, tegnet op &mdash; klik en markør for at se stedet, eller tilføj en ny.</p>
+  </div>
+
+  <div class="wrap">
+    <p style="margin:-8px 0 4px;"><a href="historien.html" class="back-link">&larr; Historien</a></p>
+
+    <section class="section" id="mapTabsSection" hidden>
+      <div class="tabs" id="mapTabs"></div>
+    </section>
+
+    <section class="section" id="mapSection" hidden>
+      <div class="card-actions" style="margin-bottom:12px;">
+        <button class="btn secondary" id="addMarkerBtn">Tilføj markør</button>
+        <span id="placingHint" class="notice ember" style="display:none;">Klik på kortet for at placere markøren.</span>
+      </div>
+      <div class="map-container" id="mapContainer">
+        <img id="mapImage" alt="Kort">
+        <div id="markersLayer"></div>
+      </div>
+
+      <div class="card" id="newMarkerCard" hidden style="margin-top:16px;">
+        <h3>Ny markør</h3>
+        <form class="form" id="markerForm">
+          <div class="field">
+            <label for="markerLabel">Navn</label>
+            <input type="text" id="markerLabel" required placeholder="F.eks. Vallaki">
+          </div>
+          <div class="field">
+            <label for="markerLore">Link til lore (valgfrit)</label>
+            <select id="markerLore">
+              <option value="">Ingen &mdash; bare et mærke</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="markerNotes">Noter (valgfrit)</label>
+            <input type="text" id="markerNotes">
+          </div>
+          <div class="card-actions">
+            <button class="btn" type="submit">Gem markør</button>
+            <button class="btn secondary" type="button" id="cancelMarkerBtn">Annuller</button>
+          </div>
+        </form>
+      </div>
+
+      <section class="section">
+        <div class="section-title"><h2>Markører</h2></div>
+        <div id="markerList"><div class="empty">Ingen markører endnu.</div></div>
+      </section>
+    </section>
+
+    <section class="section" id="uploadSection">
+      <div class="section-title"><h2 id="uploadTitle">Upload et kort</h2></div>
+      <div class="card">
+        <form class="form" id="uploadForm">
+          <div class="field">
+            <label for="mapTitleInput">Navn</label>
+            <input type="text" id="mapTitleInput" required placeholder="F.eks. Barovia-dalen">
+          </div>
+          <div class="field">
+            <label for="mapImageInput">Kortbillede</label>
+            <input type="file" id="mapImageInput" accept="image/*" required>
+          </div>
+          <div class="card-actions">
+            <button class="btn" type="submit">Upload kort</button>
+            <span id="uploadMsg" class="notice" style="display:none;"></span>
+          </div>
+        </form>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=10"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("historien.html");
+  wireLoreMentionPreviews();
+
+  let maps = [];
+  let activeMap = null;
+  let markers = [];
+  let loreOptions = [];
+  let placing = false;
+  let pendingPoint = null;
+
+  const mapContainer = document.getElementById("mapContainer");
+  const mapImage = document.getElementById("mapImage");
+  const markersLayer = document.getElementById("markersLayer");
+  const placingHint = document.getElementById("placingHint");
+  const newMarkerCard = document.getElementById("newMarkerCard");
+  const markerLoreSelect = document.getElementById("markerLore");
+
+  async function loadLoreOptions() {
+    const { data } = await window.sb.from("lore_entries").select("id, title, category").order("title", { ascending: true });
+    loreOptions = data || [];
+    setLorePreviewData(
+      (await window.sb.from("lore_entries").select("id, title, category, body, relationship, status")).data || []
+    );
+    markerLoreSelect.innerHTML =
+      `<option value="">Ingen &mdash; bare et mærke</option>` +
+      loreOptions.map((l) => `<option value="${l.id}">${escapeHtml(l.category)}: ${escapeHtml(l.title)}</option>`).join("");
+  }
+
+  async function loadMaps() {
+    const { data } = await window.sb.from("maps").select("*").order("sort_order", { ascending: true }).order("created_at", { ascending: true });
+    maps = data || [];
+    const tabsSection = document.getElementById("mapTabsSection");
+    const mapSection = document.getElementById("mapSection");
+    const uploadTitle = document.getElementById("uploadTitle");
+    if (!maps.length) {
+      tabsSection.hidden = true;
+      mapSection.hidden = true;
+      uploadTitle.textContent = "Upload det første kort";
+      return;
+    }
+    uploadTitle.textContent = "Upload endnu et kort";
+    mapSection.hidden = false;
+    tabsSection.hidden = maps.length < 2;
+    if (!activeMap || !maps.find((m) => m.id === activeMap.id)) {
+      activeMap = maps[0];
+    }
+    document.getElementById("mapTabs").innerHTML = maps
+      .map((m) => `<button type="button" data-id="${m.id}" class="${m.id === activeMap.id ? "active" : ""}">${escapeHtml(m.title)}</button>`)
+      .join("");
+    mapImage.src = activeMap.image_url;
+    mapImage.alt = activeMap.title;
+    await loadMarkers();
+  }
+
+  async function loadMarkers() {
+    if (!activeMap) return;
+    const { data } = await window.sb
+      .from("map_markers")
+      .select("*")
+      .eq("map_id", activeMap.id)
+      .order("created_at", { ascending: true });
+    markers = data || [];
+    renderMarkers();
+    renderMarkerList();
+  }
+
+  function loreTitleFor(loreId) {
+    const l = loreOptions.find((x) => x.id === loreId);
+    return l ? l.title : null;
+  }
+
+  function renderMarkers() {
+    markersLayer.innerHTML = markers
+      .map((m) => {
+        const style = `left:${m.x}%;top:${m.y}%;`;
+        const pin = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>`;
+        if (m.lore_id) {
+          return `<a href="lore.html?id=${m.lore_id}" class="lore-mention map-marker" data-lore-id="${m.lore_id}" style="${style}" title="${escapeHtml(m.label)}">${pin}</a>`;
+        }
+        return `<span class="map-marker map-marker-plain" style="${style}" title="${escapeHtml(m.label)}${m.notes ? " — " + escapeHtml(m.notes) : ""}">${pin}</span>`;
+      })
+      .join("");
+  }
+
+  function renderMarkerList() {
+    const list = document.getElementById("markerList");
+    if (!markers.length) {
+      list.innerHTML = `<div class="empty">Ingen markører endnu.</div>`;
+      return;
+    }
+    list.innerHTML = markers
+      .map((m) => {
+        const loreTitle = m.lore_id ? loreTitleFor(m.lore_id) : null;
+        return `
+        <div class="card" data-id="${m.id}">
+          <h3 style="margin-top:0;">${escapeHtml(m.label)}</h3>
+          ${loreTitle ? `<p class="meta">Linket til: <a href="lore.html?id=${m.lore_id}">${escapeHtml(loreTitle)}</a></p>` : ""}
+          ${m.notes ? `<p class="body">${escapeHtml(m.notes)}</p>` : ""}
+          <div class="card-actions">
+            <button class="btn danger deleteMarkerBtn">Slet markør</button>
+          </div>
+        </div>`;
+      })
+      .join("");
+    list.querySelectorAll(".deleteMarkerBtn").forEach((btn, i) => {
+      btn.addEventListener("click", async () => {
+        const m = markers[i];
+        if (!confirm(`Slet markøren "${m.label}"?`)) return;
+        await window.sb.from("map_markers").delete().eq("id", m.id);
+        loadMarkers();
+      });
+    });
+  }
+
+  document.getElementById("mapTabs").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-id]");
+    if (!btn) return;
+    activeMap = maps.find((m) => m.id === btn.dataset.id);
+    document.querySelectorAll("#mapTabs button").forEach((b) => b.classList.toggle("active", b === btn));
+    mapImage.src = activeMap.image_url;
+    mapImage.alt = activeMap.title;
+    exitPlacing();
+    loadMarkers();
+  });
+
+  function enterPlacing() {
+    placing = true;
+    mapContainer.classList.add("placing");
+    placingHint.style.display = "inline-block";
+  }
+  function exitPlacing() {
+    placing = false;
+    pendingPoint = null;
+    mapContainer.classList.remove("placing");
+    placingHint.style.display = "none";
+    newMarkerCard.hidden = true;
+    document.getElementById("markerForm").reset();
+  }
+
+  document.getElementById("addMarkerBtn").addEventListener("click", () => {
+    if (placing) {
+      exitPlacing();
+    } else {
+      enterPlacing();
+    }
+  });
+
+  mapContainer.addEventListener("click", (e) => {
+    if (!placing) return;
+    const rect = mapImage.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    if (x < 0 || x > 100 || y < 0 || y > 100) return;
+    pendingPoint = { x: x.toFixed(2), y: y.toFixed(2) };
+    placingHint.style.display = "none";
+    mapContainer.classList.remove("placing");
+    newMarkerCard.hidden = false;
+    document.getElementById("markerLabel").focus();
+  });
+
+  document.getElementById("cancelMarkerBtn").addEventListener("click", exitPlacing);
+
+  document.getElementById("markerForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!pendingPoint || !activeMap) return;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    await withBusy(submitBtn, "Gemmer…", async () => {
+      const label = document.getElementById("markerLabel").value.trim();
+      const loreId = document.getElementById("markerLore").value || null;
+      const notes = document.getElementById("markerNotes").value.trim();
+      const { error } = await window.sb.from("map_markers").insert({
+        map_id: activeMap.id,
+        x: pendingPoint.x,
+        y: pendingPoint.y,
+        label,
+        lore_id: loreId,
+        notes,
+        created_by: session.user.email,
+      });
+      if (error) {
+        alert("Kunne ikke gemme: " + error.message);
+        return;
+      }
+      placing = false;
+      exitPlacing();
+      loadMarkers();
+    });
+  });
+
+  document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const msg = document.getElementById("uploadMsg");
+    msg.style.display = "none";
+    const fileInput = document.getElementById("mapImageInput");
+    const file = fileInput.files[0];
+    if (!file) return;
+    await withBusy(submitBtn, "Uploader…", async () => {
+      let url;
+      try {
+        url = await uploadPastedImage(file);
+      } catch (err) {
+        msg.style.display = "inline-block";
+        msg.textContent = "Kunne ikke uploade billedet: " + err.message;
+        return;
+      }
+      const title = document.getElementById("mapTitleInput").value.trim();
+      const { error } = await window.sb.from("maps").insert({
+        title,
+        image_url: url,
+        sort_order: maps.length,
+      });
+      if (error) {
+        msg.style.display = "inline-block";
+        msg.textContent = "Kunne ikke gemme kortet: " + error.message;
+        return;
+      }
+      e.target.reset();
+      msg.style.display = "inline-block";
+      msg.textContent = "Kort uploadet.";
+      await loadMaps();
+    });
+  });
+
+  await loadLoreOptions();
+  await loadMaps();
+})();
+</script>
+</body>
+</html>

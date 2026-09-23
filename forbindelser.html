@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Forbindelser &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=11">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#A6461C">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Valkyriegade">
+<script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">Historien</p>
+    <h1>Forbindelser</h1>
+    <p>Hvem og hvad hænger sammen &mdash; udledt automatisk af hvornår lore nævner hinanden.</p>
+  </div>
+
+  <div class="wrap" style="max-width:800px;">
+    <p style="margin:-8px 0 4px;"><a href="historien.html" class="back-link">&larr; Historien</a></p>
+
+    <section class="section">
+      <div class="card">
+        <p class="body" id="graphSummary">Indlæser&hellip;</p>
+        <div id="graphHolder"></div>
+        <div class="graph-legend" id="graphLegend"></div>
+      </div>
+    </section>
+
+    <section class="section" id="orphanSection" hidden>
+      <div class="section-title"><h2>Uden forbindelser endnu</h2></div>
+      <p class="paste-hint">Disse lore-indgange bliver ikke nævnt af, og nævner ikke selv, nogen andre &mdash; endnu.</p>
+      <div class="tabs" id="orphanList" style="margin-top:10px;"></div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=10"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("historien.html");
+  wireLoreMentionPreviews();
+
+  const CATEGORY_COLOR = {
+    NPC: "var(--gold)",
+    Sted: "var(--mist)",
+    Begivenhed: "var(--ember)",
+    Monster: "var(--blood)",
+    Besværgelse: "var(--ember-soft)",
+  };
+  function categoryColor(cat) {
+    return CATEGORY_COLOR[cat] || "var(--ink-faint)";
+  }
+
+  const { data } = await window.sb.from("lore_entries").select("id, title, category, body, relationship, status");
+  const entries = data || [];
+  setLorePreviewData(entries);
+
+  const edgeSeen = new Set();
+  const edges = [];
+  entries.forEach((l) => {
+    findMentionedLoreIds(l.body, entries, l.id).forEach((targetId) => {
+      const key = [l.id, targetId].sort().join("|");
+      if (!edgeSeen.has(key)) {
+        edgeSeen.add(key);
+        edges.push({ source: l.id, target: targetId });
+      }
+    });
+  });
+
+  const degree = new Map();
+  edges.forEach((e) => {
+    degree.set(e.source, (degree.get(e.source) || 0) + 1);
+    degree.set(e.target, (degree.get(e.target) || 0) + 1);
+  });
+
+  const connectedIds = new Set();
+  edges.forEach((e) => {
+    connectedIds.add(e.source);
+    connectedIds.add(e.target);
+  });
+  const nodes = entries.filter((l) => connectedIds.has(l.id));
+  const orphans = entries.filter((l) => !connectedIds.has(l.id));
+
+  document.getElementById("graphSummary").textContent = nodes.length
+    ? `${nodes.length} lore-indgange, ${edges.length} forbindelser fundet.`
+    : "Ingen forbindelser fundet endnu — nævn en lore-titel i en anden lore-indgangs tekst, så dukker de op her.";
+
+  if (nodes.length) {
+    const SIZE = 640;
+    const cx = SIZE / 2;
+    const cy = SIZE / 2;
+    const radius = SIZE * 0.4;
+    const positioned = nodes.map((n, i) => {
+      const angle = (i / nodes.length) * 2 * Math.PI - Math.PI / 2;
+      return { ...n, x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+    });
+    const posById = new Map(positioned.map((n) => [n.id, n]));
+
+    const edgeLines = edges
+      .map((e) => {
+        const s = posById.get(e.source);
+        const t = posById.get(e.target);
+        if (!s || !t) return "";
+        return `<line x1="${s.x.toFixed(1)}" y1="${s.y.toFixed(1)}" x2="${t.x.toFixed(1)}" y2="${t.y.toFixed(1)}" stroke="var(--line)" stroke-width="1.5" opacity="0.7"/>`;
+      })
+      .join("");
+
+    const nodeEls = positioned
+      .map((n) => {
+        const r = Math.min(20, 7 + (degree.get(n.id) || 0) * 2.5);
+        const color = categoryColor(n.category);
+        const labelY = n.y + r + 14;
+        return `
+          <a href="lore.html?id=${n.id}" class="lore-mention graph-node" data-lore-id="${n.id}">
+            <circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${r}" fill="${color}" fill-opacity="0.25" stroke="${color}" stroke-width="2"></circle>
+            <text x="${n.x.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="middle" class="graph-label">${escapeHtml(n.title)}</text>
+          </a>`;
+      })
+      .join("");
+
+    document.getElementById("graphHolder").innerHTML =
+      `<svg viewBox="0 0 ${SIZE} ${SIZE}" class="graph-svg">${edgeLines}${nodeEls}</svg>`;
+
+    const usedCategories = [...new Set(nodes.map((n) => n.category))];
+    document.getElementById("graphLegend").innerHTML = usedCategories
+      .map((c) => `<span><span class="graph-legend-swatch" style="background:${categoryColor(c)};"></span>${escapeHtml(c)}</span>`)
+      .join("");
+  }
+
+  if (orphans.length) {
+    document.getElementById("orphanSection").hidden = false;
+    document.getElementById("orphanList").innerHTML = orphans
+      .map((l) => `<a href="lore.html?id=${l.id}">${escapeHtml(l.title)}</a>`)
+      .join("");
+  }
+})();
+</script>
+</body>
+</html>
