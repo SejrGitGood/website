@@ -7,7 +7,12 @@
 <title>Lore &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=9">
+<link rel="stylesheet" href="css/styles.css?v=10">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#A6461C">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Valkyriegade">
 <script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
 </head>
 <body>
@@ -69,6 +74,17 @@
               </select>
             </div>
           </div>
+          <div class="field" style="max-width:200px;">
+            <label for="author">Hvem skriver?</label>
+            <input type="text" id="author" list="authorNames" required placeholder="Dit navn">
+            <datalist id="authorNames">
+              <option value="Emil"></option>
+              <option value="Jacob"></option>
+              <option value="Markus"></option>
+              <option value="Sejr"></option>
+              <option value="Thomas"></option>
+            </datalist>
+          </div>
           <div class="field">
             <label for="body">Beskrivelse</label>
             <textarea id="body" required></textarea>
@@ -104,7 +120,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=8"></script>
+<script src="js/app.js?v=9"></script>
 <script src="js/shops.js?v=5"></script>
 <script>
 (async function () {
@@ -187,6 +203,7 @@
           <span class="badge">${escapeHtml(l.category)}</span>${attitudeBadge}${statusBadge}
           <h3 style="margin-top:8px;"><a href="lore.html?id=${l.id}">${escapeHtml(l.title)}</a></h3>
           ${bodyHtml}
+          <p class="paste-hint" style="margin-top:10px;">${attributionLine(l)}</p>
           <div class="card-actions">
             <button class="btn secondary editBtn">Rediger</button>
             <button class="btn danger deleteBtn">Slet</button>
@@ -293,6 +310,7 @@
   });
 
   wireInlinePasteUpload(document.getElementById("body"));
+  wireAuthorField(document.getElementById("author"));
 
   const categorySelect = document.getElementById("category");
   const npcFieldsRow = document.getElementById("npcFieldsRow");
@@ -312,19 +330,21 @@
       const isNpc = category === "NPC";
       const relationship = isNpc ? document.getElementById("relationship").value || null : null;
       const status = isNpc ? document.getElementById("status").value || null : null;
+      const author = document.getElementById("author").value.trim();
       const { error } = await window.sb.from("lore_entries").insert({
         title,
         category,
         body,
         relationship,
         status,
-        created_by: session.user.email,
+        created_by: author,
       });
       if (error) {
         alert("Kunne ikke gemme: " + error.message);
         return;
       }
       e.target.reset();
+      document.getElementById("author").value = author;
       updateNpcFieldsVisibility();
       load();
     });

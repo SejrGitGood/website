@@ -7,7 +7,12 @@
 <title>Sessions &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=9">
+<link rel="stylesheet" href="css/styles.css?v=10">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#A6461C">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Valkyriegade">
 <script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
 </head>
 <body>
@@ -54,6 +59,17 @@
               <input type="date" id="sessionDate">
             </div>
           </div>
+          <div class="field" style="max-width:200px;">
+            <label for="author">Hvem skriver?</label>
+            <input type="text" id="author" list="authorNames" required placeholder="Dit navn">
+            <datalist id="authorNames">
+              <option value="Emil"></option>
+              <option value="Jacob"></option>
+              <option value="Markus"></option>
+              <option value="Sejr"></option>
+              <option value="Thomas"></option>
+            </datalist>
+          </div>
           <div class="field">
             <label for="summary">Referat</label>
             <textarea id="summary" required placeholder="Hvad skete der?"></textarea>
@@ -78,7 +94,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=8"></script>
+<script src="js/app.js?v=9"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -131,6 +147,7 @@
           <h3 style="margin-top:8px;"><a href="sessions.html?id=${s.id}">${escapeHtml(s.title)}</a></h3>
           <p class="meta">${formatDate(s.session_date)}</p>
           <div class="body">${linkifyLoreMentions(renderBodyHtml(s.summary), loreIndex)}</div>
+          <p class="paste-hint" style="margin-top:10px;">${attributionLine(s)}</p>
           <div class="card-actions">
             <button class="btn secondary editBtn">Rediger</button>
             <button class="btn danger deleteBtn">Slet</button>
@@ -203,6 +220,7 @@
   }
 
   wireInlinePasteUpload(document.getElementById("summary"));
+  wireAuthorField(document.getElementById("author"));
 
   document.getElementById("addForm").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -211,19 +229,21 @@
       const number = parseInt(document.getElementById("number").value, 10);
       const title = document.getElementById("title").value.trim();
       const sessionDate = document.getElementById("sessionDate").value || null;
+      const author = document.getElementById("author").value.trim();
       const summary = document.getElementById("summary").value.trim();
       const { error } = await window.sb.from("sessions").insert({
         number,
         title,
         session_date: sessionDate,
         summary,
-        created_by: session.user.email,
+        created_by: author,
       });
       if (error) {
         alert("Kunne ikke gemme: " + error.message);
         return;
       }
       e.target.reset();
+      document.getElementById("author").value = author;
       load();
     });
   });

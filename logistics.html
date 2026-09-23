@@ -7,7 +7,12 @@
 <title>Logistik &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=9">
+<link rel="stylesheet" href="css/styles.css?v=10">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#A6461C">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Valkyriegade">
 <script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
 </head>
 <body>
@@ -50,6 +55,7 @@
           </div>
           <div class="card-actions">
             <button class="btn" type="submit">Gem</button>
+            <button class="btn secondary" type="button" id="addToCalendarBtn" hidden>Tilføj til kalender</button>
             <span id="savedMsg" class="notice" style="display:none;">Gemt.</span>
           </div>
         </form>
@@ -62,7 +68,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=8"></script>
+<script src="js/app.js?v=9"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -84,6 +90,14 @@
 
   let campaignDay = 1;
   const dayDisplay = document.getElementById("dayDisplay");
+  const addToCalendarBtn = document.getElementById("addToCalendarBtn");
+
+  function updateCalendarButton(nextSessionDate, notes) {
+    addToCalendarBtn.hidden = !nextSessionDate;
+    addToCalendarBtn.onclick = () => {
+      downloadIcs({ title: "D&D: Blessings of Valkyriegade", description: notes || "", start: nextSessionDate });
+    };
+  }
 
   const { data } = await window.sb.from("logistics").select("*").eq("id", 1).maybeSingle();
   if (data) {
@@ -92,6 +106,7 @@
     houseRulesEl.value = data.house_rules || "";
     campaignDay = data.campaign_day ?? 1;
     dayDisplay.textContent = `Dag ${campaignDay}`;
+    updateCalendarButton(data.next_session_date, data.notes);
   }
 
   async function saveDay(newDay) {
@@ -122,6 +137,7 @@
         alert("Kunne ikke gemme: " + error.message);
         return;
       }
+      updateCalendarButton(payload.next_session_date, payload.notes);
       savedMsg.style.display = "inline-block";
     });
   });

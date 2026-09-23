@@ -275,6 +275,13 @@ a.card:hover{text-decoration:none;box-shadow:0 12px 30px -12px rgba(43,32,22,0.5
 .hp-row .hp-fill.critical{background:var(--blood);}
 .hp-row .hp-text{flex:0 0 auto;min-width:76px;text-align:right;font-size:0.85rem;color:var(--ink-soft);}
 .hp-row .hp-unknown{flex:1;font-style:italic;color:var(--ink-faint);font-size:0.85rem;}
+.hp-portrait{flex:0 0 auto;width:32px;height:32px;border-radius:50%;object-fit:cover;border:1px solid var(--line);background:var(--bg);}
+.hp-portrait-fallback{
+  flex:0 0 auto;width:32px;height:32px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb, var(--ember) 16%, transparent);color:var(--ember);
+  font-family:"Cinzel",serif;font-weight:700;font-size:0.85rem;border:1px solid var(--line);
+}
 
 .inspiration-btn{
   flex:0 0 auto;width:28px;height:28px;padding:0;
@@ -313,4 +320,7 @@ a.card:hover{text-decoration:none;box-shadow:0 12px 30px -12px rgba(43,32,22,0.5
   .nav-search{width:100%;order:2;}
   .nav-search input{width:100%;}
   .nav-search input:focus-visible{width:100%;}
+  .hp-row{flex-wrap:wrap;gap:8px;}
+  .hp-row .hp-name{flex:1 1 auto;min-width:0;}
+  .hp-row .hp-track{flex:1 1 100%;order:4;}
 }

@@ -2,12 +2,56 @@
 // supabase-js (CDN) er indlæst FØR denne fil.
 window.sb = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
 
+// Gør siden installerbar som app (Føj til hjemmeskærm) — se sw.js for hvorfor
+// den ikke cacher noget. Fejler stille hvis browseren ikke understøtter det.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+
 const NAV_LINKS = [
   { href: "index.html", label: "Forside" },
   { href: "historien.html", label: "Historien" },
   { href: "dmtools.html", label: "DM Tools" },
   { href: "logistics.html", label: "Logistik" },
 ];
+
+// --- Forfatter-tilskrivning: hvem skrev/redigerede en session eller
+// lore-indgang. `created_by` kan ikke komme fra login'et (alle fem deler én
+// konto), så brugeren vælger selv sit navn — huskes pr. browser bagefter. ---
+function getStoredAuthorName() {
+  try {
+    return localStorage.getItem("authorName") || "";
+  } catch (e) {
+    return "";
+  }
+}
+function wireAuthorField(inputEl) {
+  if (!inputEl.value) inputEl.value = getStoredAuthorName();
+  inputEl.addEventListener("change", () => {
+    try {
+      localStorage.setItem("authorName", inputEl.value.trim());
+    } catch (e) {
+      // ignoreres — feltet virker stadig, huskes bare ikke til næste gang
+    }
+  });
+}
+
+// Bygger en lille "Skrevet af X · Oprettet ... · Redigeret ..."-linje.
+// `created_by`, der ligner en email, er fra før dette fandtes (den delte
+// konto alene) og siger intet brugbart, så den udelades.
+function attributionLine(item) {
+  const parts = [];
+  if (item.created_by && !item.created_by.includes("@")) {
+    parts.push(`Skrevet af ${escapeHtml(item.created_by)}`);
+  }
+  if (item.created_at) {
+    parts.push(`Oprettet ${formatDate(item.created_at)}`);
+  }
+  if (item.updated_at && item.created_at && new Date(item.updated_at) - new Date(item.created_at) > 60000) {
+    parts.push(`Redigeret ${formatDate(item.updated_at)}`);
+  }
+  return parts.join(" &middot; ");
+}
 
 // --- Tema: Auto følger systemet, de andre tilsidesætter det. Rent
 // visningsvalg pr. browser — gemmes kun lokalt, aldrig i databasen. ---
@@ -52,6 +96,39 @@ function formatDateTime(value) {
   const d = new Date(value);
   if (isNaN(d)) return value;
   return d.toLocaleString("da-DK", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+// Genererer og downloader en .ics-fil for en enkelt begivenhed — rent
+// klient-side, ingen backend nødvendig. `durationHours` antager en typisk
+// session-længde, da vi kun kender starttidspunktet.
+function downloadIcs({ title, description, start, durationHours = 4 }) {
+  const startDate = new Date(start);
+  if (isNaN(startDate)) return;
+  const endDate = new Date(startDate.getTime() + durationHours * 60 * 60 * 1000);
+  const fmt = (d) => d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+  const escapeIcs = (s) => (s || "").replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Blessings of Valkyriegade//DA",
+    "BEGIN:VEVENT",
+    `UID:${Date.now()}-${Math.random().toString(36).slice(2, 8)}@blessingsofvalkyriegade`,
+    `DTSTAMP:${fmt(new Date())}`,
+    `DTSTART:${fmt(startDate)}`,
+    `DTEND:${fmt(endDate)}`,
+    `SUMMARY:${escapeIcs(title)}`,
+  ];
+  if (description) lines.push(`DESCRIPTION:${escapeIcs(description)}`);
+  lines.push("END:VEVENT", "END:VCALENDAR");
+  const blob = new Blob([lines.join("\r\n")], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "session.ics";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // Deaktiverer `btn` og viser `busyLabel`, mens `fn` kører — forhindrer
