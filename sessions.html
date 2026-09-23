@@ -7,7 +7,7 @@
 <title>Sessions &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=7">
+<link rel="stylesheet" href="css/styles.css?v=8">
 <script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
 </head>
 <body>
@@ -78,21 +78,31 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=7"></script>
+<script src="js/app.js?v=8"></script>
 <script>
 (async function () {
   const session = await guardPage();
   if (!session) return;
   renderNav("historien.html");
   wireLightbox();
+  wireLoreMentionPreviews();
 
   const list = document.getElementById("list");
   const onlyId = new URLSearchParams(location.search).get("id");
+  let loreIndex = [];
 
   if (onlyId) {
     document.getElementById("addSection").hidden = true;
     document.getElementById("listTitle").textContent = "Session";
     document.getElementById("backLink").hidden = false;
+  }
+
+  async function loadLoreIndex() {
+    const { data } = await window.sb
+      .from("lore_entries")
+      .select("id, title, category, body, relationship, status");
+    loreIndex = data || [];
+    setLorePreviewData(loreIndex);
   }
 
   async function load() {
@@ -120,7 +130,7 @@
           <span class="badge">Session ${s.number}</span>
           <h3 style="margin-top:8px;"><a href="sessions.html?id=${s.id}">${escapeHtml(s.title)}</a></h3>
           <p class="meta">${formatDate(s.session_date)}</p>
-          <div class="body">${renderBodyHtml(s.summary)}</div>
+          <div class="body">${linkifyLoreMentions(renderBodyHtml(s.summary), loreIndex)}</div>
           <div class="card-actions">
             <button class="btn secondary editBtn">Rediger</button>
             <button class="btn danger deleteBtn">Slet</button>
@@ -218,6 +228,7 @@
     });
   });
 
+  await loadLoreIndex();
   load();
 })();
 </script>

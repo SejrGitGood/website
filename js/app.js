@@ -275,3 +275,120 @@ function wireLightbox() {
     box.hidden = false;
   });
 }
+
+// --- Automatisk sammenkædning af kendte lore-titler i tekst, med preview ---
+
+const ATTITUDE_CLASS = {
+  Fjendtlig: "hostile",
+  Uvenlig: "unfriendly",
+  Ligegyldig: "indifferent",
+  Venlig: "friendly",
+  Hjælpsom: "helpful",
+};
+const STATUS_CLASS = {
+  Levende: "alive",
+  Død: "dead",
+  Forsvundet: "missing",
+  Ukendt: "unknown",
+};
+
+function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Omslutter forekomster af kendte lore-titler i allerede-renderet HTML (fra
+// renderBodyHtml) med links til den pågældende lore-indgang. Køres EFTER
+// renderBodyHtml — rører aldrig <img>-tags, da deres alt-tekst altid er fast
+// ("Vedhæftet billede"), ingen titel kan matche den ved et uheld.
+// `excludeId` lader en lore-indgang undgå at linke til sig selv.
+function linkifyLoreMentions(html, loreEntries, excludeId) {
+  const candidates = (loreEntries || [])
+    .filter((l) => l.id !== excludeId && l.title && l.title.trim())
+    .sort((a, b) => b.title.length - a.title.length); // længste titel først, så "Ireena Kolyana" ikke bliver til "Ireena" + " Kolyana"
+  if (!candidates.length) return html;
+
+  const idByTitle = new Map();
+  candidates.forEach((l) => {
+    if (!idByTitle.has(l.title)) idByTitle.set(l.title, l.id);
+  });
+
+  const pattern = candidates.map((l) => escapeRegExp(l.title)).join("|");
+  // Unicode-bevidste ordgrænser i stedet for \b, som ikke regner æ/ø/å for ordtegn.
+  const re = new RegExp(`(?<![\\p{L}\\p{N}_])(${pattern})(?![\\p{L}\\p{N}_])`, "gu");
+
+  return html.replace(re, (match) => {
+    const id = idByTitle.get(match);
+    if (id === undefined) return match;
+    return `<a href="lore.html?id=${id}" class="lore-mention" data-lore-id="${id}">${match}</a>`;
+  });
+}
+
+const LORE_PREVIEW_DATA = new Map();
+
+// Kaldes med alle lore-indgange, siden allerede har hentet, så preview-boksen
+// aldrig behøver sit eget kald til Supabase.
+function setLorePreviewData(entries) {
+  LORE_PREVIEW_DATA.clear();
+  (entries || []).forEach((l) => LORE_PREVIEW_DATA.set(l.id, l));
+}
+
+// Ét delt preview-popover pr. side, ligesom lightboxen. Hover (eller
+// tastatur-fokus) over et .lore-mention-link viser kategori, holdning/status
+// og et uddrag — uden at forlade siden. Rører aldrig touch-enheder, da
+// mouseover/mouseout ikke udløses af et tryk; der navigerer linket bare normalt.
+function wireLoreMentionPreviews() {
+  if (document.getElementById("lorePreview")) return;
+  const box = document.createElement("div");
+  box.id = "lorePreview";
+  box.className = "lore-preview";
+  box.hidden = true;
+  document.body.appendChild(box);
+
+  let hideTimer = null;
+
+  function show(link) {
+    clearTimeout(hideTimer);
+    const entry = LORE_PREVIEW_DATA.get(link.dataset.loreId);
+    if (!entry) return;
+    const attitudeBadge =
+      entry.category === "NPC" && entry.relationship
+        ? `<span class="attitude ${ATTITUDE_CLASS[entry.relationship] || ""}">${escapeHtml(entry.relationship)}</span>`
+        : "";
+    const statusBadge =
+      entry.category === "NPC" && entry.status
+        ? `<span class="status-badge ${STATUS_CLASS[entry.status] || ""}">${escapeHtml(entry.status)}</span>`
+        : "";
+    const excerpt = stripImageMarkdown(entry.body || "").slice(0, 140);
+    box.innerHTML = `
+      <span class="badge">${escapeHtml(entry.category)}</span>${attitudeBadge}${statusBadge}
+      <h4>${escapeHtml(entry.title)}</h4>
+      ${excerpt ? `<p>${escapeHtml(excerpt)}${excerpt.length >= 140 ? "…" : ""}</p>` : ""}`;
+    const rect = link.getBoundingClientRect();
+    box.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - 300))}px`;
+    box.style.top = `${rect.bottom + window.scrollY + 8}px`;
+    box.hidden = false;
+  }
+
+  function scheduleHide() {
+    hideTimer = setTimeout(() => {
+      box.hidden = true;
+    }, 150);
+  }
+
+  document.addEventListener("mouseover", (e) => {
+    const link = e.target.closest(".lore-mention");
+    if (link) show(link);
+  });
+  document.addEventListener("mouseout", (e) => {
+    if (e.target.closest(".lore-mention")) scheduleHide();
+  });
+  document.addEventListener("focusin", (e) => {
+    const link = e.target.closest(".lore-mention");
+    if (link) show(link);
+  });
+  document.addEventListener("focusout", (e) => {
+    if (e.target.closest(".lore-mention")) scheduleHide();
+  });
+  box.addEventListener("mouseover", () => clearTimeout(hideTimer));
+  box.addEventListener("mouseout", scheduleHide);
+}

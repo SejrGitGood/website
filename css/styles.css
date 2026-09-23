@@ -254,6 +254,17 @@ a.card:hover{text-decoration:none;box-shadow:0 12px 30px -12px rgba(43,32,22,0.5
   background:rgba(255,255,255,0.12);color:#F3E7D8;border:none;cursor:pointer;font-size:1.6rem;line-height:1;
 }
 
+.lore-mention{color:inherit;text-decoration:none;border-bottom:1px dotted var(--ember);cursor:help;}
+.lore-mention:hover, .lore-mention:focus-visible{color:var(--ember);}
+
+.lore-preview{
+  position:absolute;z-index:900;max-width:280px;
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  box-shadow:var(--shadow);padding:14px 16px;
+}
+.lore-preview h4{font-family:"Cinzel",serif;font-size:1rem;margin:6px 0 0;color:var(--ink);}
+.lore-preview p{margin:6px 0 0;font-size:0.88rem;color:var(--ink-soft);line-height:1.5;}
+
 .hp-row{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px dashed var(--line);}
 .hp-row:last-child{border-bottom:none;}
 .hp-row .hp-name{flex:0 0 150px;font-family:"Cinzel",serif;font-size:0.82rem;color:var(--ink);}

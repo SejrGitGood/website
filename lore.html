@@ -7,7 +7,7 @@
 <title>Lore &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=7">
+<link rel="stylesheet" href="css/styles.css?v=8">
 <script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
 </head>
 <body>
@@ -104,7 +104,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=7"></script>
+<script src="js/app.js?v=8"></script>
 <script src="js/shops.js?v=5"></script>
 <script>
 (async function () {
@@ -112,17 +112,29 @@
   if (!session) return;
   renderNav("historien.html");
   wireLightbox();
+  wireLoreMentionPreviews();
 
   const list = document.getElementById("list");
   const onlyId = new URLSearchParams(location.search).get("id");
   let activeCat = "all";
   let rowsCache = [];
+  let loreIndex = [];
 
   if (onlyId) {
     document.getElementById("addSection").hidden = true;
     document.getElementById("tabs").hidden = true;
     document.getElementById("listTitle").textContent = "Indgang";
     document.getElementById("backLink").hidden = false;
+  }
+
+  // Altid ufiltreret, uafhængig af `onlyId` — ellers ville en enkelt
+  // lore-side (permalink) ikke have nogen andre titler at linke til.
+  async function loadLoreIndex() {
+    const { data } = await window.sb
+      .from("lore_entries")
+      .select("id, title, category, body, relationship, status");
+    loreIndex = data || [];
+    setLorePreviewData(loreIndex);
   }
 
   async function load() {
@@ -156,22 +168,10 @@
     rows.forEach(wireRow);
   }
 
-  const ATTITUDE_CLASS = {
-    Fjendtlig: "hostile",
-    Uvenlig: "unfriendly",
-    Ligegyldig: "indifferent",
-    Venlig: "friendly",
-    Hjælpsom: "helpful",
-  };
-  const STATUS_CLASS = {
-    Levende: "alive",
-    Død: "dead",
-    Forsvundet: "missing",
-    Ukendt: "unknown",
-  };
-
   function rowHtml(l) {
-    const bodyHtml = l.shop_data ? shopEntryHtml(l.shop_data) : `<div class="body">${renderBodyHtml(l.body)}</div>`;
+    const bodyHtml = l.shop_data
+      ? shopEntryHtml(l.shop_data)
+      : `<div class="body">${linkifyLoreMentions(renderBodyHtml(l.body), loreIndex, l.id)}</div>`;
     const isNpc = l.category === "NPC";
     const attitudeBadge =
       isNpc && l.relationship
@@ -330,6 +330,7 @@
     });
   });
 
+  await loadLoreIndex();
   load();
 })();
 </script>
