@@ -7,7 +7,7 @@
 <title>Karakterer &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=11">
+<link rel="stylesheet" href="css/styles.css?v=12">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -50,7 +50,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=11"></script>
+<script src="js/app.js?v=12"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -74,7 +74,7 @@
       ? `<img class="inline-thumb" style="max-height:220px;margin:0 0 10px;" src="${escapeHtml(d.portraitUrl)}" alt="${escapeHtml(d.name)}">`
       : "";
     return `
-      <div class="card">
+      <div class="card" id="character-${c.id}">
         ${portrait}
         <span class="badge">${escapeHtml(c.player_name)}</span>
         <h3 style="margin-top:8px;">${escapeHtml(d.name || c.character_name)}</h3>
@@ -91,7 +91,7 @@
 
   function privateCardHtml(c) {
     return `
-      <div class="card">
+      <div class="card" id="character-${c.id}">
         <span class="badge">${escapeHtml(c.player_name)}</span>
         <h3 style="margin-top:8px;">${escapeHtml(c.character_name)}</h3>
         ${c.teaser ? `<p class="teaser">${escapeHtml(c.teaser)}</p>` : ""}
@@ -113,6 +113,20 @@
       return;
     }
     grid.innerHTML = data.map((c) => (c.is_public && c.data ? publicCardHtml(c) : privateCardHtml(c))).join("");
+    jumpToTarget();
+  }
+
+  // Andre sider (lore-omtaler, forbindelsesgrafen) linker til en bestemt
+  // karakter via ?id= — siden viser altid hele rosteret, så vi scroller til
+  // og fremhæver kortet i stedet for at filtrere, siden der kun er få stykker.
+  function jumpToTarget() {
+    const id = new URLSearchParams(location.search).get("id");
+    if (!id) return;
+    const card = document.getElementById(`character-${id}`);
+    if (!card) return;
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.classList.add("jump-target");
+    setTimeout(() => card.classList.remove("jump-target"), 2500);
   }
 
   document.getElementById("refreshBtn").addEventListener("click", async () => {

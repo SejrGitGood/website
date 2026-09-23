@@ -7,7 +7,7 @@
 <title>Forbindelser &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=11">
+<link rel="stylesheet" href="css/styles.css?v=12">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -48,7 +48,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=11"></script>
+<script src="js/app.js?v=12"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -63,13 +63,20 @@
     Monster: "var(--blood)",
     Besværgelse: "var(--ember-soft)",
     Faction: "var(--ink-soft)",
+    Karakter: "var(--ink)",
   };
   function categoryColor(cat) {
     return CATEGORY_COLOR[cat] || "var(--ink-faint)";
   }
 
-  const { data } = await window.sb.from("lore_entries").select("id, title, category, body, relationship, status");
-  const entries = data || [];
+  const [{ data: loreData }, { data: charData }] = await Promise.all([
+    window.sb.from("lore_entries").select("id, title, category, body, relationship, status"),
+    window.sb.from("characters").select("id, character_name, teaser"),
+  ]);
+  const entries = [
+    ...(loreData || []).map((l) => ({ ...l, href: `lore.html?id=${l.id}` })),
+    ...characterMentionEntries(charData),
+  ];
   setLorePreviewData(entries);
 
   const edgeSeen = new Set();
@@ -99,8 +106,8 @@
   const orphans = entries.filter((l) => !connectedIds.has(l.id));
 
   document.getElementById("graphSummary").textContent = nodes.length
-    ? `${nodes.length} lore-indgange, ${edges.length} forbindelser fundet.`
-    : "Ingen forbindelser fundet endnu — nævn en lore-titel i en anden lore-indgangs tekst, så dukker de op her.";
+    ? `${nodes.length} lore-indgange og karakterer, ${edges.length} forbindelser fundet.`
+    : "Ingen forbindelser fundet endnu — nævn en lore-titel eller et karakternavn i en lore-indgangs tekst, så dukker de op her.";
 
   if (nodes.length) {
     const SIZE = 640;
@@ -128,7 +135,7 @@
         const color = categoryColor(n.category);
         const labelY = n.y + r + 14;
         return `
-          <a href="lore.html?id=${n.id}" class="lore-mention graph-node" data-lore-id="${n.id}">
+          <a href="${n.href}" class="lore-mention graph-node" data-lore-id="${n.id}">
             <circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${r}" fill="${color}" fill-opacity="0.25" stroke="${color}" stroke-width="2"></circle>
             <text x="${n.x.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="middle" class="graph-label">${escapeHtml(n.title)}</text>
           </a>`;
@@ -147,7 +154,7 @@
   if (orphans.length) {
     document.getElementById("orphanSection").hidden = false;
     document.getElementById("orphanList").innerHTML = orphans
-      .map((l) => `<a href="lore.html?id=${l.id}">${escapeHtml(l.title)}</a>`)
+      .map((l) => `<a href="${l.href}">${escapeHtml(l.title)}</a>`)
       .join("");
   }
 })();

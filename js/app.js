@@ -373,55 +373,73 @@ function escapeRegExp(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// Bygger et regex, der matcher alle kendte lore-titler (længste først, så
+// Bygger et regex, der matcher alle kendte navne — lore-titler og
+// karakternavne begge, se characterMentionEntries — (længste først, så
 // "Ireena Kolyana" ikke bliver til "Ireena" + " Kolyana"), plus et opslag
-// fra matchet tekst til lore-id. Delt af linkifyLoreMentions (tekst → HTML
+// fra matchet tekst til {id, href}. Delt af linkifyLoreMentions (tekst → HTML
 // med links) og findMentionedLoreIds (tekst → liste af id'er, bruges af
 // forbindelsesgrafen). Unicode-bevidste ordgrænser i stedet for \b, som ikke
 // regner æ/ø/å for ordtegn. Case-insensitive (folk skriver ikke altid en
 // titel med stort midt i en sætning), og tillader ét bøjnings-s bagpå
 // ("Daggerfords", "Morwens") uden at det tæller som en del af matchet —
-// ellers ville stort set alle danske ejefald-former aldrig linke.
-function buildMentionMatcher(loreEntries, excludeId) {
-  const candidates = (loreEntries || [])
+// ellers ville stort set alle danske ejefald-former aldrig linke. `href`
+// er valgfri pr. entry og falder tilbage til en lore-side, så eksisterende
+// kald med bare lore-indgange virker uændret.
+function buildMentionMatcher(entries, excludeId) {
+  const candidates = (entries || [])
     .filter((l) => l.id !== excludeId && l.title && l.title.trim())
     .sort((a, b) => b.title.length - a.title.length);
   if (!candidates.length) return null;
   const idByTitle = new Map();
   candidates.forEach((l) => {
     const key = l.title.toLowerCase();
-    if (!idByTitle.has(key)) idByTitle.set(key, l.id);
+    if (!idByTitle.has(key)) idByTitle.set(key, { id: l.id, href: l.href || `lore.html?id=${l.id}` });
   });
   const pattern = candidates.map((l) => escapeRegExp(l.title)).join("|");
   const re = new RegExp(`(?<![\\p{L}\\p{N}_])(${pattern})(?=s?(?![\\p{L}\\p{N}_]))`, "giu");
   return { re, idByTitle };
 }
 
-// Omslutter forekomster af kendte lore-titler i allerede-renderet HTML (fra
-// renderBodyHtml) med links til den pågældende lore-indgang. Køres EFTER
-// renderBodyHtml — rører aldrig <img>-tags, da deres alt-tekst altid er fast
-// ("Vedhæftet billede"), ingen titel kan matche den ved et uheld.
-// `excludeId` lader en lore-indgang undgå at linke til sig selv.
-function linkifyLoreMentions(html, loreEntries, excludeId) {
-  const matcher = buildMentionMatcher(loreEntries, excludeId);
+// Laver "lore-agtige" objekter af karakterer, så de kan indgå i samme
+// omtale-genkendelse og samme preview-popover som lore-indgange — fx så
+// "Troelius" i en lore-teksts krop bliver til et link til karakterens kort.
+// Alle karakterer er med, ikke kun dem sat til offentlig på D&D Beyond —
+// navnet er ikke en hemmelighed, kun det fulde ark er gated af is_public.
+function characterMentionEntries(characters) {
+  return (characters || []).map((c) => ({
+    id: c.id,
+    title: c.character_name,
+    category: "Karakter",
+    body: c.teaser || "",
+    href: `characters.html?id=${c.id}`,
+  }));
+}
+
+// Omslutter forekomster af kendte navne i allerede-renderet HTML (fra
+// renderBodyHtml) med links til den pågældende lore-indgang eller karakter.
+// Køres EFTER renderBodyHtml — rører aldrig <img>-tags, da deres alt-tekst
+// altid er fast ("Vedhæftet billede"), ingen titel kan matche den ved et uheld.
+// `excludeId` lader en indgang undgå at linke til sig selv.
+function linkifyLoreMentions(html, entries, excludeId) {
+  const matcher = buildMentionMatcher(entries, excludeId);
   if (!matcher) return html;
   return html.replace(matcher.re, (match) => {
-    const id = matcher.idByTitle.get(match.toLowerCase());
-    return id === undefined ? match : `<a href="lore.html?id=${id}" class="lore-mention" data-lore-id="${id}">${match}</a>`;
+    const hit = matcher.idByTitle.get(match.toLowerCase());
+    return hit === undefined ? match : `<a href="${hit.href}" class="lore-mention" data-lore-id="${hit.id}">${match}</a>`;
   });
 }
 
 // Samme genkendelse som linkifyLoreMentions, men på rå tekst og returnerer
 // bare de fundne id'er i stedet for HTML — bruges til at udlede kanterne i
-// forbindelsesgrafen (hvilke lore-indgange nævner hinanden).
-function findMentionedLoreIds(text, loreEntries, excludeId) {
-  const matcher = buildMentionMatcher(loreEntries, excludeId);
+// forbindelsesgrafen (hvilke lore-indgange og karakterer nævner hinanden).
+function findMentionedLoreIds(text, entries, excludeId) {
+  const matcher = buildMentionMatcher(entries, excludeId);
   if (!matcher || !text) return [];
   const found = new Set();
   let m;
   while ((m = matcher.re.exec(text))) {
-    const id = matcher.idByTitle.get(m[1].toLowerCase());
-    if (id !== undefined) found.add(id);
+    const hit = matcher.idByTitle.get(m[1].toLowerCase());
+    if (hit !== undefined) found.add(hit.id);
   }
   return [...found];
 }
