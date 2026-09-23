@@ -87,6 +87,12 @@ a:hover{text-decoration:underline;}
 :focus-visible{outline:2px solid var(--ember);outline-offset:3px;border-radius:4px;}
 .jump-target{outline:2px solid var(--ember);outline-offset:3px;transition:outline-color 2.5s ease;}
 
+.npc-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.npc-row select{
+  font-family:"Cormorant Garamond",serif;font-size:0.85rem;
+  background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:4px 8px;color:var(--ink);
+}
+
 .wrap{max-width:920px;margin:0 auto;padding:0 20px;width:100%;}
 
 /* nav */

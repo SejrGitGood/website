@@ -7,7 +7,7 @@
 <title>Ved Bordet &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=13">
+<link rel="stylesheet" href="css/styles.css?v=14">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -131,26 +131,53 @@
   }
   await loadQuests();
 
-  const { data: loreRows } = await window.sb
-    .from("lore_entries")
-    .select("id, title, category, relationship, status")
-    .eq("category", "NPC")
-    .order("title", { ascending: true });
+  const RELATIONSHIP_OPTIONS = ["", "Fjendtlig", "Uvenlig", "Ligegyldig", "Venlig", "Hjælpsom"];
+  const STATUS_OPTIONS = ["", "Levende", "Død", "Forsvundet", "Ukendt"];
+  function npcSelectHtml(cls, id, options, current) {
+    return `<select class="${cls}" data-id="${id}">${options
+      .map((v) => `<option value="${v}" ${v === (current || "") ? "selected" : ""}>${v || "Ikke sat"}</option>`)
+      .join("")}</select>`;
+  }
+
   const npcCard = document.getElementById("npcCard");
-  const npcsWithStatus = (loreRows || []).filter((l) => l.relationship || l.status);
-  npcCard.innerHTML = npcsWithStatus.length
-    ? `<div class="card"><ul class="shop-items">${npcsWithStatus
-        .map((l) => {
-          const attitude = l.relationship
-            ? `<span class="attitude ${ATTITUDE_CLASS[l.relationship] || ""}">${escapeHtml(l.relationship)}</span>`
-            : "";
-          const status = l.status
-            ? `<span class="status-badge ${STATUS_CLASS[l.status] || ""}">${escapeHtml(l.status)}</span>`
-            : "";
-          return `<li><a href="lore.html?id=${l.id}">${escapeHtml(l.title)}</a> ${attitude}${status}</li>`;
-        })
-        .join("")}</ul></div>`
-    : `<div class="empty">Ingen NPC'er med sat holdning eller status endnu. <a href="lore.html">Sæt en på Lore-siden</a>.</div>`;
+  async function loadNpcs() {
+    const { data: loreRows } = await window.sb
+      .from("lore_entries")
+      .select("id, title, relationship, status")
+      .eq("category", "NPC")
+      .order("title", { ascending: true });
+    const rows = loreRows || [];
+    npcCard.innerHTML = rows.length
+      ? `<div class="card"><ul class="shop-items">${rows
+          .map(
+            (l) => `
+        <li class="npc-row">
+          <a href="lore.html?id=${l.id}">${escapeHtml(l.title)}</a>
+          ${npcSelectHtml("npcAttitudeSelect", l.id, RELATIONSHIP_OPTIONS, l.relationship)}
+          ${npcSelectHtml("npcStatusSelect", l.id, STATUS_OPTIONS, l.status)}
+        </li>`
+          )
+          .join("")}</ul></div>`
+      : `<div class="empty">Ingen NPC'er i Lore endnu. <a href="lore.html">Tilføj en</a>.</div>`;
+
+    npcCard.querySelectorAll(".npcAttitudeSelect").forEach((sel) => {
+      sel.addEventListener("change", async () => {
+        await window.sb
+          .from("lore_entries")
+          .update({ relationship: sel.value || null, updated_at: new Date().toISOString() })
+          .eq("id", sel.dataset.id);
+      });
+    });
+    npcCard.querySelectorAll(".npcStatusSelect").forEach((sel) => {
+      sel.addEventListener("change", async () => {
+        await window.sb
+          .from("lore_entries")
+          .update({ status: sel.value || null, updated_at: new Date().toISOString() })
+          .eq("id", sel.dataset.id);
+      });
+    });
+  }
+  await loadNpcs();
 })();
 </script>
 </body>
