@@ -378,7 +378,10 @@ function escapeRegExp(str) {
 // fra matchet tekst til lore-id. Delt af linkifyLoreMentions (tekst → HTML
 // med links) og findMentionedLoreIds (tekst → liste af id'er, bruges af
 // forbindelsesgrafen). Unicode-bevidste ordgrænser i stedet for \b, som ikke
-// regner æ/ø/å for ordtegn.
+// regner æ/ø/å for ordtegn. Case-insensitive (folk skriver ikke altid en
+// titel med stort midt i en sætning), og tillader ét bøjnings-s bagpå
+// ("Daggerfords", "Morwens") uden at det tæller som en del af matchet —
+// ellers ville stort set alle danske ejefald-former aldrig linke.
 function buildMentionMatcher(loreEntries, excludeId) {
   const candidates = (loreEntries || [])
     .filter((l) => l.id !== excludeId && l.title && l.title.trim())
@@ -386,10 +389,11 @@ function buildMentionMatcher(loreEntries, excludeId) {
   if (!candidates.length) return null;
   const idByTitle = new Map();
   candidates.forEach((l) => {
-    if (!idByTitle.has(l.title)) idByTitle.set(l.title, l.id);
+    const key = l.title.toLowerCase();
+    if (!idByTitle.has(key)) idByTitle.set(key, l.id);
   });
   const pattern = candidates.map((l) => escapeRegExp(l.title)).join("|");
-  const re = new RegExp(`(?<![\\p{L}\\p{N}_])(${pattern})(?![\\p{L}\\p{N}_])`, "gu");
+  const re = new RegExp(`(?<![\\p{L}\\p{N}_])(${pattern})(?=s?(?![\\p{L}\\p{N}_]))`, "giu");
   return { re, idByTitle };
 }
 
@@ -402,7 +406,7 @@ function linkifyLoreMentions(html, loreEntries, excludeId) {
   const matcher = buildMentionMatcher(loreEntries, excludeId);
   if (!matcher) return html;
   return html.replace(matcher.re, (match) => {
-    const id = matcher.idByTitle.get(match);
+    const id = matcher.idByTitle.get(match.toLowerCase());
     return id === undefined ? match : `<a href="lore.html?id=${id}" class="lore-mention" data-lore-id="${id}">${match}</a>`;
   });
 }
@@ -416,7 +420,7 @@ function findMentionedLoreIds(text, loreEntries, excludeId) {
   const found = new Set();
   let m;
   while ((m = matcher.re.exec(text))) {
-    const id = matcher.idByTitle.get(m[1]);
+    const id = matcher.idByTitle.get(m[1].toLowerCase());
     if (id !== undefined) found.add(id);
   }
   return [...found];
