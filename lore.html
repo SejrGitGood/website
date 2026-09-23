@@ -41,7 +41,7 @@
               <label for="category">Kategori</label>
               <select id="category">
                 <option value="NPC">NPC</option>
-                <option value="Fraktion">Fraktion</option>
+                <option value="Faction">Faction</option>
                 <option value="Sted">Sted</option>
                 <option value="Begivenhed">Begivenhed</option>
                 <option value="Genstand">Genstand</option>
@@ -103,7 +103,7 @@
         <div class="tabs" id="tabs">
           <button data-cat="all" class="active">Alle</button>
           <button data-cat="NPC">NPC</button>
-          <button data-cat="Fraktion">Fraktion</button>
+          <button data-cat="Faction">Faction</button>
           <button data-cat="Sted">Sted</button>
           <button data-cat="Begivenhed">Begivenhed</button>
           <button data-cat="Genstand">Genstand</button>
@@ -221,7 +221,7 @@
               <div class="field" style="max-width:200px;">
                 <label>Kategori</label>
                 <select class="f-category">
-                  ${["NPC", "Fraktion", "Sted", "Begivenhed", "Genstand", "Butik", "Monster", "Besværgelse", "Andet"]
+                  ${["NPC", "Faction", "Sted", "Begivenhed", "Genstand", "Butik", "Monster", "Besværgelse", "Andet"]
                     .map((c) => `<option value="${c}" ${c === l.category ? "selected" : ""}>${c}</option>`)
                     .join("")}
                 </select>
