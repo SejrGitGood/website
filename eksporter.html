@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Eksportér &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=11">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#A6461C">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Valkyriegade">
+<script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">DM Tools</p>
+    <h1>Eksportér</h1>
+    <p>Hent alt indhold som ren tekst &mdash; til backup, eller til at dele et udsnit et andet sted.</p>
+  </div>
+
+  <div class="wrap" style="max-width:800px;">
+    <p style="margin:-8px 0 4px;"><a href="dmtools.html" class="back-link">&larr; Alle DM Tools</a></p>
+
+    <section class="section">
+      <div class="card">
+        <div class="card-actions">
+          <button class="btn" id="exportBtn">Generér eksport</button>
+          <button class="btn secondary" id="downloadBtn" hidden>Download som fil</button>
+        </div>
+        <p class="paste-hint" style="margin-top:10px;">Samler sessions, lore, mål, bytte og logistik i én tekst. Kan tage et par sekunder.</p>
+      </div>
+    </section>
+
+    <section class="section" id="outputSection" hidden>
+      <div class="section-title"><h2>Resultat</h2></div>
+      <div class="field">
+        <textarea id="exportOutput" readonly style="min-height:520px;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:0.82rem;"></textarea>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=10"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("dmtools.html");
+
+  let exportText = "";
+
+  document.getElementById("exportBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("exportBtn");
+    await withBusy(btn, "Henter…", async () => {
+      const [sessionsRes, loreRes, questsRes, lootRes, logisticsRes] = await Promise.all([
+        window.sb.from("sessions").select("*").order("number"),
+        window.sb.from("lore_entries").select("*").order("title"),
+        window.sb.from("quests").select("*").order("created_at"),
+        window.sb.from("loot_items").select("*").order("created_at"),
+        window.sb.from("logistics").select("*").eq("id", 1).maybeSingle(),
+      ]);
+
+      const lines = [];
+      lines.push("=== SESSIONS ===", "");
+      (sessionsRes.data || []).forEach((s) => {
+        lines.push(`Session ${s.number}: ${s.title}`);
+        lines.push(`Dato: ${s.session_date || "ukendt"}`);
+        lines.push(`Skrevet af: ${s.created_by || "ukendt"}`);
+        lines.push("");
+        lines.push(stripImageMarkdown(s.summary || ""));
+        lines.push("", "---", "");
+      });
+
+      lines.push("=== LORE ===", "");
+      (loreRes.data || []).forEach((l) => {
+        let head = `[${l.category}] ${l.title}`;
+        if (l.category === "NPC" && (l.relationship || l.status)) {
+          head += ` (${l.relationship || "?"} / ${l.status || "?"})`;
+        }
+        lines.push(head);
+        lines.push(`Skrevet af: ${l.created_by || "ukendt"}`);
+        lines.push("");
+        lines.push(stripImageMarkdown(l.body || ""));
+        lines.push("", "---", "");
+      });
+
+      lines.push("=== MÅL ===", "");
+      (questsRes.data || []).forEach((q) => {
+        lines.push(`${q.done ? "[FULDFØRT]" : "[AKTIV]"} ${q.title}`);
+        if (q.notes) lines.push(q.notes);
+        lines.push("");
+      });
+
+      lines.push("=== BYTTE ===", "");
+      (lootRes.data || []).forEach((i) => {
+        lines.push(`${i.name} x${i.quantity}${i.carried_by ? " (hos " + i.carried_by + ")" : ""}`);
+        if (i.notes) lines.push("  " + i.notes);
+      });
+
+      lines.push("", "=== LOGISTIK ===", "");
+      if (logisticsRes.data) {
+        lines.push(`Kampagnedag: ${logisticsRes.data.campaign_day || 1}`);
+        if (logisticsRes.data.house_rules) lines.push(`Husregler: ${logisticsRes.data.house_rules}`);
+      }
+
+      exportText = lines.join("\n");
+      document.getElementById("exportOutput").value = exportText;
+      document.getElementById("outputSection").hidden = false;
+      document.getElementById("downloadBtn").hidden = false;
+    });
+  });
+
+  document.getElementById("downloadBtn").addEventListener("click", () => {
+    const blob = new Blob([exportText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "blessings-of-valkyriegade-eksport.txt";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+})();
+</script>
+</body>
+</html>
