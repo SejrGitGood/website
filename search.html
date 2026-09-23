@@ -35,6 +35,16 @@
       <div class="section-title"><h2>Lore</h2></div>
       <div class="grid" id="loreResults"></div>
     </section>
+
+    <section class="section">
+      <div class="section-title"><h2>Karakterer</h2></div>
+      <div class="grid" id="characterResults"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-title"><h2>Mål</h2></div>
+      <div class="grid" id="questResults"></div>
+    </section>
   </div>
 </main>
 
@@ -52,6 +62,8 @@
   const q = (new URLSearchParams(location.search).get("q") || "").trim();
   const sessionResults = document.getElementById("sessionResults");
   const loreResults = document.getElementById("loreResults");
+  const characterResults = document.getElementById("characterResults");
+  const questResults = document.getElementById("questResults");
 
   if (!q) {
     return;
@@ -59,6 +71,8 @@
   document.getElementById("queryLine").textContent = `Resultater for "${q}"`;
   sessionResults.innerHTML = `<div class="empty">Søger&hellip;</div>`;
   loreResults.innerHTML = `<div class="empty">Søger&hellip;</div>`;
+  characterResults.innerHTML = `<div class="empty">Søger&hellip;</div>`;
+  questResults.innerHTML = `<div class="empty">Søger&hellip;</div>`;
 
   // Én .ilike()-forespørgsel pr. kolonne (aldrig rå strengsammensætning i et
   // .or()-filter) — undgår at søgeord med komma/parenteser kan ødelægge
@@ -90,9 +104,29 @@
       </a>`;
   }
 
-  const [sessionRows, loreRows] = await Promise.all([
+  function characterResultHtml(c) {
+    return `
+      <a class="card" href="characters.html?id=${c.id}" style="display:block;">
+        <span class="badge">${escapeHtml(c.player_name)}</span>
+        <h3 style="margin-top:8px;">${escapeHtml(c.character_name)}</h3>
+        ${c.teaser ? `<p class="body">${escapeHtml(c.teaser.slice(0, 160))}${c.teaser.length > 160 ? "…" : ""}</p>` : ""}
+      </a>`;
+  }
+
+  function questResultHtml(q) {
+    return `
+      <a class="card" href="quests.html" style="display:block;">
+        <span class="badge">${q.done ? "Fuldført" : "Aktiv"}</span>
+        <h3 style="margin-top:8px;">${escapeHtml(q.title)}</h3>
+        ${q.notes ? `<p class="body">${escapeHtml(q.notes.slice(0, 160))}${q.notes.length > 160 ? "…" : ""}</p>` : ""}
+      </a>`;
+  }
+
+  const [sessionRows, loreRows, characterRows, questRows] = await Promise.all([
     searchTable("sessions", ["title", "summary"]),
     searchTable("lore_entries", ["title", "body"]),
+    searchTable("characters", ["character_name", "player_name", "teaser"]),
+    searchTable("quests", ["title", "notes"]),
   ]);
 
   sessionResults.innerHTML = sessionRows.length
@@ -101,6 +135,12 @@
   loreResults.innerHTML = loreRows.length
     ? loreRows.map(loreResultHtml).join("")
     : `<div class="empty">Ingen lore matcher.</div>`;
+  characterResults.innerHTML = characterRows.length
+    ? characterRows.map(characterResultHtml).join("")
+    : `<div class="empty">Ingen karakterer matcher.</div>`;
+  questResults.innerHTML = questRows.length
+    ? questRows.map(questResultHtml).join("")
+    : `<div class="empty">Ingen mål matcher.</div>`;
 })();
 </script>
 </body>
