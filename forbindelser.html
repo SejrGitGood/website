@@ -7,7 +7,7 @@
 <title>Forbindelser &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=12">
+<link rel="stylesheet" href="css/styles.css?v=13">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -48,7 +48,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=14"></script>
+<script src="js/app.js?v=15"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -64,14 +64,16 @@
     Besværgelse: "var(--ember-soft)",
     Faction: "var(--ink-soft)",
     Karakter: "var(--ink)",
+    Session: "var(--dusk)",
   };
   function categoryColor(cat) {
     return CATEGORY_COLOR[cat] || "var(--ink-faint)";
   }
 
-  const [{ data: loreData }, { data: charData }] = await Promise.all([
+  const [{ data: loreData }, { data: charData }, { data: sessionData }] = await Promise.all([
     window.sb.from("lore_entries").select("id, title, category, body, relationship, status"),
     window.sb.from("characters").select("id, character_name, teaser"),
+    window.sb.from("sessions").select("id, title, summary"),
   ]);
   // characterMentionEntries giver bevidst to kandidater pr. karakter (fulde
   // navn + fornavn), så begge former genkendes i løbende tekst — men grafen
@@ -80,6 +82,7 @@
   const mentionCandidates = [
     ...(loreData || []).map((l) => ({ ...l, href: `lore.html?id=${l.id}` })),
     ...characterMentionEntries(charData),
+    ...sessionMentionEntries(sessionData),
   ];
   const entriesById = new Map();
   mentionCandidates.forEach((e) => {
@@ -116,8 +119,8 @@
   const orphans = entries.filter((l) => !connectedIds.has(l.id));
 
   document.getElementById("graphSummary").textContent = nodes.length
-    ? `${nodes.length} lore-indgange og karakterer, ${edges.length} forbindelser fundet.`
-    : "Ingen forbindelser fundet endnu — nævn en lore-titel eller et karakternavn i en lore-indgangs tekst, så dukker de op her.";
+    ? `${nodes.length} lore-indgange, karakterer og sessions, ${edges.length} forbindelser fundet.`
+    : "Ingen forbindelser fundet endnu — nævn en lore-titel, et karakternavn eller en sessions titel i en tekst, så dukker de op her.";
 
   if (nodes.length) {
     const SIZE = 640;

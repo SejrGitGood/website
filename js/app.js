@@ -10,6 +10,7 @@ if ("serviceWorker" in navigator) {
 
 const NAV_LINKS = [
   { href: "index.html", label: "Forside" },
+  { href: "ved-bordet.html", label: "Ved Bordet" },
   { href: "historien.html", label: "Historien" },
   { href: "dmtools.html", label: "DM Tools" },
   { href: "logistics.html", label: "Logistik" },
@@ -129,6 +130,63 @@ function downloadIcs({ title, description, start, durationHours = 4 }) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// --- Selskabets Helbred-widgetten: brugt på både forsiden og Ved Bordet, så
+// den bor her i stedet for at være kopieret to steder. ---
+function inspirationIcon() {
+  return `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 L14 10 L22 12 L14 14 L12 22 L10 14 L2 12 L10 10 Z"/></svg>`;
+}
+function inspirationBtnHtml(c, name) {
+  return `<button type="button" class="inspiration-btn ${c.has_inspiration ? "active" : ""}" data-id="${c.id}" title="Inspiration" aria-label="Inspiration for ${name}">${inspirationIcon()}</button>`;
+}
+function portraitHtml(c, name) {
+  const url = c.data && c.data.portraitUrl;
+  if (url) {
+    return `<img class="hp-portrait" src="${escapeHtml(url)}" alt="${name}" loading="lazy">`;
+  }
+  const initial = (name || "?").trim().charAt(0).toUpperCase();
+  return `<span class="hp-portrait-fallback">${escapeHtml(initial)}</span>`;
+}
+function hpRowHtml(c) {
+  const name = escapeHtml((c.data && c.data.name) || c.character_name);
+  const inspirationBtn = inspirationBtnHtml(c, name);
+  const portrait = portraitHtml(c, name);
+  if (!c.is_public || !c.data || !c.data.hp) {
+    return `
+      <div class="hp-row">
+        ${portrait}
+        <span class="hp-name">${name}</span>
+        <span class="hp-unknown">Ikke offentlig endnu</span>
+        ${inspirationBtn}
+      </div>`;
+  }
+  const hp = c.data.hp;
+  const pct = hp.max ? Math.max(0, Math.min(100, Math.round((hp.current / hp.max) * 100))) : 0;
+  const cls = pct <= 25 ? "critical" : pct <= 50 ? "wounded" : "";
+  return `
+    <div class="hp-row">
+      ${portrait}
+      <span class="hp-name">${name}</span>
+      <span class="hp-track"><span class="hp-fill ${cls}" style="width:${pct}%;"></span></span>
+      <span class="hp-text">${hp.current}/${hp.max}${hp.temp ? ` (+${hp.temp})` : ""}</span>
+      ${inspirationBtn}
+    </div>`;
+}
+function hpWidgetHtml(charRows) {
+  return charRows && charRows.length
+    ? charRows.map(hpRowHtml).join("")
+    : `<div class="empty">Ingen karakterer i rosteret endnu.</div>`;
+}
+// Delegeret klik-håndtering for inspirations-knapperne i hpWidgetHtml's output.
+function wireHpWidget(containerEl) {
+  containerEl.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".inspiration-btn");
+    if (!btn) return;
+    const newVal = !btn.classList.contains("active");
+    btn.classList.toggle("active", newVal);
+    await window.sb.from("characters").update({ has_inspiration: newVal }).eq("id", btn.dataset.id);
+  });
 }
 
 // Deaktiverer `btn` og viser `busyLabel`, mens `fn` kører — forhindrer
@@ -426,6 +484,21 @@ function characterMentionEntries(characters) {
     }
   });
   return out;
+}
+
+// Samme idé for sessions, så en lore-indgang eller en anden session kan
+// nævne en sessions titel og få et link/en kant i forbindelsesgrafen ud af
+// det — fx en lore-indgang der refererer tilbage til "Ind i Barovia".
+function sessionMentionEntries(sessions) {
+  return (sessions || [])
+    .filter((s) => s.title && s.title.trim())
+    .map((s) => ({
+      id: s.id,
+      title: s.title,
+      category: "Session",
+      body: stripImageMarkdown(s.summary || ""),
+      href: `sessions.html?id=${s.id}`,
+    }));
 }
 
 // Omslutter forekomster af kendte navne i allerede-renderet HTML (fra

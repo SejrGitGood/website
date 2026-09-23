@@ -7,7 +7,7 @@
 <title>Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=12">
+<link rel="stylesheet" href="css/styles.css?v=13">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -72,7 +72,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=14"></script>
+<script src="js/app.js?v=15"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -84,59 +84,8 @@
     .select("*")
     .order("sort_order", { ascending: true });
   const hpCard = document.getElementById("hpCard");
-
-  function inspirationIcon() {
-    return `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 L14 10 L22 12 L14 14 L12 22 L10 14 L2 12 L10 10 Z"/></svg>`;
-  }
-  function inspirationBtnHtml(c, name) {
-    return `<button type="button" class="inspiration-btn ${c.has_inspiration ? "active" : ""}" data-id="${c.id}" title="Inspiration" aria-label="Inspiration for ${name}">${inspirationIcon()}</button>`;
-  }
-
-  function portraitHtml(c, name) {
-    const url = c.data && c.data.portraitUrl;
-    if (url) {
-      return `<img class="hp-portrait" src="${escapeHtml(url)}" alt="${name}" loading="lazy">`;
-    }
-    const initial = (name || "?").trim().charAt(0).toUpperCase();
-    return `<span class="hp-portrait-fallback">${escapeHtml(initial)}</span>`;
-  }
-
-  function hpRowHtml(c) {
-    const name = escapeHtml((c.data && c.data.name) || c.character_name);
-    const inspirationBtn = inspirationBtnHtml(c, name);
-    const portrait = portraitHtml(c, name);
-    if (!c.is_public || !c.data || !c.data.hp) {
-      return `
-        <div class="hp-row">
-          ${portrait}
-          <span class="hp-name">${name}</span>
-          <span class="hp-unknown">Ikke offentlig endnu</span>
-          ${inspirationBtn}
-        </div>`;
-    }
-    const hp = c.data.hp;
-    const pct = hp.max ? Math.max(0, Math.min(100, Math.round((hp.current / hp.max) * 100))) : 0;
-    const cls = pct <= 25 ? "critical" : pct <= 50 ? "wounded" : "";
-    return `
-      <div class="hp-row">
-        ${portrait}
-        <span class="hp-name">${name}</span>
-        <span class="hp-track"><span class="hp-fill ${cls}" style="width:${pct}%;"></span></span>
-        <span class="hp-text">${hp.current}/${hp.max}${hp.temp ? ` (+${hp.temp})` : ""}</span>
-        ${inspirationBtn}
-      </div>`;
-  }
-  hpCard.innerHTML = charRows && charRows.length
-    ? charRows.map(hpRowHtml).join("")
-    : `<div class="empty">Ingen karakterer i rosteret endnu.</div>`;
-
-  hpCard.addEventListener("click", async (e) => {
-    const btn = e.target.closest(".inspiration-btn");
-    if (!btn) return;
-    const newVal = !btn.classList.contains("active");
-    btn.classList.toggle("active", newVal);
-    await window.sb.from("characters").update({ has_inspiration: newVal }).eq("id", btn.dataset.id);
-  });
+  hpCard.innerHTML = hpWidgetHtml(charRows);
+  wireHpWidget(hpCard);
 
   const { data: questRows } = await window.sb
     .from("quests")

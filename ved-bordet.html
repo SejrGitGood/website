@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Ved Bordet &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=13">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#A6461C">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Valkyriegade">
+<script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">Lige nu</p>
+    <h1>Ved Bordet</h1>
+    <p>Det I har brug for midt i en session &mdash; helbred, holdninger og mål, samlet ét sted.</p>
+  </div>
+
+  <div class="wrap">
+    <section class="section" id="hpSection">
+      <div class="section-title">
+        <h2>Selskabets Helbred</h2>
+        <a href="characters.html">Se karakterer &rarr;</a>
+      </div>
+      <div class="card" id="hpCard"><div class="empty">Indlæser&hellip;</div></div>
+    </section>
+
+    <section class="section" id="statusSection">
+      <div class="section-title">
+        <h2>Lige nu</h2>
+        <a href="logistics.html">Se/ret logistik &rarr;</a>
+      </div>
+      <div id="statusCard"><div class="empty">Indlæser&hellip;</div></div>
+    </section>
+
+    <section class="section" id="questsSection">
+      <div class="section-title">
+        <h2>Aktive mål</h2>
+        <a href="quests.html">Se alle mål &rarr;</a>
+      </div>
+      <div id="questsCard"><div class="empty">Indlæser&hellip;</div></div>
+    </section>
+
+    <section class="section" id="npcSection">
+      <div class="section-title">
+        <h2>NPC-holdninger</h2>
+        <a href="lore.html">Se al lore &rarr;</a>
+      </div>
+      <div id="npcCard"><div class="empty">Indlæser&hellip;</div></div>
+    </section>
+
+    <section class="section">
+      <div class="section-title"><h2>Hurtige opslag</h2></div>
+      <div class="card">
+        <div class="card-actions">
+          <a class="btn secondary" href="monsters.html">Monstre</a>
+          <a class="btn secondary" href="spells.html">Besværgelser</a>
+          <a class="btn secondary" href="conditions.html">Tilstande</a>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=15"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("ved-bordet.html");
+  wireLoreMentionPreviews();
+
+  const { data: charRows } = await window.sb
+    .from("characters")
+    .select("*")
+    .order("sort_order", { ascending: true });
+  const hpCard = document.getElementById("hpCard");
+  hpCard.innerHTML = hpWidgetHtml(charRows);
+  wireHpWidget(hpCard);
+
+  const { data: logistics } = await window.sb.from("logistics").select("*").eq("id", 1).maybeSingle();
+  const statusCard = document.getElementById("statusCard");
+  const dayLine = logistics && logistics.campaign_day ? `<span class="badge">Dag ${logistics.campaign_day}</span>` : "";
+  const rulesLine = logistics && logistics.house_rules ? `<p class="body">${escapeHtml(logistics.house_rules)}</p>` : "";
+  statusCard.innerHTML = dayLine || rulesLine
+    ? `<div class="card">${dayLine}${rulesLine ? `<div style="margin-top:8px;">${rulesLine}</div>` : ""}</div>`
+    : `<div class="empty">Ingen kampagnedag eller husregler sat endnu.</div>`;
+
+  async function loadQuests() {
+    const questsCard = document.getElementById("questsCard");
+    const { data } = await window.sb
+      .from("quests")
+      .select("*")
+      .eq("done", false)
+      .order("created_at", { ascending: true });
+    const rows = data || [];
+    questsCard.innerHTML = rows.length
+      ? `<div class="card"><ul class="shop-items" id="questList">${rows
+          .map(
+            (q) => `
+        <li data-id="${q.id}">
+          <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
+            <input type="checkbox" class="questDoneBox" style="margin-top:4px;">
+            <span>${escapeHtml(q.title)}${q.notes ? `<br><span class="meta">${escapeHtml(q.notes)}</span>` : ""}</span>
+          </label>
+        </li>`
+          )
+          .join("")}</ul></div>`
+      : `<div class="empty">Ingen aktive mål lige nu. <a href="quests.html">Tilføj et</a>.</div>`;
+    questsCard.querySelectorAll(".questDoneBox").forEach((box) => {
+      box.addEventListener("change", async () => {
+        const id = box.closest("li").dataset.id;
+        box.disabled = true;
+        await window.sb.from("quests").update({ done: true, updated_at: new Date().toISOString() }).eq("id", id);
+        loadQuests();
+      });
+    });
+  }
+  await loadQuests();
+
+  const { data: loreRows } = await window.sb
+    .from("lore_entries")
+    .select("id, title, category, relationship, status")
+    .eq("category", "NPC")
+    .order("title", { ascending: true });
+  const npcCard = document.getElementById("npcCard");
+  const npcsWithStatus = (loreRows || []).filter((l) => l.relationship || l.status);
+  npcCard.innerHTML = npcsWithStatus.length
+    ? `<div class="card"><ul class="shop-items">${npcsWithStatus
+        .map((l) => {
+          const attitude = l.relationship
+            ? `<span class="attitude ${ATTITUDE_CLASS[l.relationship] || ""}">${escapeHtml(l.relationship)}</span>`
+            : "";
+          const status = l.status
+            ? `<span class="status-badge ${STATUS_CLASS[l.status] || ""}">${escapeHtml(l.status)}</span>`
+            : "";
+          return `<li><a href="lore.html?id=${l.id}">${escapeHtml(l.title)}</a> ${attitude}${status}</li>`;
+        })
+        .join("")}</ul></div>`
+    : `<div class="empty">Ingen NPC'er med sat holdning eller status endnu. <a href="lore.html">Sæt en på Lore-siden</a>.</div>`;
+})();
+</script>
+</body>
+</html>

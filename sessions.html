@@ -7,7 +7,7 @@
 <title>Sessions &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=12">
+<link rel="stylesheet" href="css/styles.css?v=13">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -94,7 +94,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=14"></script>
+<script src="js/app.js?v=15"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -114,11 +114,12 @@
   }
 
   async function loadLoreIndex() {
-    const [{ data: loreData }, { data: charData }] = await Promise.all([
+    const [{ data: loreData }, { data: charData }, { data: sessionData }] = await Promise.all([
       window.sb.from("lore_entries").select("id, title, category, body, relationship, status"),
       window.sb.from("characters").select("id, character_name, teaser"),
+      window.sb.from("sessions").select("id, title, summary"),
     ]);
-    loreIndex = [...(loreData || []), ...characterMentionEntries(charData)];
+    loreIndex = [...(loreData || []), ...characterMentionEntries(charData), ...sessionMentionEntries(sessionData)];
     setLorePreviewData(loreIndex);
   }
 
@@ -147,7 +148,7 @@
           <span class="badge">Session ${s.number}</span>
           <h3 style="margin-top:8px;"><a href="sessions.html?id=${s.id}">${escapeHtml(s.title)}</a></h3>
           <p class="meta">${formatDate(s.session_date)}</p>
-          <div class="body">${linkifyLoreMentions(renderBodyHtml(s.summary), loreIndex)}</div>
+          <div class="body">${linkifyLoreMentions(renderBodyHtml(s.summary), loreIndex, s.id)}</div>
           <p class="paste-hint" style="margin-top:10px;">${attributionLine(s)}</p>
           <div class="card-actions">
             <button class="btn secondary editBtn">Rediger</button>
