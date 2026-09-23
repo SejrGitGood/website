@@ -7,7 +7,7 @@
 <title>Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=15">
+<link rel="stylesheet" href="css/styles.css?v=16">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -72,7 +72,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=15"></script>
+<script src="js/app.js?v=16"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -87,15 +87,19 @@
   hpCard.innerHTML = hpWidgetHtml(charRows);
   wireHpWidget(hpCard);
 
-  const { data: questRows } = await window.sb
+  const { data: questRowsRaw } = await window.sb
     .from("quests")
     .select("*")
     .eq("done", false)
-    .order("created_at", { ascending: true })
-    .limit(6);
+    .order("created_at", { ascending: true });
+  const questRows = (questRowsRaw || [])
+    .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1))
+    .slice(0, 6);
   const questsCard = document.getElementById("questsCard");
-  questsCard.innerHTML = questRows && questRows.length
-    ? `<ul class="shop-items">${questRows.map((q) => `<li>${escapeHtml(q.title)}</li>`).join("")}</ul>`
+  questsCard.innerHTML = questRows.length
+    ? `<ul class="shop-items">${questRows
+        .map((q) => `<li>${escapeHtml(q.title)}<span class="priority-badge ${PRIORITY_CLASS[q.priority] || "normal"}">${escapeHtml(q.priority || "Normal")}</span></li>`)
+        .join("")}</ul>`
     : `<div class="empty">Ingen aktive mål lige nu. <a href="quests.html">Tilføj et</a>.</div>`;
 
   const { data: logistics } = await window.sb.from("logistics").select("*").eq("id", 1).maybeSingle();

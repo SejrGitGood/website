@@ -142,6 +142,9 @@ create table if not exists quests (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- Prioritet ('Høj'/'Normal'/'Lav'), så Ved Bordet kan vise det vigtigste
+-- mål øverst under en session i stedet for bare oprettelsesrækkefølge.
+alter table quests add column if not exists priority text not null default 'Normal';
 
 -- Interaktivt kort: et eller flere kortbilleder (uploades via samme
 -- billed-pipeline som Ctrl+V-indsætning), med markører der kan linke til en

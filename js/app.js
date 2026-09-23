@@ -426,6 +426,8 @@ const STATUS_CLASS = {
   Forsvundet: "missing",
   Ukendt: "unknown",
 };
+const PRIORITY_CLASS = { Høj: "high", Normal: "normal", Lav: "low" };
+const PRIORITY_ORDER = { Høj: 0, Normal: 1, Lav: 2 };
 
 function escapeRegExp(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

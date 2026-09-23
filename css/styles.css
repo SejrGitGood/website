@@ -152,6 +152,15 @@ a:hover{text-decoration:underline;}
 .status-badge.missing{--status-color:var(--ember);}
 .status-badge.unknown{--status-color:var(--ink-faint);}
 
+.priority-badge{
+  display:inline-block;font-family:"Cinzel",serif;font-size:0.68rem;letter-spacing:0.05em;text-transform:uppercase;
+  padding:3px 9px;border-radius:999px;margin-left:6px;
+  background:color-mix(in srgb, var(--priority-color) 14%, transparent);color:var(--priority-color);
+}
+.priority-badge.high{--priority-color:var(--blood);}
+.priority-badge.normal{--priority-color:var(--gold);}
+.priority-badge.low{--priority-color:var(--ink-faint);}
+
 main{flex:1;}
 .page-head{padding-block:clamp(30px,6vw,52px) 10px;text-align:center;}
 .eyebrow{

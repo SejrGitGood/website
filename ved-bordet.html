@@ -7,7 +7,7 @@
 <title>Ved Bordet &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=15">
+<link rel="stylesheet" href="css/styles.css?v=16">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -75,7 +75,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=15"></script>
+<script src="js/app.js?v=16"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -106,7 +106,7 @@
       .select("*")
       .eq("done", false)
       .order("created_at", { ascending: true });
-    const rows = data || [];
+    const rows = (data || []).sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1));
     questsCard.innerHTML = rows.length
       ? `<div class="card"><ul class="shop-items" id="questList">${rows
           .map(
@@ -114,7 +114,10 @@
         <li data-id="${q.id}">
           <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
             <input type="checkbox" class="questDoneBox" style="margin-top:4px;">
-            <span>${escapeHtml(q.title)}${q.notes ? `<br><span class="meta">${escapeHtml(q.notes)}</span>` : ""}</span>
+            <span>
+              ${escapeHtml(q.title)}<span class="priority-badge ${PRIORITY_CLASS[q.priority] || "normal"}">${escapeHtml(q.priority || "Normal")}</span>
+              ${q.notes ? `<br><span class="meta">${escapeHtml(q.notes)}</span>` : ""}
+            </span>
           </label>
         </li>`
           )
