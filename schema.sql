@@ -84,6 +84,17 @@ create table if not exists character_private_notes (
   updated_at timestamptz not null default now()
 );
 
+-- Hvilke mails der må oprette en PERSONLIG konto og kræve en karakter via
+-- min-karakter.html. Uden denne liste ville policyerne nedenfor ("se ledige
+-- karakterer" / "kræv en karakter") gælde for enhver, der selv opretter en
+-- konto med den offentlige anon-nøgle (som ligger frit i det offentlige
+-- repo) — dvs. hvem som helst på internettet, ikke kun jer fem. Tilføj hver
+-- spillers valgte mail her, én gang, når de fortæller dig den:
+-- insert into approved_personal_emails (email) values ('spiller@eksempel.dk');
+create table if not exists approved_personal_emails (
+  email text primary key
+);
+
 create table if not exists logistics (
   id int primary key default 1,
   next_session_date timestamptz,
@@ -167,6 +178,7 @@ alter table quests enable row level security;
 alter table character_private_notes enable row level security;
 alter table maps enable row level security;
 alter table map_markers enable row level security;
+alter table approved_personal_emails enable row level security;
 
 -- Rydder op efter en evt. tidligere, mere åben version af dette skema,
 -- så denne fil altid trygt kan køres igen fra toppen.
@@ -239,13 +251,24 @@ create policy "allow-listed users only" on map_markers
 -- OR'er alle policies for samme kommando sammen) — en personlig konto behøver
 -- ALDRIG stå i allowed_users, den kan kun røre sin egen karakterrække.
 
+-- En konto må slå sin egen mail op i godkendelseslisten (nødvendigt for at
+-- de to policies nedenfor kan bruge exists(...) til at tjekke den).
+drop policy if exists "read own approval" on approved_personal_emails;
+create policy "read own approval" on approved_personal_emails
+  for select using (auth.jwt() ->> 'email' = email);
+
 -- En spiller, der endnu ikke har valgt sin karakter, må se hvilke rækker der
 -- stadig er ledige (owner_email er null), så min-karakter.html kan vise en
--- vælger.
+-- vælger. KRÆVER at mailen står i approved_personal_emails — ellers ville
+-- dette gælde for enhver, der selv opretter en konto med den offentlige
+-- anon-nøgle, ikke kun jer fem.
 drop policy if exists "select unclaimed characters" on characters;
 create policy "select unclaimed characters" on characters
   for select
-  using (owner_email is null);
+  using (
+    owner_email is null
+    and exists (select 1 from approved_personal_emails ape where ape.email = auth.jwt() ->> 'email')
+  );
 
 -- Ejeren må altid læse sin egen række (for at forudfylde redigeringsformularen).
 drop policy if exists "owner can select own character" on characters;
@@ -253,14 +276,18 @@ create policy "owner can select own character" on characters
   for select
   using (auth.jwt() ->> 'email' = owner_email);
 
--- Selvbetjent "claim": en logget-ind personlig konto må sætte sig selv som
+-- Selvbetjent "claim": en godkendt personlig konto må sætte sig selv som
 -- ejer af en karakter, der endnu ikke er krævet af nogen. Når owner_email
 -- først er sat, matcher "unclaimed"-betingelsen (using) ikke længere, så
--- karakteren kan ikke kapres af en anden konto bagefter.
+-- karakteren kan ikke kapres af en anden konto bagefter. Samme
+-- godkendelseskrav som ovenfor.
 drop policy if exists "claim unclaimed character" on characters;
 create policy "claim unclaimed character" on characters
   for update
-  using (owner_email is null)
+  using (
+    owner_email is null
+    and exists (select 1 from approved_personal_emails ape where ape.email = auth.jwt() ->> 'email')
+  )
   with check (auth.jwt() ->> 'email' = owner_email);
 
 -- Ejeren må opdatere sin egen karakter (bruges til at gemme teaser).
@@ -281,6 +308,10 @@ create policy "owner only" on character_private_notes
 -- Vil du senere tilføje eller fjerne en spiller, uden at køre hele filen igen:
 -- insert into allowed_users (email) values ('ny@eksempel.dk');
 -- delete from allowed_users where email = 'gammel@eksempel.dk';
+
+-- Samme for personlige Min Karakter-konti — kør én gang pr. spiller, når du
+-- kender deres valgte mail (kræves FØR de kan vælge/kræve deres karakter):
+-- insert into approved_personal_emails (email) values ('spiller@eksempel.dk');
 
 -- Billeder: en offentligt-læsbar bucket (så <img src> altid virker uden ekstra
 -- login-håndtering), men kun allow-listede brugere må lægge noget op eller slette.
