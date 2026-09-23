@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Min Karakter &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=9">
+<script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">Personligt</p>
+    <h1>Min Karakter</h1>
+    <p>Din egen, personlige login &mdash; adskilt fra den delte konto. Kun du kan se og redigere din private baggrundshistorie.</p>
+  </div>
+
+  <div class="wrap" style="max-width:600px;">
+    <p style="margin:-8px 0 4px;"><a href="characters.html" class="back-link">&larr; Karakterer</a></p>
+
+    <section class="section" id="authSection">
+      <div class="card">
+        <h3>Log ind med din personlige konto</h3>
+        <p class="body">Dette er <strong>ikke</strong> den delte kampagne-adgangskode &mdash; det er din helt egen konto, kun brugt her, til at gemme din teaser og private baggrundshistorie. Har du ikke en endnu, opret en med en email og en selvvalgt adgangskode.</p>
+        <form class="form" id="personalAuthForm">
+          <div class="field">
+            <label for="personalEmail">Email</label>
+            <input type="email" id="personalEmail" required autocomplete="username">
+          </div>
+          <div class="field">
+            <label for="personalPassword">Adgangskode</label>
+            <input type="password" id="personalPassword" required autocomplete="current-password" minlength="6">
+          </div>
+          <div class="card-actions">
+            <button class="btn" type="submit" id="personalLoginBtn">Log ind</button>
+            <button class="btn secondary" type="button" id="personalSignupBtn">Opret ny konto</button>
+          </div>
+        </form>
+        <p class="notice" id="personalAuthMsg" hidden style="margin-top:14px;"></p>
+      </div>
+    </section>
+
+    <section class="section" id="claimSection" hidden>
+      <div class="card">
+        <h3>Vælg din karakter</h3>
+        <p class="body">Hvilken karakter er din? Dette kan kun gøres én gang pr. karakter.</p>
+        <div class="tabs" id="claimList" style="margin-top:10px;"></div>
+        <div class="card-actions">
+          <button class="btn" id="claimBtn" disabled>Bekræft valg</button>
+        </div>
+        <p class="notice" id="claimMsg" hidden style="margin-top:14px;"></p>
+      </div>
+    </section>
+
+    <section class="section" id="editSection" hidden>
+      <div class="card-actions" style="margin-bottom:16px;justify-content:space-between;">
+        <h3 id="editCharName" style="margin:0;"></h3>
+        <button class="btn secondary" id="personalLogoutBtn">Log ud (personlig konto)</button>
+      </div>
+
+      <div class="card">
+        <form class="form" id="teaserForm">
+          <div class="field">
+            <label for="teaserInput">Offentlig teaser</label>
+            <input type="text" id="teaserInput" maxlength="200" placeholder="En kort, spoiler-fri sætning om din karakter">
+            <p class="paste-hint">Vises for alle på Karakterer-siden, sammen med resten af karakteren &mdash; ikke fuld baggrundshistorie, bare en teaser.</p>
+          </div>
+          <div class="card-actions">
+            <button class="btn" type="submit">Gem teaser</button>
+            <span id="teaserSavedMsg" class="notice" style="display:none;">Gemt.</span>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <form class="form" id="backstoryForm">
+          <div class="field">
+            <label for="backstoryInput">Privat baggrundshistorie</label>
+            <textarea id="backstoryInput" style="min-height:260px;" placeholder="Kun du kan se og redigere dette — ikke engang den delte konto kan læse det."></textarea>
+          </div>
+          <div class="card-actions">
+            <button class="btn" type="submit">Gem baggrundshistorie</button>
+            <span id="backstorySavedMsg" class="notice" style="display:none;">Gemt.</span>
+          </div>
+        </form>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=8"></script>
+<script>
+(async function () {
+  // Gate 1: kræver den delte login, ligesom alle andre sider — sikrer at kun
+  // dem, der kender kampagnens fælles adgangskode, overhovedet kan nå denne side.
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("dmtools.html");
+
+  // Gate 2: en HELT SEPARAT Supabase-klient med sin egen storageKey, så en
+  // personlig session kan eksistere side om side med den delte login-session
+  // i samme browser, uden at den ene logger den anden ud.
+  const sbPersonal = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey, {
+    auth: { storageKey: "sb-personal-auth" },
+  });
+
+  const authSection = document.getElementById("authSection");
+  const claimSection = document.getElementById("claimSection");
+  const editSection = document.getElementById("editSection");
+  const authMsg = document.getElementById("personalAuthMsg");
+  const claimMsg = document.getElementById("claimMsg");
+
+  let myEmail = null;
+  let myChar = null;
+  let selectedClaimId = null;
+
+  function showAuth() {
+    authSection.hidden = false;
+    claimSection.hidden = true;
+    editSection.hidden = true;
+    document.getElementById("personalAuthForm").reset();
+    authMsg.hidden = true;
+  }
+
+  async function showClaimOrEdit() {
+    const { data: mine } = await sbPersonal.from("characters").select("*").eq("owner_email", myEmail).maybeSingle();
+    if (mine) {
+      myChar = mine;
+      authSection.hidden = true;
+      claimSection.hidden = true;
+      editSection.hidden = false;
+      document.getElementById("editCharName").textContent = `${mine.player_name} — ${mine.character_name}`;
+      document.getElementById("teaserInput").value = mine.teaser || "";
+      const { data: notes } = await sbPersonal
+        .from("character_private_notes")
+        .select("*")
+        .eq("character_id", mine.id)
+        .maybeSingle();
+      document.getElementById("backstoryInput").value = (notes && notes.backstory) || "";
+      return;
+    }
+
+    const { data: unclaimed, error } = await sbPersonal
+      .from("characters")
+      .select("id, player_name, character_name")
+      .is("owner_email", null)
+      .order("sort_order", { ascending: true });
+    authSection.hidden = true;
+    claimSection.hidden = false;
+    editSection.hidden = true;
+    selectedClaimId = null;
+    document.getElementById("claimBtn").disabled = true;
+    const claimList = document.getElementById("claimList");
+    claimMsg.hidden = true;
+    if (error) {
+      claimList.innerHTML = "";
+      claimMsg.hidden = false;
+      claimMsg.textContent = "Kunne ikke hente karakterer: " + error.message;
+      return;
+    }
+    if (!unclaimed || !unclaimed.length) {
+      claimList.innerHTML = "";
+      claimMsg.hidden = false;
+      claimMsg.textContent = "Alle karakterer er allerede krævet. Kontakt DM'en hvis det er en fejl.";
+      return;
+    }
+    claimList.innerHTML = unclaimed
+      .map((c) => `<button type="button" data-id="${c.id}">${escapeHtml(c.player_name)} — ${escapeHtml(c.character_name)}</button>`)
+      .join("");
+  }
+
+  document.getElementById("claimList").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-id]");
+    if (!btn) return;
+    selectedClaimId = btn.dataset.id;
+    document.querySelectorAll("#claimList button").forEach((b) => b.classList.toggle("active", b === btn));
+    document.getElementById("claimBtn").disabled = false;
+  });
+
+  document.getElementById("claimBtn").addEventListener("click", async () => {
+    if (!selectedClaimId) return;
+    const btn = document.getElementById("claimBtn");
+    await withBusy(btn, "Bekræfter…", async () => {
+      const { error } = await sbPersonal
+        .from("characters")
+        .update({ owner_email: myEmail })
+        .eq("id", selectedClaimId);
+      if (error) {
+        claimMsg.hidden = false;
+        claimMsg.textContent = "Kunne ikke vælge karakter: " + error.message;
+        return;
+      }
+      await showClaimOrEdit();
+    });
+  });
+
+  document.getElementById("personalAuthForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    authMsg.hidden = true;
+    const email = document.getElementById("personalEmail").value.trim();
+    const password = document.getElementById("personalPassword").value;
+    const btn = document.getElementById("personalLoginBtn");
+    await withBusy(btn, "Logger ind…", async () => {
+      const { data, error } = await sbPersonal.auth.signInWithPassword({ email, password });
+      if (error) {
+        authMsg.hidden = false;
+        authMsg.textContent = "Kunne ikke logge ind: " + error.message;
+        return;
+      }
+      myEmail = data.session.user.email;
+      await showClaimOrEdit();
+    });
+  });
+
+  document.getElementById("personalSignupBtn").addEventListener("click", async () => {
+    authMsg.hidden = true;
+    const email = document.getElementById("personalEmail").value.trim();
+    const password = document.getElementById("personalPassword").value;
+    if (!email || !password) {
+      authMsg.hidden = false;
+      authMsg.textContent = "Udfyld email og adgangskode først.";
+      return;
+    }
+    const btn = document.getElementById("personalSignupBtn");
+    await withBusy(btn, "Opretter…", async () => {
+      const { data, error } = await sbPersonal.auth.signUp({ email, password });
+      if (error) {
+        authMsg.hidden = false;
+        authMsg.textContent = "Kunne ikke oprette konto: " + error.message;
+        return;
+      }
+      if (data.session) {
+        myEmail = data.session.user.email;
+        await showClaimOrEdit();
+      } else {
+        authMsg.hidden = false;
+        authMsg.textContent = "Konto oprettet. Tjek din email for at bekræfte den, og log så ind ovenfor.";
+      }
+    });
+  });
+
+  document.getElementById("personalLogoutBtn").addEventListener("click", async () => {
+    await sbPersonal.auth.signOut();
+    myEmail = null;
+    myChar = null;
+    showAuth();
+  });
+
+  document.getElementById("teaserForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!myChar) return;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const msg = document.getElementById("teaserSavedMsg");
+    msg.style.display = "none";
+    await withBusy(submitBtn, "Gemmer…", async () => {
+      const teaser = document.getElementById("teaserInput").value.trim();
+      const { error } = await sbPersonal
+        .from("characters")
+        .update({ teaser, updated_at: new Date().toISOString() })
+        .eq("id", myChar.id);
+      if (error) {
+        alert("Kunne ikke gemme: " + error.message);
+        return;
+      }
+      msg.style.display = "inline-block";
+    });
+  });
+
+  document.getElementById("backstoryForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!myChar) return;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const msg = document.getElementById("backstorySavedMsg");
+    msg.style.display = "none";
+    await withBusy(submitBtn, "Gemmer…", async () => {
+      const backstory = document.getElementById("backstoryInput").value.trim();
+      const { error } = await sbPersonal.from("character_private_notes").upsert({
+        character_id: myChar.id,
+        owner_email: myEmail,
+        backstory,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) {
+        alert("Kunne ikke gemme: " + error.message);
+        return;
+      }
+      msg.style.display = "inline-block";
+    });
+  });
+
+  const { data: existing } = await sbPersonal.auth.getSession();
+  if (existing.session) {
+    myEmail = existing.session.user.email;
+    await showClaimOrEdit();
+  } else {
+    showAuth();
+  }
+})();
+</script>
+</body>
+</html>

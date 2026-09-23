@@ -67,6 +67,23 @@ create table if not exists characters (
 -- hver D&D Beyond-synk, så den ville forsvinde igen ved næste "Opdater nu".
 alter table characters add column if not exists has_inspiration boolean not null default false;
 
+-- Kort, offentlig teaser til karakteren (ikke fuld baggrundshistorie) — vises
+-- for alle, uanset D&D Beyond-synk. Skrives af spilleren selv via
+-- min-karakter.html, som bruger en PERSONLIG konto pr. spiller, adskilt fra
+-- den delte login. `owner_email` binder karakteren til den personlige konto.
+alter table characters add column if not exists teaser text;
+alter table characters add column if not exists owner_email text unique;
+
+-- Den fulde, private baggrundshistorie — i en helt separat tabel (ikke bare
+-- en kolonne på characters), så RLS nedenfor kan gøre den ulæselig for ALLE
+-- andre end ejeren selv, inklusive den delte konto alle fem logger ind med.
+create table if not exists character_private_notes (
+  character_id uuid primary key references characters(id) on delete cascade,
+  owner_email text not null,
+  backstory text,
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists logistics (
   id int primary key default 1,
   next_session_date timestamptz,
@@ -123,6 +140,7 @@ alter table characters enable row level security;
 alter table loot_items enable row level security;
 alter table party_treasury enable row level security;
 alter table quests enable row level security;
+alter table character_private_notes enable row level security;
 
 -- Rydder op efter en evt. tidligere, mere åben version af dette skema,
 -- så denne fil altid trygt kan køres igen fra toppen.
@@ -177,6 +195,50 @@ create policy "allow-listed users only" on quests
   for all
   using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
   with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+
+-- --- Personlige konti (min-karakter.html) ---
+-- Disse politikker gælder UDOVER "allow-listed users only" ovenfor (Postgres
+-- OR'er alle policies for samme kommando sammen) — en personlig konto behøver
+-- ALDRIG stå i allowed_users, den kan kun røre sin egen karakterrække.
+
+-- En spiller, der endnu ikke har valgt sin karakter, må se hvilke rækker der
+-- stadig er ledige (owner_email er null), så min-karakter.html kan vise en
+-- vælger.
+drop policy if exists "select unclaimed characters" on characters;
+create policy "select unclaimed characters" on characters
+  for select
+  using (owner_email is null);
+
+-- Ejeren må altid læse sin egen række (for at forudfylde redigeringsformularen).
+drop policy if exists "owner can select own character" on characters;
+create policy "owner can select own character" on characters
+  for select
+  using (auth.jwt() ->> 'email' = owner_email);
+
+-- Selvbetjent "claim": en logget-ind personlig konto må sætte sig selv som
+-- ejer af en karakter, der endnu ikke er krævet af nogen. Når owner_email
+-- først er sat, matcher "unclaimed"-betingelsen (using) ikke længere, så
+-- karakteren kan ikke kapres af en anden konto bagefter.
+drop policy if exists "claim unclaimed character" on characters;
+create policy "claim unclaimed character" on characters
+  for update
+  using (owner_email is null)
+  with check (auth.jwt() ->> 'email' = owner_email);
+
+-- Ejeren må opdatere sin egen karakter (bruges til at gemme teaser).
+drop policy if exists "owner can update own character" on characters;
+create policy "owner can update own character" on characters
+  for update
+  using (auth.jwt() ->> 'email' = owner_email)
+  with check (auth.jwt() ->> 'email' = owner_email);
+
+-- Privat baggrundshistorie: KUN ejeren selv, ingen andre — heller ikke den
+-- delte konto. Bevidst ingen "allow-listed users only"-politik på denne tabel.
+drop policy if exists "owner only" on character_private_notes;
+create policy "owner only" on character_private_notes
+  for all
+  using (auth.jwt() ->> 'email' = owner_email)
+  with check (auth.jwt() ->> 'email' = owner_email);
 
 -- Vil du senere tilføje eller fjerne en spiller, uden at køre hele filen igen:
 -- insert into allowed_users (email) values ('ny@eksempel.dk');

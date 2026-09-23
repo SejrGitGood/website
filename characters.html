@@ -7,7 +7,7 @@
 <title>Karakterer &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=8">
+<link rel="stylesheet" href="css/styles.css?v=9">
 <script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
 </head>
 <body>
@@ -26,6 +26,7 @@
     <section class="section">
       <div class="card-actions" style="margin-bottom:16px;">
         <button class="btn secondary" id="refreshBtn">Opdater nu fra D&amp;D Beyond</button>
+        <a class="btn secondary" href="min-karakter.html">Rediger din karakter (privat login) &rarr;</a>
         <span id="refreshMsg" class="notice" style="display:none;"></span>
       </div>
       <div class="grid" id="grid"><div class="empty">Indlæser&hellip;</div></div>
@@ -33,6 +34,9 @@
 
     <p class="paste-hint" style="text-align:center;">
       Opdateres automatisk hver nat, eller klik "Opdater nu" for at hente frisk data med det samme. Kun karakterer sat til offentlig på D&amp;D Beyond vises med fulde detaljer.
+    </p>
+    <p class="paste-hint" style="text-align:center;">
+      Vil du selv skrive en teaser eller gemme din fulde (private) baggrundshistorie? Det foregår med din egen personlige login, adskilt fra den delte konto — se "Rediger din karakter" ovenfor.
     </p>
   </div>
 </main>
@@ -70,6 +74,7 @@
         <span class="badge">${escapeHtml(c.player_name)}</span>
         <h3 style="margin-top:8px;">${escapeHtml(d.name || c.character_name)}</h3>
         <p class="meta">${escapeHtml(d.race || "")} &middot; ${classLine}</p>
+        ${c.teaser ? `<p class="teaser">${escapeHtml(c.teaser)}</p>` : ""}
         <p class="body">${hpLine}${d.background ? ` &middot; ${escapeHtml(d.background)}` : ""}${d.alignment ? ` &middot; ${escapeHtml(d.alignment)}` : ""}</p>
         <ul class="shop-items">${statsHtml}</ul>
         ${equippedHtml ? `<p class="meta" style="margin-top:10px;">Udstyr: ${equippedHtml}</p>` : ""}
@@ -84,6 +89,7 @@
       <div class="card">
         <span class="badge">${escapeHtml(c.player_name)}</span>
         <h3 style="margin-top:8px;">${escapeHtml(c.character_name)}</h3>
+        ${c.teaser ? `<p class="teaser">${escapeHtml(c.teaser)}</p>` : ""}
         <p class="body">Karakterarket er endnu ikke gjort offentligt på D&amp;D Beyond.</p>
         <div class="card-actions">
           <a class="btn secondary" href="https://www.dndbeyond.com/characters/${c.ddb_character_id}" target="_blank" rel="noopener">Åbn på D&amp;D Beyond</a>

@@ -171,6 +171,7 @@ a.card:hover{text-decoration:none;box-shadow:0 12px 30px -12px rgba(43,32,22,0.5
   color:var(--ink-faint);margin-top:4px;
 }
 .card .body{margin-top:10px;color:var(--ink-soft);white-space:pre-wrap;}
+.card .teaser{margin-top:8px;font-style:italic;color:var(--ink);}
 .card-actions{display:flex;gap:8px;margin-top:14px;}
 
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;}
