@@ -405,14 +405,27 @@ function buildMentionMatcher(entries, excludeId) {
 // "Troelius" i en lore-teksts krop bliver til et link til karakterens kort.
 // Alle karakterer er med, ikke kun dem sat til offentlig på D&D Beyond —
 // navnet er ikke en hemmelighed, kun det fulde ark er gated af is_public.
+// To kandidater pr. karakter (fulde navn + fornavn alene), begge til samme
+// id/href — i praksis skrives folk næsten altid ved fornavn i løbende tekst
+// ("Troelius'", ikke "Troelius Richter'"), så kun det fulde navn ville
+// stort set aldrig matche noget.
 function characterMentionEntries(characters) {
-  return (characters || []).map((c) => ({
-    id: c.id,
-    title: c.character_name,
-    category: "Karakter",
-    body: c.teaser || "",
-    href: `characters.html?id=${c.id}`,
-  }));
+  const out = [];
+  (characters || []).forEach((c) => {
+    if (!c.character_name || !c.character_name.trim()) return;
+    const base = {
+      id: c.id,
+      category: "Karakter",
+      body: c.teaser || "",
+      href: `characters.html?id=${c.id}`,
+    };
+    out.push({ ...base, title: c.character_name });
+    const firstName = c.character_name.trim().split(/\s+/)[0];
+    if (firstName && firstName !== c.character_name) {
+      out.push({ ...base, title: firstName });
+    }
+  });
+  return out;
 }
 
 // Omslutter forekomster af kendte navne i allerede-renderet HTML (fra
