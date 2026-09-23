@@ -48,7 +48,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=13"></script>
+<script src="js/app.js?v=14"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -73,16 +73,26 @@
     window.sb.from("lore_entries").select("id, title, category, body, relationship, status"),
     window.sb.from("characters").select("id, character_name, teaser"),
   ]);
-  const entries = [
+  // characterMentionEntries giver bevidst to kandidater pr. karakter (fulde
+  // navn + fornavn), så begge former genkendes i løbende tekst — men grafen
+  // skal kun vise ét punkt pr. person, så vi lægger dem sammen til én
+  // node-liste her (beholder den længste/mest fulde titel som label).
+  const mentionCandidates = [
     ...(loreData || []).map((l) => ({ ...l, href: `lore.html?id=${l.id}` })),
     ...characterMentionEntries(charData),
   ];
+  const entriesById = new Map();
+  mentionCandidates.forEach((e) => {
+    const existing = entriesById.get(e.id);
+    if (!existing || e.title.length > existing.title.length) entriesById.set(e.id, e);
+  });
+  const entries = [...entriesById.values()];
   setLorePreviewData(entries);
 
   const edgeSeen = new Set();
   const edges = [];
   entries.forEach((l) => {
-    findMentionedLoreIds(l.body, entries, l.id).forEach((targetId) => {
+    findMentionedLoreIds(l.body, mentionCandidates, l.id).forEach((targetId) => {
       const key = [l.id, targetId].sort().join("|");
       if (!edgeSeen.has(key)) {
         edgeSeen.add(key);

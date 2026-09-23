@@ -459,11 +459,19 @@ function findMentionedLoreIds(text, entries, excludeId) {
 
 const LORE_PREVIEW_DATA = new Map();
 
-// Kaldes med alle lore-indgange, siden allerede har hentet, så preview-boksen
-// aldrig behøver sit eget kald til Supabase.
+// Kaldes med alle lore-indgange (og evt. karakterer, se
+// characterMentionEntries), siden allerede har hentet, så preview-boksen
+// aldrig behøver sit eget kald til Supabase. En karakter kan optræde som to
+// entries med samme id (fulde navn + fornavn) — behold den med længst titel,
+// så preview-kortet viser det fulde navn uanset hvilken form der blev matchet.
 function setLorePreviewData(entries) {
   LORE_PREVIEW_DATA.clear();
-  (entries || []).forEach((l) => LORE_PREVIEW_DATA.set(l.id, l));
+  (entries || []).forEach((l) => {
+    const existing = LORE_PREVIEW_DATA.get(l.id);
+    if (!existing || (l.title || "").length > (existing.title || "").length) {
+      LORE_PREVIEW_DATA.set(l.id, l);
+    }
+  });
 }
 
 // Ét delt preview-popover pr. side, ligesom lightboxen. Hover (eller
