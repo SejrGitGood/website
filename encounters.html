@@ -743,7 +743,7 @@
     const out = {};
     (data || []).forEach((r) => {
       const o = (out[r.character_id] = out[r.character_id] || { ac: null, hp_max: null });
-      if (o.ac == null && r.ac != null) o.ac = r.ac;
+      if (o.ac == null && r.ac > 0) o.ac = r.ac;
       if (o.hp_max == null && r.hp_max != null) o.hp_max = r.hp_max;
     });
     return out;
@@ -945,7 +945,7 @@
     const ds = hp.synced && down && c.data.deathSaves;
     const acInput = hideStats
       ? ""
-      : `<label class="enc-meta" ${acFromDdb != null ? `title="Fra D&amp;D Beyond — skriv et tal for at overskrive"` : ""}>AC <input type="number" min="0" class="small-input" style="width:52px;" data-field="ac" value="${cb.ac ?? ""}" placeholder="${acFromDdb ?? ""}"></label>`;
+      : `<label class="enc-meta" ${acFromDdb != null ? `title="Fra D&amp;D Beyond — skriv et tal for at overskrive"` : ""}>AC <input type="number" min="1" class="small-input" style="width:52px;" data-field="ac" value="${cb.ac || ""}" placeholder="${acFromDdb ?? ""}"></label>`;
 
     return `
       <div class="combatant ${current ? "current" : ""} ${isOut(cb) ? "defeated" : ""} ${selected ? "selected" : ""}" data-id="${cb.id}">
@@ -1135,7 +1135,7 @@
     const c = isPc && cb.character_id ? charById(cb.character_id) : null;
     const hp = hpOf(cb);
     const hideStats = playerView && !isPc;
-    const ac = cb.ac ?? syncedAc(c);
+    const ac = cb.ac || syncedAc(c);
     const sub = isPc
       ? c && isSynced(c)
         ? [(c.data.classes || []).map((cl) => `${cl.name} ${cl.level}`).join(" / "), c.data.race].filter(Boolean).map(escapeHtml).join(" &middot; ")
@@ -1426,9 +1426,13 @@
       const cb = row && combatants.find((x) => x.id === row.dataset.id);
       if (!cb) return;
       const field = e.target.dataset.field;
-      if (field === "initiative" || field === "ac") {
+      if (field === "initiative") {
         const v = parseInt(e.target.value, 10);
-        await updateCombatant(cb, { [field]: Number.isNaN(v) ? null : v });
+        await updateCombatant(cb, { initiative: Number.isNaN(v) ? null : v });
+      } else if (field === "ac") {
+        // Tomt eller 0 = brug AC fra D&D Beyond / ingen AC.
+        const v = parseInt(e.target.value, 10);
+        await updateCombatant(cb, { ac: v > 0 ? v : null });
       } else if (field === "hp_max") {
         const v = parseInt(e.target.value, 10);
         if (v > 0) await updateCombatant(cb, { hp_max: v, hp_current: v });
