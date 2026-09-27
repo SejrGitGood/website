@@ -290,10 +290,13 @@
         return;
       }
       if (draftEntryIds.length) {
+        // Kun noter, der stadig er åbne — laver to personer referat samtidig,
+        // beholder den første session sine noter.
         const { error: logErr } = await window.sb
           .from("session_log_entries")
           .update({ session_id: created.id })
-          .in("id", draftEntryIds);
+          .in("id", draftEntryIds)
+          .is("session_id", null);
         if (logErr) alert("Sessionen er gemt, men loggen kunne ikke tømmes: " + logErr.message);
         draftEntryIds = [];
         document.getElementById("draftNotice").hidden = true;
