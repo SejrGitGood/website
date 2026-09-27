@@ -211,6 +211,13 @@ create table if not exists encounter_combatants (
 -- Frie noter pr. deltager (vises i detaljepanelet) — f.eks. handlingerne for
 -- et eget monster, der ikke findes i Open5e.
 alter table encounter_combatants add column if not exists notes text;
+-- Legendariske handlinger pr. runde (0 = ingen; null = ukendt, ældre rækker)
+-- og hvor mange der er brugt, siden monsterets egen tur startede.
+alter table encounter_combatants add column if not exists legendary_max int;
+alter table encounter_combatants add column if not exists legendary_used int not null default 0;
+-- Varighed pr. tilstand: {"Poisoned": {"until": 4, "anchor": "<combatant-id>", "rounds": 3}}
+-- = udløber ved starten af anchors tur i runde 4 (uden anchor: ved rundens start).
+alter table encounter_combatants add column if not exists condition_timers jsonb not null default '{}';
 
 -- Aftenens log (Ved Bordet): korte noter, skrevet undervejs i en session af
 -- hvem som helst ved bordet. session_id er null, så længe noten hører til den

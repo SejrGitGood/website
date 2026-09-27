@@ -7,7 +7,7 @@
 <title>Kampbygger &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=20">
+<link rel="stylesheet" href="css/styles.css?v=21">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -144,6 +144,7 @@
   <div class="turn-bar-inner">
     <div class="turn-now" id="turnNow"></div>
     <div class="turn-actions" id="turnActions"></div>
+    <div class="turn-legend" id="turnLegend" hidden></div>
   </div>
 </div>
 
@@ -181,6 +182,8 @@
     "Blinded", "Charmed", "Deafened", "Exhaustion", "Frightened", "Grappled", "Incapacitated", "Invisible",
     "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious", "Concentration",
   ];
+  // Varigheder at vælge imellem på en tilstand (runder; 10 = 1 minut).
+  const DURATIONS = [1, 2, 3, 10];
   const STATUS_LABEL = { kladde: "Kladde", aktiv: "I gang", afsluttet: "Afsluttet" };
   // Hvor ofte spillernes ark hentes fra D&D Beyond, mens en kamp kører. Alle
   // enheder deler characters.updated_at, så kun én af dem henter pr. interval.
@@ -272,13 +275,28 @@
     return statBlockCache.get(slug);
   }
 
-  // encounter_combatants.notes kræver en lille SQL-ændring; indtil den er kørt,
-  // skjules notefeltet i stedet for at "Start kamp" fejler.
+  // Nyere kolonner kræver små SQL-ændringer; indtil de er kørt, skjules
+  // funktionerne i stedet for at "Start kamp" fejler.
   let notesSupported = false;
-  async function detectNotesColumn() {
-    const { error } = await window.sb.from("encounter_combatants").select("notes").limit(1);
-    notesSupported = !error;
+  let extrasSupported = false; // legendariske handlinger + varighed på tilstande
+  async function detectColumns() {
+    const [notes, extras] = await Promise.all([
+      window.sb.from("encounter_combatants").select("notes").limit(1),
+      window.sb.from("encounter_combatants").select("legendary_max, legendary_used, condition_timers").limit(1),
+    ]);
+    notesSupported = !notes.error;
+    extrasSupported = !extras.error;
   }
+
+  // Legendariske handlinger fra en Open5e stat block: antal pr. runde står i
+  // indledningen ("can take 3 legendary actions"), prisen i navnet ("Costs 2 Actions").
+  const NUMBER_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5 };
+  function legendaryCount(block) {
+    if (!Array.isArray(block.legendary_actions) || !block.legendary_actions.length) return 0;
+    const m = /can take (\d+|one|two|three|four|five) legendary actions?/i.exec(block.legendary_desc || "");
+    return m ? NUMBER_WORDS[m[1].toLowerCase()] ?? Number(m[1]) : 3;
+  }
+  const legendaryCost = (name) => Number((/\(costs? (\d+) actions?\)/i.exec(name || "") || [])[1] || 1);
 
   // --- Sværhedsgrad ---
   function multiplierFor(monsterCount, partySize) {
@@ -345,6 +363,7 @@
       hit_dice: m.hit_dice || "",
       ac: m.armor_class,
       init_bonus: Math.floor(((m.dexterity ?? 10) - 10) / 2),
+      legendary: legendaryCount(m),
       count: 1,
     };
   }
@@ -461,6 +480,7 @@
           <div class="field" style="min-width:80px;"><label>HP</label><input type="number" min="1" data-f="hp" required></div>
           <div class="field" style="min-width:80px;"><label>AC</label><input type="number" min="0" data-f="ac"></div>
           <div class="field" style="min-width:80px;"><label>Init.-bonus</label><input type="number" data-f="init" value="0"></div>
+          <div class="field" style="min-width:80px;"><label title="Legendariske handlinger pr. runde">Legendariske</label><input type="number" min="0" max="9" data-f="legendary" value="0"></div>
         </div>
         <div class="field">
           <label>Handlinger / noter <span class="enc-meta">(valgfrit — vises i detaljepanelet)</span></label>
@@ -486,6 +506,7 @@
         hit_dice: "",
         ac: get("ac") === "" ? null : parseInt(get("ac"), 10),
         init_bonus: parseInt(get("init"), 10) || 0,
+        legendary: Math.max(0, Math.min(9, parseInt(get("legendary"), 10) || 0)),
         notes: get("notes").trim() || null,
         count: 1,
       };
@@ -602,7 +623,7 @@
           .map(
             (m) => `
         <div class="enc-row">
-          <span class="enc-name"><button type="button" class="text-link" data-view-monster="${escapeHtml(m.key)}" title="Vis detaljer">${escapeHtml(m.name)}</button><br><span class="enc-meta">CR ${escapeHtml(m.cr_label ?? String(m.cr))} &middot; ${fmt(m.xp)} XP &middot; HP ${m.hp ?? "?"} &middot; AC ${m.ac ?? "?"}</span></span>
+          <span class="enc-name"><button type="button" class="text-link" data-view-monster="${escapeHtml(m.key)}" title="Vis detaljer">${escapeHtml(m.name)}</button><br><span class="enc-meta">CR ${escapeHtml(m.cr_label ?? String(m.cr))} &middot; ${fmt(m.xp)} XP &middot; HP ${m.hp ?? "?"} &middot; AC ${m.ac ?? "?"}${m.legendary ? ` &middot; ${m.legendary} legendariske` : ""}</span></span>
           <span class="qty">
             <button type="button" class="icon-btn" data-qty="-1" data-key="${escapeHtml(m.key)}" aria-label="Færre ${escapeHtml(m.name)}">&minus;</button>
             <span>${m.count}</span>
@@ -756,6 +777,19 @@
     encounter.monsters.forEach((m) => (totals[m.name] = (totals[m.name] || 0) + m.count));
     const seen = {};
     const rollHp = $("rollHp").checked;
+    // Kladder gemt før legendariske handlinger kom med, har ikke antallet —
+    // det slås op i stat blocken i stedet.
+    const legendaryBySlug = {};
+    if (extrasSupported) {
+      const slugs = [...new Set(encounter.monsters.filter((m) => m.slug && m.legendary === undefined).map((m) => m.slug))];
+      await Promise.all(
+        slugs.map((slug) =>
+          fetchStatBlock(slug)
+            .then((block) => (legendaryBySlug[slug] = legendaryCount(block)))
+            .catch(() => {})
+        )
+      );
+    }
     const monsterRows = [];
     encounter.monsters.forEach((m) => {
       for (let i = 0; i < m.count; i++) {
@@ -773,6 +807,7 @@
           xp: m.xp || 0,
           monster_slug: m.slug || null,
           ...(notesSupported ? { notes: m.notes || null } : {}),
+          ...(extrasSupported ? { legendary_max: m.legendary ?? legendaryBySlug[m.slug] ?? (m.slug ? null : 0) } : {}),
         });
       }
     });
@@ -799,6 +834,7 @@
         xp: 0,
         monster_slug: null,
         ...(notesSupported ? { notes: null } : {}),
+        ...(extrasSupported ? { legendary_max: null } : {}),
       };
     });
     // Samme felter i alle rækker: ved en samlet insert udfylder Supabase felter,
@@ -894,6 +930,54 @@
   const deathSavesText = (ds) =>
     `${"✓".repeat(ds.success)}${"○".repeat(Math.max(0, 3 - ds.success))} · ${"✗".repeat(ds.fail)}${"○".repeat(Math.max(0, 3 - ds.fail))}${ds.stable ? " · stabil" : ""}`;
 
+  // --- Varighed på tilstande ---
+  // En varighed på N runder sættes i forhold til den, der har tur lige nu
+  // ("anchor"), og udløber ved starten af anchors tur N runder senere — så
+  // "1 runde" = til starten af den nuværendes næste tur, og 10 = 1 minut.
+  // Før kampen er begyndt, tælles fra starten af runde 1.
+  const timersOf = (cb) => (extrasSupported && cb.condition_timers) || {};
+  function newTimer(rounds) {
+    const started = encounter.round > 0 && encounter.turn_combatant_id;
+    return started
+      ? { until: encounter.round + rounds, anchor: encounter.turn_combatant_id, rounds }
+      : { until: 1 + rounds, anchor: null, rounds };
+  }
+  // Et fjernet anchor tæller som rundens start.
+  function anchorIndex(t, list) {
+    return Math.max(0, t.anchor ? list.findIndex((c) => c.id === t.anchor) : 0);
+  }
+  // Hvor mange gange anchors tur endnu skal starte, før tilstanden udløber (0 = udløbet).
+  function roundsLeft(t, list) {
+    if (encounter.round < 1) return t.until - 1;
+    const cur = list.findIndex((c) => c.id === encounter.turn_combatant_id);
+    return t.until - encounter.round + (cur < anchorIndex(t, list) ? 1 : 0);
+  }
+  const genitive = (name) => (/[sxz]$/i.test(name) ? `${name}'` : `${name}s`);
+  function expiryText(t, list) {
+    const anchor = t.anchor && combatants.find((c) => c.id === t.anchor);
+    const left = Math.max(1, roundsLeft(t, list));
+    return `${left} ${left === 1 ? "runde" : "runder"} tilbage — udløber ved starten af ${anchor ? `${genitive(anchor.name)} tur` : "runden"} i runde ${t.until}`;
+  }
+
+  // --- Legendariske handlinger ---
+  // Ældre rækker (legendary_max = null) bruger stat blocken, hvis den er hentet.
+  function legendaryMaxOf(cb) {
+    if (!extrasSupported || cb.kind !== "monster") return 0;
+    if (cb.legendary_max != null) return cb.legendary_max;
+    const block = cb.monster_slug && statBlocks.get(cb.monster_slug);
+    return block ? legendaryCount(block) : 0;
+  }
+  // Fyldt ◆ = tilbage (klik = brug én), tom ◇ = brugt (klik = fortryd).
+  function legendPipsHtml(cb, max) {
+    const left = Math.max(0, max - (cb.legendary_used || 0));
+    const pips = Array.from({ length: max }, (_, i) =>
+      i < left
+        ? `<button type="button" class="legend-pip" data-legend="1" data-cb="${cb.id}" title="Brug én legendarisk handling">&#9670;</button>`
+        : `<button type="button" class="legend-pip spent" data-legend="-1" data-cb="${cb.id}" title="Fortryd — giv én tilbage">&#9671;</button>`
+    ).join("");
+    return `<span class="legend-pips" role="group" aria-label="${left} af ${max} legendariske handlinger tilbage">${pips}</span>`;
+  }
+
   function combatantHtml(cb, list) {
     const isPc = cb.kind === "pc";
     const c = isPc && cb.character_id ? charById(cb.character_id) : null;
@@ -922,9 +1006,22 @@
     }
 
     const conditions = cb.conditions || [];
+    const timers = timersOf(cb);
     const chips = conditions
-      .map((k) => `<button type="button" class="cond-chip" data-remove-cond="${escapeHtml(k)}" title="Fjern ${escapeHtml(k)}">${escapeHtml(k)} &times;</button>`)
+      .map((k) => {
+        const key = escapeHtml(k);
+        const t = timers[k];
+        const left = t ? Math.max(1, roundsLeft(t, list)) : null;
+        const options = [...new Set([...DURATIONS, ...(left ? [left] : [])])].sort((a, b) => a - b);
+        const duration = extrasSupported
+          ? `<select class="cond-dur" data-cond-dur="${key}" aria-label="Varighed for ${key}" title="${t ? escapeHtml(expiryText(t, list)) : "Sæt varighed i runder"}"><option value="">&infin;</option>${options
+              .map((n) => `<option value="${n}" ${n === left ? "selected" : ""}>${n} r.</option>`)
+              .join("")}</select>`
+          : "";
+        return `<span class="cond-chip ${t ? "timed" : ""}">${key}${duration}<button type="button" class="cond-x" data-remove-cond="${key}" aria-label="Fjern ${key}" title="Fjern ${key}">&times;</button></span>`;
+      })
       .join("");
+    const legendMax = hideStats || isOut(cb) ? 0 : legendaryMaxOf(cb);
     const condOptions = CONDITIONS.filter((k) => !conditions.includes(k))
       .map((k) => `<option value="${k}">${k}</option>`)
       .join("");
@@ -966,6 +1063,7 @@
             <button type="button" class="icon-btn" data-act="remove" aria-label="Fjern ${name} fra kampen">&times;</button>
           </div>
           <div class="cb-hp">${hpHtml}</div>
+          ${legendMax ? `<div class="cb-legend"><span class="enc-meta">Legendariske</span>${legendPipsHtml(cb, legendMax)}</div>` : ""}
           ${ds ? `<p class="enc-meta">Dødsslag ${deathSavesText(ds)}</p>` : ""}
           <div class="cb-conds">
             ${chips}
@@ -999,6 +1097,18 @@
     document.body.classList.toggle("has-turnbar", show);
     if (!show) return;
     const list = sortCombatants(combatants);
+    // Legendariske handlinger bruges i slutningen af de andres ture — så de
+    // står her som påmindelse, undtagen for den der selv har tur.
+    const legends =
+      encounter.round > 0 && !playerView
+        ? list.filter((cb) => cb.id !== encounter.turn_combatant_id && !isOut(cb) && legendaryMaxOf(cb) > 0)
+        : [];
+    $("turnLegend").hidden = !legends.length;
+    $("turnLegend").innerHTML = legends.length
+      ? `<span class="enc-meta">Legendariske handlinger:</span>${legends
+          .map((cb) => `<span class="turn-legend-item">${escapeHtml(cb.name)} ${legendPipsHtml(cb, legendaryMaxOf(cb))}</span>`)
+          .join("")}`
+      : "";
     if (encounter.round > 0) {
       const current = list.find((c) => c.id === encounter.turn_combatant_id);
       const next = current ? upcoming(list) : null;
@@ -1126,6 +1236,7 @@
         ${m.hp != null ? `<span><strong>HP</strong> ${m.hp}</span>` : ""}
         ${m.ac != null ? `<span><strong>AC</strong> ${m.ac}</span>` : ""}
         <span><strong>Initiativ</strong> ${signed(m.init_bonus || 0)}</span>
+        ${m.legendary ? `<span><strong>Legendariske handlinger</strong> ${m.legendary} pr. runde</span>` : ""}
       </div>
       ${m.notes ? `<p class="body">${escapeHtml(m.notes)}</p>` : `<p class="enc-meta" style="margin-top:10px;">Ingen handlinger skrevet ind.</p>`}`;
   }
@@ -1142,7 +1253,18 @@
         : "Spillerkarakter"
       : "Monster";
     const hpText = hp.max == null ? "?" : hideStats ? healthWord(hp.cur, hp.max) : `${hp.cur}/${hp.max}${hp.temp ? ` (+${hp.temp})` : ""}`;
-    const conds = (cb.conditions || []).map((k) => `<span class="cond-chip" style="cursor:default;">${escapeHtml(k)}</span>`).join("");
+    const list = sortCombatants(combatants);
+    const timers = timersOf(cb);
+    const conds = (cb.conditions || [])
+      .map((k) => {
+        const t = timers[k];
+        return `<span class="cond-chip ${t ? "timed" : ""}">${escapeHtml(k)}${t ? ` &middot; ${Math.max(1, roundsLeft(t, list))} r.` : ""}</span>`;
+      })
+      .join("");
+    const expiries = (cb.conditions || [])
+      .filter((k) => timers[k])
+      .map((k) => `<strong>${escapeHtml(k)}</strong>: ${escapeHtml(expiryText(timers[k], list))}`)
+      .join("<br>");
     let details = "";
     if (isPc && isSynced(c)) details = pcDetailsHtml(c);
     else if (isPc) details = `<p class="enc-meta" style="margin-top:14px;">Karakteren er ikke offentlig på D&amp;D Beyond. Sæt arket til &quot;Public&quot;, så vises AC, handlinger og besværgelser her automatisk.</p>`;
@@ -1164,8 +1286,39 @@
         <span><strong>Initiativ</strong> ${cb.initiative ?? "–"} <span class="enc-meta">(${signed(initBonusOf(cb))})</span></span>
       </div>
       ${conds ? `<div class="cb-conds" style="margin-top:10px;">${conds}</div>` : ""}
+      ${expiries ? `<p class="enc-meta" style="margin-top:6px;">${expiries}</p>` : ""}
+      ${hideStats ? "" : legendaryDrawerHtml(cb)}
       ${details}
       ${notes}`;
+  }
+
+  function legendaryDrawerHtml(cb) {
+    if (!extrasSupported || cb.kind !== "monster") return "";
+    const max = legendaryMaxOf(cb);
+    if (!max) {
+      // Egne monstre kan få dem slået til her; SRD-monstre har dem fra stat blocken.
+      return cb.monster_slug
+        ? ""
+        : `<p class="enc-meta" style="margin-top:12px;"><button type="button" class="text-link" data-legend-max="${cb.id}" data-value="3">+ Legendariske handlinger</button></p>`;
+    }
+    const left = Math.max(0, max - (cb.legendary_used || 0));
+    const block = cb.monster_slug && statBlocks.get(cb.monster_slug);
+    const actions = block && Array.isArray(block.legendary_actions) ? block.legendary_actions : [];
+    const buttons = actions
+      .map((a) => {
+        const cost = legendaryCost(a.name);
+        const label = a.name.replace(/\s*\(costs? \d+ actions?\)/i, "");
+        return `<button type="button" class="btn secondary" data-legend="${cost}" data-cb="${cb.id}" ${cost > left ? "disabled" : ""} title="${escapeHtml(a.desc || "")}">${escapeHtml(label)}${cost > 1 ? ` (${cost})` : ""}</button>`;
+      })
+      .join("");
+    return `
+      <h4 class="enc-sub">Legendariske handlinger</h4>
+      <div class="cb-legend">${legendPipsHtml(cb, max)}<span class="enc-meta">${left} af ${max} tilbage &middot; kommer igen ved starten af dens tur</span></div>
+      ${buttons ? `<div class="legend-actions">${buttons}</div>` : ""}
+      <p class="enc-meta" style="margin-top:8px;">
+        <label>Pr. runde <input type="number" min="0" max="9" class="small-input" style="width:52px;" data-legend-max="${cb.id}" value="${max}"></label>
+        ${left < max ? `<button type="button" class="text-link" data-legend="-${max}" data-cb="${cb.id}" style="margin-left:10px;">Nulstil</button>` : ""}
+      </p>`;
   }
 
   function renderDrawer() {
@@ -1319,9 +1472,58 @@
       const c = list[idx];
       if (c.id !== excludeId && !isOut(c)) {
         await updateEncounter({ turn_combatant_id: c.id, round });
+        if (dir > 0) await startOfTurn(c, list);
         return;
       }
     }
+  }
+  // Når en tur starter (kun fremad): monsteret får sine legendariske handlinger
+  // igen, og tilstande, hvis varighed er gået, fjernes — med "Behold" i
+  // kvitteringen, hvis de skal blive (så uden varighed).
+  async function startOfTurn(c, list) {
+    if (!extrasSupported) return;
+    const writes = [];
+    if (c.legendary_used > 0) writes.push(updateCombatant(c, { legendary_used: 0 }));
+    const expired = [];
+    combatants.forEach((cb) => {
+      const timers = timersOf(cb);
+      const gone = Object.keys(timers).filter((k) => roundsLeft(timers[k], list) <= 0);
+      if (!gone.length) return;
+      const rest = { ...timers };
+      gone.forEach((k) => delete rest[k]);
+      const shown = gone.filter((k) => (cb.conditions || []).includes(k));
+      shown.forEach((k) => expired.push({ id: cb.id, name: cb.name, cond: k }));
+      writes.push(updateCombatant(cb, { conditions: (cb.conditions || []).filter((k) => !gone.includes(k)), condition_timers: rest }));
+    });
+    await Promise.all(writes);
+    if (!expired.length) return;
+    const keep = () =>
+      Promise.all(
+        [...new Set(expired.map((x) => x.id))].map((id) => {
+          const cb = combatants.find((x) => x.id === id);
+          if (!cb) return null;
+          const back = expired.filter((x) => x.id === id && !(cb.conditions || []).includes(x.cond)).map((x) => x.cond);
+          return back.length ? updateCombatant(cb, { conditions: [...(cb.conditions || []), ...back] }) : null;
+        })
+      );
+    showToast(`Udløbet: ${expired.map((x) => `${x.cond} (${x.name})`).join(", ")}`, "Behold", keep);
+  }
+
+  // Klik på ◆/◇ eller en legendarisk handling — på kortet, i turbjælken og i panelet.
+  // data-legend er hvor mange der bruges (negativ = gives tilbage).
+  async function handleLegendClick(e) {
+    const btn = e.target.closest("[data-legend]");
+    if (!btn) return false;
+    const cb = combatants.find((x) => x.id === btn.dataset.cb);
+    const max = cb ? legendaryMaxOf(cb) : 0;
+    if (!max) return true;
+    const used = Math.max(0, Math.min(max, (cb.legendary_used || 0) + Number(btn.dataset.legend)));
+    await updateCombatant(cb, { legendary_used: used, ...(cb.legendary_max == null ? { legendary_max: max } : {}) });
+    return true;
+  }
+  async function setLegendaryMax(cb, value) {
+    const max = Math.max(0, Math.min(9, value || 0));
+    await updateCombatant(cb, { legendary_max: max, legendary_used: Math.min(cb.legendary_used || 0, max) });
   }
   async function beginCombat() {
     const list = sortCombatants(combatants);
@@ -1358,6 +1560,7 @@
       xp: m.xp || 0,
       monster_slug: m.slug || null,
       ...(notesSupported && m.notes ? { notes: m.notes } : {}),
+      ...(extrasSupported ? { legendary_max: m.legendary || 0 } : {}),
     };
     const { data, error } = await window.sb.from("encounter_combatants").insert(row).select("*").single();
     if (error) {
@@ -1403,6 +1606,7 @@
     };
     $("trackerHead").addEventListener("click", onActionClick);
     $("turnBar").addEventListener("click", onActionClick);
+    $("turnBar").addEventListener("click", handleLegendClick);
 
     // N = næste tur, F (eller P) = forrige — ikke mens man skriver i et felt.
     document.addEventListener("keydown", (e) => {
@@ -1440,15 +1644,31 @@
         const value = e.target.value;
         e.target.blur();
         await updateCombatant(cb, { conditions: [...(cb.conditions || []), value] });
+      } else if (e.target.dataset.condDur !== undefined) {
+        // Ny varighed tælles fra nu (den der har tur); ∞ fjerner den.
+        const cond = e.target.dataset.condDur;
+        const rounds = parseInt(e.target.value, 10);
+        e.target.blur();
+        const timers = { ...timersOf(cb) };
+        if (rounds > 0) timers[cond] = newTimer(rounds);
+        else delete timers[cond];
+        await updateCombatant(cb, { condition_timers: timers });
       }
     });
     list.addEventListener("click", async (e) => {
       const row = e.target.closest(".combatant");
       const cb = row && combatants.find((x) => x.id === row.dataset.id);
       if (!cb) return;
+      if (await handleLegendClick(e)) return;
       const chip = e.target.closest("[data-remove-cond]");
       if (chip) {
-        await updateCombatant(cb, { conditions: (cb.conditions || []).filter((k) => k !== chip.dataset.removeCond) });
+        const cond = chip.dataset.removeCond;
+        const patch = { conditions: (cb.conditions || []).filter((k) => k !== cond) };
+        if (timersOf(cb)[cond]) {
+          patch.condition_timers = { ...timersOf(cb) };
+          delete patch.condition_timers[cond];
+        }
+        await updateCombatant(cb, patch);
         return;
       }
       const act = e.target.closest("[data-act]")?.dataset.act;
@@ -1604,6 +1824,7 @@
       renderDone();
     }
     renderTurnBar();
+    syncTurnBarHeight();
     renderDrawer();
   }
 
@@ -1614,15 +1835,38 @@
   });
   $("drawerBody").addEventListener("click", async (e) => {
     const btn = e.target.closest('[data-drawer-act="add"]');
-    if (btn && drawerState && drawerState.onAdd) await drawerState.onAdd(btn);
+    if (btn && drawerState && drawerState.onAdd) {
+      await drawerState.onAdd(btn);
+      return;
+    }
+    if (await handleLegendClick(e)) return;
+    const enable = e.target.closest("button[data-legend-max]");
+    const cb = enable && combatants.find((x) => x.id === enable.dataset.legendMax);
+    if (cb) await setLegendaryMax(cb, Number(enable.dataset.value));
   });
+  $("drawerBody").addEventListener("change", async (e) => {
+    const input = e.target.closest("input[data-legend-max]");
+    const cb = input && combatants.find((x) => x.id === input.dataset.legendMax);
+    if (!cb) return;
+    input.blur();
+    await setLegendaryMax(cb, parseInt(input.value, 10));
+  });
+
+  // Turbjælken brydes over flere linjer på smalle skærme (og får en ekstra
+  // linje med legendariske handlinger) — siden og kvitteringen holder fri efter
+  // dens faktiske højde.
+  function syncTurnBarHeight() {
+    const bar = $("turnBar");
+    document.documentElement.style.setProperty("--turnbar-h", `${bar.hidden ? 0 : bar.offsetHeight}px`);
+  }
+  new ResizeObserver(syncTurnBarHeight).observe($("turnBar"));
 
   await loadCharacters();
   if (!encId) {
     await renderListView();
     return;
   }
-  await detectNotesColumn();
+  await detectColumns();
   if (await reloadEncounter()) render();
 })();
 </script>

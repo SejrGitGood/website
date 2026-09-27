@@ -443,9 +443,26 @@ select.small-input{width:auto;}
 .cond-chip{
   display:inline-flex;align-items:center;gap:4px;
   font-family:"Cinzel",serif;font-size:0.64rem;letter-spacing:0.04em;text-transform:uppercase;
-  padding:2px 8px;border-radius:999px;border:1px solid var(--ember-soft);color:var(--ember);background:none;cursor:pointer;
+  padding:2px 8px;border-radius:999px;border:1px solid var(--ember-soft);color:var(--ember);background:none;
 }
-.cond-chip:hover{border-color:var(--blood);color:var(--blood);}
+.cond-chip.timed{background:color-mix(in srgb, var(--ember) 12%, transparent);}
+.cond-x{background:none;border:none;padding:0 0 0 2px;font:inherit;font-size:0.95rem;line-height:1;color:inherit;cursor:pointer;}
+.cond-x:hover{color:var(--blood);}
+/* Varighed inde i tilstands-chippen: en diskret select med en lille pil */
+.cond-dur{
+  -webkit-appearance:none;appearance:none;border:none;border-left:1px solid var(--ember-soft);border-radius:0;
+  color:inherit;font:inherit;margin-left:2px;padding:0 11px 0 6px;cursor:pointer;
+  background:linear-gradient(45deg, transparent 50%, currentColor 50%) calc(100% - 6px) 55% / 3px 3px no-repeat,
+             linear-gradient(135deg, currentColor 50%, transparent 50%) calc(100% - 3px) 55% / 3px 3px no-repeat;
+}
+.cond-dur option{color:var(--ink);background:var(--surface);}
+.cb-legend{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.legend-pips{display:inline-flex;gap:2px;}
+.legend-pip{background:none;border:none;padding:0 2px;font-size:1.1rem;line-height:1;color:var(--ember);cursor:pointer;}
+.legend-pip.spent{color:var(--ink-faint);}
+.legend-pip:hover{transform:scale(1.2);}
+.legend-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.legend-actions .btn{padding:6px 10px;font-size:0.68rem;}
 .sync-line{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;margin-top:14px;font-size:0.85rem;color:var(--ink-soft);}
 .sync-line label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;}
 .sync-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ink-faint);margin-right:6px;}
@@ -483,9 +500,12 @@ select.small-input{width:auto;}
 .turn-now{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;min-width:0;}
 .turn-name{font-family:"Cinzel",serif;font-size:1.15rem;color:var(--ember);}
 .turn-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-body.has-turnbar{padding-bottom:110px;}
+.turn-legend{flex-basis:100%;display:flex;align-items:center;gap:4px 16px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:6px;}
+.turn-legend-item{display:inline-flex;align-items:center;gap:6px;font-size:0.9rem;}
+/* --turnbar-h sættes fra turbjælkens faktiske højde (se encounters.html) */
+body.has-turnbar{padding-bottom:calc(var(--turnbar-h, 94px) + 16px);}
 .toast{
-  position:fixed;left:50%;bottom:104px;transform:translateX(-50%);z-index:45;
+  position:fixed;left:50%;bottom:calc(var(--turnbar-h, 90px) + 14px);transform:translateX(-50%);z-index:45;
   display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);
   background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:10px;box-shadow:var(--shadow);font-size:0.92rem;
 }
@@ -498,9 +518,6 @@ body.has-turnbar{padding-bottom:110px;}
 @media (max-width:760px){
   .enc-grid{grid-template-columns:1fr;}
   .kbd-hint{display:none;}
-  body.has-turnbar{padding-bottom:150px;}
-  .toast{bottom:146px;}
-  .drawer{padding-bottom:150px;}
 }
 
 [hidden]{display:none !important;}
