@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Tarokka-læsningen &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=22">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#A6461C">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Valkyriegade">
+<script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">Historien</p>
+    <h1>Tarokka-læsningen</h1>
+    <p>Madam Evas spådom: hvor de tre skatte ligger, hvem der kan hjælpe jer, og hvor Strahd venter.</p>
+  </div>
+
+  <div class="wrap">
+    <p style="margin:-8px 0 4px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+      <a href="historien.html" class="back-link">&larr; Historien</a>
+      <button type="button" class="btn secondary" id="editToggle" style="padding:6px 12px;">Rediger læsningen (DM)</button>
+    </p>
+    <p class="enc-meta" id="editHint" hidden>DM-visning: betydningerne står her, også de skjulte. Spillerne ser kun kortet, Madam Evas ord og de betydninger, du har afsløret.</p>
+    <section class="section">
+      <div class="tarokka-grid" id="reading"><div class="empty">Indlæser&hellip;</div></div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=20"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("historien.html");
+  wireLoreMentionPreviews();
+
+  const $ = (id) => document.getElementById(id);
+  // De fem kort i læsningen, og hvad "løst" hedder for hver af dem.
+  const SLOTS = [
+    { slot: "tome", title: "Tome of Strahd", done: "Fundet" },
+    { slot: "symbol", title: "Holy Symbol of Ravenkind", done: "Fundet" },
+    { slot: "sword", title: "Sunsword", done: "Fundet" },
+    { slot: "ally", title: "Strahds fjende", done: "Allieret" },
+    { slot: "strahd", title: "Strahds tilholdssted", done: "Konfronteret" },
+  ];
+  let rows = {};
+  let loreIndex = [];
+  let editing = false;
+
+  async function loadLoreIndex() {
+    const [{ data: loreData }, { data: charData }] = await Promise.all([
+      window.sb.from("lore_entries").select("id, title, category, body, relationship, status"),
+      window.sb.from("characters").select("id, character_name, teaser"),
+    ]);
+    loreIndex = [...(loreData || []), ...characterMentionEntries(charData)];
+    setLorePreviewData(loreIndex);
+  }
+  const linked = (text) => linkifyLoreMentions(escapeHtml(text), loreIndex);
+
+  function viewHtml(s, r) {
+    return `
+      <div class="card tarokka-card ${r.resolved ? "resolved" : ""}">
+        <p class="meta" style="margin:0;">${escapeHtml(s.title)}</p>
+        <div class="tarokka-face ${r.card ? "" : "back"}">${r.card ? escapeHtml(r.card) : "Ikke trukket endnu"}</div>
+        ${r.prophecy ? `<p class="body tarokka-prophecy">&ldquo;${linked(r.prophecy)}&rdquo;</p>` : ""}
+        ${r.answer_revealed && r.answer ? `<p class="body"><strong>Betydning:</strong> ${linked(r.answer)}</p>` : ""}
+        ${r.resolved ? `<div><span class="badge">${s.done}</span></div>` : ""}
+      </div>`;
+  }
+  function editHtml(s, r) {
+    return `
+      <form class="card tarokka-card form" data-slot="${s.slot}">
+        <p class="meta" style="margin:0;">${escapeHtml(s.title)}</p>
+        <div class="field"><label>Kort</label><input type="text" name="card" value="${escapeHtml(r.card || "")}" placeholder="Det kort, der blev trukket"></div>
+        <div class="field"><label>Madam Evas ord</label><textarea name="prophecy" style="min-height:90px;" placeholder="Det, hun sagde — spillerne ser det">${escapeHtml(r.prophecy || "")}</textarea></div>
+        <div class="field"><label>Betydning <span class="enc-meta">(skjult, indtil du afslører den)</span></label><textarea name="answer" style="min-height:70px;" placeholder="Hvor / hvem det er">${escapeHtml(r.answer || "")}</textarea></div>
+        <label class="enc-meta" style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="answer_revealed" ${r.answer_revealed ? "checked" : ""}> Vis betydningen for spillerne</label>
+        <label class="enc-meta" style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="resolved" ${r.resolved ? "checked" : ""}> ${s.done}</label>
+        <div><button class="btn" type="submit">Gem</button> <span class="enc-meta" data-saved hidden>Gemt</span></div>
+      </form>`;
+  }
+  function render() {
+    $("reading").innerHTML = SLOTS.map((s) => (editing ? editHtml : viewHtml)(s, rows[s.slot] || { slot: s.slot })).join("");
+  }
+
+  async function load() {
+    const { data, error } = await window.sb.from("tarokka_reading").select("*");
+    if (error) {
+      $("reading").innerHTML = /tarokka_reading/.test(error.message)
+        ? `<div class="empty">Tarokka-læsningen er ikke sat op endnu &mdash; kør den nye SQL fra schema.sql i Supabase.</div>`
+        : `<div class="empty">Kunne ikke hente læsningen: ${escapeHtml(error.message)}</div>`;
+      return false;
+    }
+    rows = {};
+    (data || []).forEach((r) => (rows[r.slot] = r));
+    render();
+    return true;
+  }
+
+  $("editToggle").addEventListener("click", () => {
+    editing = !editing;
+    $("editToggle").textContent = editing ? "Færdig" : "Rediger læsningen (DM)";
+    $("editHint").hidden = !editing;
+    render();
+  });
+  $("reading").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.target.closest("form[data-slot]");
+    if (!form) return;
+    const f = form.elements;
+    const row = {
+      slot: form.dataset.slot,
+      card: f.card.value.trim() || null,
+      prophecy: f.prophecy.value.trim() || null,
+      answer: f.answer.value.trim() || null,
+      answer_revealed: f.answer_revealed.checked,
+      resolved: f.resolved.checked,
+      updated_at: new Date().toISOString(),
+    };
+    await withBusy(form.querySelector('button[type="submit"]'), "Gemmer…", async () => {
+      // upsert, så det også virker, hvis de fem rækker ikke er oprettet endnu.
+      const { error } = await window.sb.from("tarokka_reading").upsert(row, { onConflict: "slot" });
+      if (error) {
+        alert("Kunne ikke gemme: " + error.message);
+        return;
+      }
+      rows[row.slot] = { ...(rows[row.slot] || {}), ...row };
+      const saved = form.querySelector("[data-saved]");
+      saved.hidden = false;
+      setTimeout(() => (saved.hidden = true), 1500);
+    });
+  });
+
+  await loadLoreIndex();
+  if (await load()) {
+    // Andre enheder ser ændringer med det samme — men ikke midt i DM'ens redigering.
+    subscribeToChanges("tarokka", ["tarokka_reading"], () => {
+      if (!editing) load();
+    });
+  }
+})();
+</script>
+</body>
+</html>

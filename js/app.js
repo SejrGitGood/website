@@ -324,6 +324,126 @@ function sortCombatants(list) {
   });
 }
 
+// Monstres helbred i ord (spillervisningen og Tavlen viser aldrig tal).
+function healthWord(cur, max) {
+  if (cur <= 0) return "Besejret";
+  if (cur >= max) return "Uskadt";
+  return cur > max / 2 ? "Såret" : "Blodig";
+}
+
+// Varighed på en tilstand (encounter_combatants.condition_timers): udløber ved
+// starten af anchors tur i runde t.until (uden anchor: ved rundens start).
+// Returnerer hvor mange gange anchors tur endnu skal starte (0 = udløbet).
+// list er deltagerne i turrækkefølge (sortCombatants).
+function conditionRoundsLeft(t, list, round, turnId) {
+  if (round < 1) return t.until - 1;
+  const cur = list.findIndex((c) => c.id === turnId);
+  const anchor = Math.max(0, t.anchor ? list.findIndex((c) => c.id === t.anchor) : 0);
+  return t.until - round + (cur < anchor ? 1 : 0);
+}
+
+// --- Tid på dagen (logistics.time_of_day): fire faser pr. kampagnedag ---
+const TIME_PHASES = [
+  { key: "morgen", label: "Morgen", icon: "☀", dark: false },
+  { key: "eftermiddag", label: "Eftermiddag", icon: "☀", dark: false },
+  { key: "aften", label: "Aften", icon: "☽", dark: true },
+  { key: "nat", label: "Nat", icon: "☾", dark: true },
+];
+function phaseIndex(key) {
+  const i = TIME_PHASES.findIndex((p) => p.key === key);
+  return i === -1 ? 0 : i;
+}
+const phaseOf = (key) => TIME_PHASES[phaseIndex(key)];
+// Flytter tiden n faser frem (eller tilbage); efter natten kommer næste dags morgen.
+function shiftTime(day, phaseKey, n) {
+  const total = Math.max(0, (day - 1) * TIME_PHASES.length + phaseIndex(phaseKey) + n);
+  return { day: Math.floor(total / TIME_PHASES.length) + 1, phase: TIME_PHASES[total % TIME_PHASES.length].key };
+}
+// "ca. 12 timer siden" / "ca. 2 døgn siden" — en fase er groft regnet 6 timer.
+function timeSinceText(day, phaseKey, nowDay, nowPhase) {
+  if (day == null) return "";
+  const n = TIME_PHASES.length;
+  const diff = (nowDay - 1) * n + phaseIndex(nowPhase) - ((day - 1) * n + phaseIndex(phaseKey));
+  if (diff <= 0) return "lige nu";
+  if (diff < n) return `ca. ${diff * 6} timer siden`;
+  return `ca. ${Math.round(diff / n)} døgn siden`;
+}
+function timeOfDayText(day, phaseKey) {
+  const p = phaseOf(phaseKey);
+  return `Dag ${day} · ${p.label}`;
+}
+
+// --- Handouts "på bordet" (handouts.html): pop-up og banner på tværs af sider ---
+function handoutContentHtml(h) {
+  return `${h.image_url ? `<img class="handout-img" src="${escapeHtml(h.image_url)}" alt="${escapeHtml(h.title)}">` : ""}${
+    h.body ? `<p class="body" style="margin-top:12px;">${renderBodyHtml(h.body)}</p>` : ""
+  }`;
+}
+function showHandoutOverlay(h) {
+  let box = document.getElementById("handoutOverlay");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "handoutOverlay";
+    box.className = "handout-overlay";
+    box.hidden = true;
+    box.innerHTML = `
+      <div class="handout-sheet" role="dialog" aria-modal="true" aria-labelledby="handoutOverlayTitle">
+        <div class="handout-head">
+          <div><p class="eyebrow" style="margin:0;">Handout</p><h2 id="handoutOverlayTitle" style="margin:4px 0 0;"></h2></div>
+          <button type="button" class="icon-btn" data-close aria-label="Luk">&times;</button>
+        </div>
+        <div data-content></div>
+      </div>`;
+    document.body.appendChild(box);
+    const close = () => (box.hidden = true);
+    box.addEventListener("click", (e) => {
+      if (e.target === box || e.target.closest("[data-close]")) close();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !box.hidden) close();
+    });
+  }
+  box.querySelector("#handoutOverlayTitle").textContent = h.title;
+  box.querySelector("[data-content]").innerHTML = handoutContentHtml(h);
+  box.hidden = false;
+  box.querySelector("[data-close]").focus();
+}
+// Holder øje med den handout, DM'en har lagt på bordet: bannerEl (valgfri) viser
+// den, og når DM'en viser en ny, mens siden er åben, popper den op. Ved
+// sideindlæsning vises kun banneret — ingen pop-up for noget, der allerede lå der.
+// onChange(handout|null) kaldes ved hver ændring (bruges af Tavlen).
+async function watchTableHandout(bannerEl, { popup = true, onChange } = {}) {
+  let lastShown;
+  let current = null;
+  if (bannerEl) {
+    bannerEl.addEventListener("click", (e) => {
+      if (e.target.closest("[data-open-handout]") && current) showHandoutOverlay(current);
+    });
+  }
+  async function check() {
+    const { data, error } = await window.sb
+      .from("handouts")
+      .select("*")
+      .eq("on_table", true)
+      .order("shown_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    current = error ? null : data;
+    if (bannerEl) {
+      bannerEl.hidden = !current;
+      if (current) {
+        bannerEl.innerHTML = `<span class="enc-meta">På bordet nu:</span> <strong>${escapeHtml(current.title)}</strong> <button type="button" class="btn secondary" data-open-handout style="padding:6px 12px;">Vis</button>`;
+      }
+    }
+    const shown = current ? current.shown_at : null;
+    if (current && popup && lastShown !== undefined && shown !== lastShown) showHandoutOverlay(current);
+    lastShown = shown;
+    if (onChange) onChange(current);
+  }
+  await check();
+  subscribeToChanges("table-handout", ["handouts"], check);
+}
+
 // Deaktiverer `btn` og viser `busyLabel`, mens `fn` kører — forhindrer
 // dobbelt-indsendelse og giver et tegn på, at noget sker, på en langsom
 // forbindelse. Gendanner altid knappen bagefter, uanset om fn fejler.

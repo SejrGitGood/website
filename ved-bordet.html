@@ -7,7 +7,7 @@
 <title>Ved Bordet &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=21">
+<link rel="stylesheet" href="css/styles.css?v=22">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -26,12 +26,22 @@
   </div>
 
   <div class="wrap">
+    <div class="card handout-banner" id="handoutBanner" style="margin-top:8px;" hidden></div>
+
     <section class="section" id="combatSection" hidden>
       <div class="section-title">
         <h2>Kamp i gang</h2>
         <a href="encounters.html" id="combatLink">Åbn trackeren &rarr;</a>
       </div>
       <div class="card" id="combatCard"></div>
+    </section>
+
+    <section class="section" id="statusSection">
+      <div class="section-title">
+        <h2>Lige nu</h2>
+        <a href="logistics.html">Se/ret logistik &rarr;</a>
+      </div>
+      <div id="statusCard"><div class="empty">Indlæser&hellip;</div></div>
     </section>
 
     <section class="section" id="logSection">
@@ -73,14 +83,6 @@
       <div class="card" id="hpCard"><div class="empty">Indlæser&hellip;</div></div>
     </section>
 
-    <section class="section" id="statusSection">
-      <div class="section-title">
-        <h2>Lige nu</h2>
-        <a href="logistics.html">Se/ret logistik &rarr;</a>
-      </div>
-      <div id="statusCard"><div class="empty">Indlæser&hellip;</div></div>
-    </section>
-
     <section class="section" id="questsSection">
       <div class="section-title">
         <h2>Aktive mål</h2>
@@ -101,6 +103,9 @@
       <div class="section-title"><h2>Hurtige opslag</h2></div>
       <div class="card">
         <div class="card-actions">
+          <a class="btn secondary" href="tavle.html">Tavle</a>
+          <a class="btn secondary" href="handouts.html">Handouts</a>
+          <a class="btn secondary" href="tarokka.html">Tarokka</a>
           <a class="btn secondary" href="encounters.html">Kampbygger</a>
           <a class="btn secondary" href="monsters.html">Monstre</a>
           <a class="btn secondary" href="spells.html">Besværgelser</a>
@@ -115,7 +120,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=19"></script>
+<script src="js/app.js?v=20"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -250,13 +255,87 @@
   await loadLog();
   subscribeToChanges("ved-bordet-log", ["session_log_entries"], loadLog);
 
-  const { data: logistics } = await window.sb.from("logistics").select("*").eq("id", 1).maybeSingle();
+  // --- Lige nu: kampagnedag, tid på dagen og sidste hvil ---
   const statusCard = document.getElementById("statusCard");
-  const dayLine = logistics && logistics.campaign_day ? `<span class="badge">Dag ${logistics.campaign_day}</span>` : "";
-  const rulesLine = logistics && logistics.house_rules ? `<p class="body">${escapeHtml(logistics.house_rules)}</p>` : "";
-  statusCard.innerHTML = dayLine || rulesLine
-    ? `<div class="card">${dayLine}${rulesLine ? `<div style="margin-top:8px;">${rulesLine}</div>` : ""}</div>`
-    : `<div class="empty">Ingen kampagnedag eller husregler sat endnu.</div>`;
+  let logistics = null;
+  async function loadStatus() {
+    const { data } = await window.sb.from("logistics").select("*").eq("id", 1).maybeSingle();
+    logistics = data;
+    renderStatus();
+  }
+  function restText(day, phase) {
+    if (day == null) return "ikke endnu";
+    return `dag ${day}, ${phaseOf(phase).label.toLowerCase()} (${timeSinceText(day, phase, logistics.campaign_day || 1, logistics.time_of_day)})`;
+  }
+  function renderStatus() {
+    const l = logistics;
+    if (!l) {
+      statusCard.innerHTML = `<div class="empty">Ingen kampagnedag sat endnu.</div>`;
+      return;
+    }
+    const rulesLine = l.house_rules ? `<p class="body" style="margin-top:12px;">${escapeHtml(l.house_rules)}</p>` : "";
+    // Før den nye SQL er kørt, findes tid på dagen ikke — så vises bare dagen som før.
+    if (!("time_of_day" in l)) {
+      statusCard.innerHTML = `<div class="card"><span class="badge">Dag ${l.campaign_day || 1}</span>${rulesLine}</div>`;
+      return;
+    }
+    const idx = phaseIndex(l.time_of_day);
+    const p = TIME_PHASES[idx];
+    statusCard.innerHTML = `
+      <div class="card">
+        <div class="time-widget">
+          <span class="time-phase ${p.dark ? "dark" : ""}"><span class="icon" aria-hidden="true">${p.icon}</span>${escapeHtml(timeOfDayText(l.campaign_day || 1, l.time_of_day))}</span>
+          <span class="time-controls">
+            <span class="phase-pips" aria-hidden="true">${TIME_PHASES.map((_, i) => `<span class="phase-pip ${i === idx ? "on" : ""}"></span>`).join("")}</span>
+            <button type="button" class="btn secondary" data-time="-1" aria-label="Tilbage til forrige tid på dagen" style="padding:6px 12px;">&lsaquo;</button>
+            <button type="button" class="btn" data-time="1">${idx === TIME_PHASES.length - 1 ? "Ny dag" : "Næste"} &rsaquo;</button>
+          </span>
+        </div>
+        <p class="rest-line"><strong>Langt hvil:</strong> ${escapeHtml(restText(l.last_long_rest_day, l.last_long_rest_phase))}<br><strong>Kort hvil:</strong> ${escapeHtml(restText(l.last_short_rest_day, l.last_short_rest_phase))}</p>
+        <div class="card-actions" style="margin-top:10px;">
+          <button type="button" class="btn secondary" data-rest="short">Kort hvil</button>
+          <button type="button" class="btn secondary" data-rest="long">Langt hvil</button>
+        </div>
+        ${rulesLine}
+      </div>`;
+  }
+  async function saveLogistics(patch) {
+    Object.assign(logistics, patch);
+    renderStatus();
+    const { error } = await window.sb.from("logistics").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", 1);
+    if (error) {
+      alert("Kunne ikke gemme: " + error.message);
+      await loadStatus();
+    }
+  }
+  statusCard.addEventListener("click", async (e) => {
+    const timeBtn = e.target.closest("[data-time]");
+    const restBtn = e.target.closest("[data-rest]");
+    if (!logistics || (!timeBtn && !restBtn)) return;
+    const day = logistics.campaign_day || 1;
+    if (timeBtn) {
+      const next = shiftTime(day, logistics.time_of_day, Number(timeBtn.dataset.time));
+      await saveLogistics({ campaign_day: next.day, time_of_day: next.phase });
+    } else if (restBtn.dataset.rest === "short") {
+      await saveLogistics({ last_short_rest_day: day, last_short_rest_phase: logistics.time_of_day });
+    } else {
+      // Et langt hvil tager 8 timer: fra aften eller nat vågner man næste morgen,
+      // ellers er det en fase senere. Hvilet noteres, hvor det sluttede.
+      const idx = phaseIndex(logistics.time_of_day);
+      const woke = shiftTime(day, logistics.time_of_day, idx >= 2 ? TIME_PHASES.length - idx : 1);
+      await saveLogistics({ campaign_day: woke.day, time_of_day: woke.phase, last_long_rest_day: woke.day, last_long_rest_phase: woke.phase });
+      await window.sb.from("session_log_entries").insert({
+        body: `Langt hvil — selskabet vågnede ${timeOfDayText(woke.day, woke.phase).toLowerCase().replace(" · ", ", ")}.`,
+        campaign_day: woke.day,
+      });
+      await loadLog();
+    }
+  });
+  await loadStatus();
+  subscribeToChanges("ved-bordet-status", ["logistics"], loadStatus);
+
+  // Handouts, som DM'en lægger på bordet, popper op her.
+  watchTableHandout(document.getElementById("handoutBanner"));
 
   async function loadQuests() {
     const questsCard = document.getElementById("questsCard");

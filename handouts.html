@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Handouts &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=22">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#A6461C">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Valkyriegade">
+<script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow" id="pageEyebrow">Historien</p>
+    <h1>Handouts</h1>
+    <p id="pageIntro">Breve, billeder og kort, DM'en har vist ved bordet &mdash; det nyeste øverst.</p>
+  </div>
+
+  <div class="wrap" style="max-width:760px;">
+    <p style="margin:-8px 0 4px;"><a href="historien.html" class="back-link" id="backLink">&larr; Historien</a></p>
+    <div class="card handout-banner" id="handoutBanner" style="margin-top:8px;" hidden></div>
+
+    <!-- DM-visning (?dm=1): forbered og vis for bordet -->
+    <section class="section" id="dmSection" hidden>
+      <div class="section-title"><h2 id="formTitle">Ny handout</h2></div>
+      <div class="card">
+        <form class="form" id="handoutForm">
+          <div class="field">
+            <label for="hTitle">Titel</label>
+            <input type="text" id="hTitle" required placeholder="F.eks. Brevet fra borgmesteren">
+          </div>
+          <div class="field">
+            <label for="hImage">Billede <span class="enc-meta">(valgfrit &mdash; vælg en fil, eller sæt et billede ind med Ctrl+V her på siden)</span></label>
+            <input type="file" id="hImage" accept="image/*">
+            <div id="imagePreview" style="margin-top:8px;"></div>
+          </div>
+          <div class="field">
+            <label for="hBody">Tekst <span class="enc-meta">(valgfrit &mdash; det, spillerne læser)</span></label>
+            <textarea id="hBody" style="min-height:140px;"></textarea>
+          </div>
+          <div class="card-actions">
+            <button class="btn" type="submit" data-then="show">Gem og vis for bordet</button>
+            <button class="btn secondary" type="submit" data-then="save">Gem som forberedt</button>
+            <button class="btn secondary" type="button" id="cancelEdit" hidden>Annuller</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="section-title" style="margin-top:28px;"><h2>Forberedte</h2></div>
+      <p class="enc-meta" style="margin:-6px 0 10px;">Kun her i DM-visningen &mdash; spillerne ser dem først, når du viser dem.</p>
+      <div id="preparedList"></div>
+
+      <div class="section-title" style="margin-top:28px;"><h2>Vist for spillerne</h2></div>
+    </section>
+
+    <section class="section" id="archiveSection">
+      <div id="archiveList"><div class="empty">Indlæser&hellip;</div></div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=20"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  const dmMode = new URLSearchParams(location.search).get("dm") === "1";
+  renderNav(dmMode ? "dmtools.html" : "historien.html");
+  wireLightbox();
+  wireLoreMentionPreviews();
+
+  const $ = (id) => document.getElementById(id);
+  let handouts = [];
+  let loreIndex = [];
+  let editingId = null;
+  let imageUrl = null;
+
+  if (dmMode) {
+    $("pageEyebrow").textContent = "DM Tools";
+    $("pageIntro").textContent = "Forbered breve, billeder og kort, og vis dem for bordet, når tiden er inde — de popper op hos alle på Ved Bordet og vises på Tavlen.";
+    $("backLink").href = "dmtools.html";
+    $("backLink").innerHTML = "&larr; Alle DM Tools";
+    $("dmSection").hidden = false;
+    wireInlinePasteUpload($("hBody"));
+  }
+
+  async function loadLoreIndex() {
+    const [{ data: loreData }, { data: charData }] = await Promise.all([
+      window.sb.from("lore_entries").select("id, title, category, body, relationship, status"),
+      window.sb.from("characters").select("id, character_name, teaser"),
+    ]);
+    loreIndex = [...(loreData || []), ...characterMentionEntries(charData)];
+    setLorePreviewData(loreIndex);
+  }
+
+  const shownDate = (h) => (h.revealed_at ? new Date(h.revealed_at).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" }) : "");
+  function cardHtml(h) {
+    const meta = [h.campaign_day ? `Dag ${h.campaign_day}` : "", h.revealed_at ? `vist ${shownDate(h)}` : "ikke vist endnu"].filter(Boolean).join(" &middot; ");
+    const actions = dmMode
+      ? `<div class="card-actions" style="margin-top:12px;">
+          ${h.on_table
+            ? `<button class="btn secondary" data-act="off">Tag af bordet</button>`
+            : `<button class="btn" data-act="show">${h.revealed_at ? "Vis igen for bordet" : "Vis for bordet"}</button>`}
+          <button class="btn secondary" data-act="edit">Rediger</button>
+          ${h.revealed_at ? `<button class="btn secondary" data-act="unreveal" title="Flyt tilbage til de forberedte, så spillerne ikke ser den">Skjul igen</button>` : ""}
+          <button class="btn danger" data-act="delete">Slet</button>
+        </div>`
+      : "";
+    return `
+      <div class="card handout-card ${h.on_table ? "on-table" : ""}" data-id="${h.id}">
+        ${h.on_table ? `<span class="badge">På bordet nu</span>` : ""}
+        <h3 style="${h.on_table ? "margin-top:8px;" : ""}"><button type="button" class="text-link" data-act="open" title="Vis stort">${escapeHtml(h.title)}</button></h3>
+        <p class="meta">${meta}</p>
+        ${h.image_url ? `<img class="inline-thumb handout-thumb" src="${escapeHtml(h.image_url)}" alt="${escapeHtml(h.title)}" loading="lazy">` : ""}
+        ${h.body ? `<p class="body" style="margin-top:10px;">${linkifyLoreMentions(renderBodyHtml(h.body), loreIndex)}</p>` : ""}
+        ${actions}
+      </div>`;
+  }
+
+  function render() {
+    const revealed = handouts.filter((h) => h.revealed_at).sort((a, b) => b.revealed_at.localeCompare(a.revealed_at));
+    $("archiveList").innerHTML = revealed.length
+      ? revealed.map(cardHtml).join("")
+      : `<div class="empty">${dmMode ? "Intet vist endnu." : "Ingen handouts endnu &mdash; de dukker op her, når DM'en viser dem ved bordet."}</div>`;
+    if (dmMode) {
+      const prepared = handouts.filter((h) => !h.revealed_at).sort((a, b) => a.created_at.localeCompare(b.created_at));
+      $("preparedList").innerHTML = prepared.length ? prepared.map(cardHtml).join("") : `<div class="empty">Ingen forberedte handouts.</div>`;
+    }
+  }
+
+  async function load() {
+    const { data, error } = await window.sb.from("handouts").select("*");
+    if (error) {
+      $("archiveList").innerHTML = /handouts/.test(error.message)
+        ? `<div class="empty">Handouts er ikke sat op endnu &mdash; kør den nye SQL fra schema.sql i Supabase.</div>`
+        : `<div class="empty">Kunne ikke hente handouts: ${escapeHtml(error.message)}</div>`;
+      return;
+    }
+    handouts = data || [];
+    render();
+  }
+
+  // --- DM: vis for bordet (højst én ad gangen), tag af, skjul igen ---
+  async function currentDay() {
+    const { data } = await window.sb.from("logistics").select("campaign_day").eq("id", 1).maybeSingle();
+    return data ? data.campaign_day : null;
+  }
+  async function showOnTable(h) {
+    const now = new Date().toISOString();
+    await window.sb.from("handouts").update({ on_table: false }).eq("on_table", true).neq("id", h.id);
+    const firstTime = !h.revealed_at;
+    const day = h.campaign_day ?? (await currentDay());
+    const { error } = await window.sb
+      .from("handouts")
+      .update({ on_table: true, shown_at: now, revealed_at: h.revealed_at || now, campaign_day: day, updated_at: now })
+      .eq("id", h.id);
+    if (error) {
+      alert("Kunne ikke vise den: " + error.message);
+      return;
+    }
+    // Første gang, den vises, kommer den med i Aftenens log (og dermed referatet).
+    if (firstTime) await window.sb.from("session_log_entries").insert({ body: `Handout: ${h.title}`, campaign_day: day });
+    await load();
+  }
+
+  $("archiveSection").addEventListener("click", onCardClick);
+  $("dmSection").addEventListener("click", onCardClick);
+  async function onCardClick(e) {
+    const card = e.target.closest("[data-id]");
+    const act = e.target.closest("[data-act]")?.dataset.act;
+    const h = card && handouts.find((x) => x.id === card.dataset.id);
+    if (!h || !act) return;
+    if (act === "open") return showHandoutOverlay(h);
+    if (!dmMode) return;
+    if (act === "show") await showOnTable(h);
+    else if (act === "off") await window.sb.from("handouts").update({ on_table: false }).eq("id", h.id);
+    else if (act === "unreveal") {
+      if (!confirm(`Skjul "${h.title}" for spillerne igen?`)) return;
+      await window.sb.from("handouts").update({ revealed_at: null, on_table: false }).eq("id", h.id);
+    } else if (act === "delete") {
+      if (!confirm(`Slet "${h.title}"?`)) return;
+      await window.sb.from("handouts").delete().eq("id", h.id);
+    } else if (act === "edit") {
+      editingId = h.id;
+      $("hTitle").value = h.title;
+      $("hBody").value = h.body || "";
+      setImage(h.image_url);
+      $("formTitle").textContent = `Rediger: ${h.title}`;
+      $("cancelEdit").hidden = false;
+      $("formTitle").scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    await load();
+  }
+
+  // --- DM: formularen ---
+  function setImage(url) {
+    imageUrl = url || null;
+    $("imagePreview").innerHTML = imageUrl
+      ? `<img class="handout-thumb" src="${escapeHtml(imageUrl)}" alt="Valgt billede" style="margin-top:0;cursor:default;"><button type="button" class="btn secondary" id="removeImage" style="margin-top:8px;padding:6px 12px;">Fjern billedet</button>`
+      : "";
+  }
+  async function uploadImage(file) {
+    $("imagePreview").innerHTML = `<p class="enc-meta">Uploader billedet&hellip;</p>`;
+    try {
+      setImage(await uploadPastedImage(file));
+    } catch (err) {
+      $("imagePreview").innerHTML = `<p class="enc-meta">Upload fejlede: ${escapeHtml(err.message)}</p>`;
+    }
+  }
+  function resetForm() {
+    editingId = null;
+    $("handoutForm").reset();
+    setImage(null);
+    $("formTitle").textContent = "Ny handout";
+    $("cancelEdit").hidden = true;
+  }
+  if (dmMode) {
+    $("hImage").addEventListener("change", () => {
+      const file = $("hImage").files[0];
+      if (file) uploadImage(file);
+    });
+    // Et billede sat ind et andet sted end i teksten bliver handoutens billede.
+    document.addEventListener("paste", (e) => {
+      if (e.target === $("hBody")) return;
+      const item = Array.from(e.clipboardData?.items || []).find((it) => it.type.startsWith("image/"));
+      if (!item) return;
+      e.preventDefault();
+      uploadImage(item.getAsFile());
+    });
+    $("imagePreview").addEventListener("click", (e) => {
+      if (e.target.id === "removeImage") {
+        setImage(null);
+        $("hImage").value = "";
+      }
+    });
+    $("cancelEdit").addEventListener("click", resetForm);
+    $("handoutForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = e.submitter || e.target.querySelector('button[type="submit"]');
+      const then = btn.dataset.then || "save";
+      const title = $("hTitle").value.trim();
+      if (!title) return;
+      const row = { title, body: $("hBody").value.trim() || null, image_url: imageUrl, updated_at: new Date().toISOString() };
+      await withBusy(btn, "Gemmer…", async () => {
+        const { data, error } = editingId
+          ? await window.sb.from("handouts").update(row).eq("id", editingId).select("*").single()
+          : await window.sb.from("handouts").insert({ ...row, created_by: getStoredAuthorName() || null }).select("*").single();
+        if (error) {
+          alert("Kunne ikke gemme: " + error.message);
+          return;
+        }
+        resetForm();
+        if (then === "show") await showOnTable(data);
+        else await load();
+      });
+    });
+  }
+
+  await loadLoreIndex();
+  await load();
+  // I DM-visningen er det én selv, der viser dem — så kun banneret, ingen pop-up.
+  watchTableHandout($("handoutBanner"), { popup: !dmMode });
+  subscribeToChanges("handouts-page", ["handouts"], load);
+})();
+</script>
+</body>
+</html>

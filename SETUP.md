@@ -35,11 +35,40 @@ Live and working: Supabase project, shared login, public repo, GitHub Pages, ima
 
 **Aftenens log** (top of Ved Bordet): anyone at the table jots a one-line note during play; it appears on every open device instantly (Supabase Realtime), with who wrote it, the time, and the campaign day at that moment. NPC/character/place names auto-link like everywhere else. "Lav referat →" opens Sessions with the add-form pre-filled — next session number, today's date, and the notes as a bulleted draft grouped by campaign day. Give it a title, edit, save: only then are exactly those notes attached to the new session (`session_log_entries.session_id`) and cleared from the log. Abandoning the draft loses nothing, and a note someone adds while the draft is open stays in the log for next time. Needs the `session_log_entries` table from `schema.sql` (it's also in the Realtime block).
 
+**Tid på dagen og hvil** (Ved Bordet → "Lige nu"):
+- The campaign day has four phases: Morgen, Eftermiddag, Aften and Nat. "Næste ›" moves on a phase, and after Nat it becomes "Ny dag", which counts the campaign day up. "‹" steps back if someone clicks too far.
+- "Kort hvil" records the current day and phase.
+- "Langt hvil" also moves the time on. From Aften or Nat the party wakes the next morning; otherwise the rest takes one phase. The rest is recorded at the time the party woke, and a line goes into Aftenens log.
+- Both rests show how long ago they were, roughly ("ca. 12 timer siden", "ca. 2 døgn siden"). One phase counts as about 6 hours.
+- Everything is stored in `logistics` (`time_of_day`, `last_long_rest_*`, `last_short_rest_*`) and updates live on every device and on the Tavle. The Logistik page's ±1 day buttons still work as before.
+
+**Handouts** (DM Tools → Handouts = `handouts.html?dm=1`; the players' archive is Historien → Handouts):
+- In DM mode you prepare a handout with a title, an image and/or text. Choose a file or paste an image with Ctrl+V anywhere on the page; images pasted into the text box go inline, as in sessions and lore.
+- "Vis for bordet" puts it on the table: it pops up on every open Ved Bordet, with a "På bordet nu" banner, and fills the Tavle. Only one handout is on the table at a time. "Tag af bordet" takes it off; "Skjul igen" moves it back to the prepared ones.
+- The first time a handout is shown, it's added to Aftenens log (and so to the next recap) and stamped with the campaign day.
+- The archive lists everything that has been shown, newest first. Lore names in the text are auto-linked.
+- Prepared handouts only show in DM mode. That's the same "out of sight" as the other DM tools, not real secrecy (everyone shares one login).
+- A page that loads while a handout is already on the table shows only the banner, not a pop-up, so reloading doesn't keep popping things up.
+
+**Tavle** (`tavle.html`, DM Tools or Ved Bordet quick links): a full-screen page for a TV or tablet on the table. It has no menu and always uses the dark theme (or "blood" if chosen).
+- The top shows the day and time of day. The page shows the handout on the table if there is one; otherwise the running fight; otherwise party health, active goals and Aftenens log.
+- The fight view shows the round, whose turn it is in big letters, who's next, and the turn order with conditions and their remaining rounds. Players show their HP, synced from D&D Beyond. Monsters only ever show Uskadt/Såret/Blodig/Besejret: never HP, AC, notes or legendary actions.
+- "Fuld skærm" goes full screen and keeps the screen from sleeping while the page is open (Screen Wake Lock, where the browser supports it).
+- It updates live via Realtime, plus a refresh every 30 seconds, since goals aren't in Realtime.
+
+**Tarokka-læsningen** (Historien → Tarokka-læsningen, `tarokka.html`): Madam Eva's reading as five fixed cards: Tome of Strahd, Holy Symbol of Ravenkind, Sunsword, Strahd's enemy and Strahd's location.
+- Everyone sees the card drawn and her words.
+- The meaning stays hidden until the DM ticks "Vis betydningen for spillerne", and "Fundet/Allieret/Konfronteret" marks a card as resolved (gold border and a badge).
+- Edit it with "Rediger læsningen (DM)". The DM view shows the hidden meanings, so don't open it with players looking at the screen.
+- The DM types the cards and texts from their own book; nothing from the book is built in. Lore names are auto-linked.
+
+**HP bars fixed**: the fill in Ved Bordet's "Selskabets Helbred" and the Kampbygger's HP bars never drew. It was an inline element ignoring its width, and it now fills in proportion to HP.
+
 **Eksportér**: a DM Tools page that dumps every session, lore entry, quest, loot item and the logistics note as one plain-text block — as a `<textarea>` you can copy from, or a downloadable `.txt` file. Meant as cheap insurance against an accidental delete, and as the easiest way to hand Claude the actual campaign content for review (Claude has no login of its own and, by design, won't type a password into any field even for a dedicated account — this export is the practical way around that).
 
 **Nav structure**: the top nav is just Forside / Historien / DM Tools / Logistik. Sessions, Lore, Mål, Tidslinje, Kort and Forbindelser all live behind the "Historien" hub page (same pattern as DM Tools). The homepage still deep-links straight to Sessions/Lore/Mål previews, same as it deep-links to Karakterer under DM Tools.
 
-**One-time step needed**: run the latest `schema.sql` once in Supabase → SQL Editor → New query → Run. Safe to re-run any time. It adds (among earlier additions) `loot_items`, `party_treasury`, the campaign-day counter on `logistics`, the NPC attitude/status fields on `lore_entries`, `characters.has_inspiration`, the new `quests` table, `characters.teaser`/`owner_email`, the new `character_private_notes` table, and the new `maps`/`map_markers` tables for Kort.
+**One-time step needed**: run the latest `schema.sql` once in Supabase → SQL Editor → New query → Run. Safe to re-run any time. It adds (among earlier additions) `loot_items`, `party_treasury`, the campaign-day counter on `logistics`, the NPC attitude/status fields on `lore_entries`, `characters.has_inspiration`, the new `quests` table, `characters.teaser`/`owner_email`, the new `character_private_notes` table, the new `maps`/`map_markers` tables for Kort, and — newest — the time-of-day/rest columns on `logistics`, the `handouts` and `tarokka_reading` tables, and `logistics`/`handouts`/`tarokka_reading` in the Realtime publication. Before that last part is run, the new pages say so, Ved Bordet shows just the day, and nothing else breaks.
 
 **Personal accounts (Min Karakter)**: each player can now sign up for their own account — separate from the shared login — to write a public teaser and a fully private backstory for their character. Players self-serve via "Rediger din karakter" on the Karakterer page, and self-claim their character from a list (one-time, can't be taken back once claimed — if someone claims the wrong one, fix it in the SQL editor: `update characters set owner_email = null where id = '...'`). One thing worth checking once in the Supabase dashboard: **Authentication → Providers → Email → "Confirm email"**. If that's turned on, a new player has to click a confirmation link before they can log in after signing up (they'll see a message telling them to check their inbox); if it's off, they're logged in immediately after signup. Either works, it's just good to know which one your project is set to.
 

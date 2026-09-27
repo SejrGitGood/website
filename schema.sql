@@ -110,6 +110,15 @@ insert into logistics (id) values (1) on conflict (id) do nothing;
 -- rigtige verdens dato) — DM'en trykker +/- manuelt, ingen datomatematik.
 alter table logistics add column if not exists campaign_day int not null default 1;
 
+-- Tid på dagen (Ved Bordet/Tavlen): fire faser pr. kampagnedag — morgen,
+-- eftermiddag, aften, nat. Efter natten tæller kampagnedagen op. Sidste korte
+-- og lange hvil gemmes som (dag, fase), så man kan se, hvor længe siden det er.
+alter table logistics add column if not exists time_of_day text not null default 'morgen';
+alter table logistics add column if not exists last_long_rest_day int;
+alter table logistics add column if not exists last_long_rest_phase text;
+alter table logistics add column if not exists last_short_rest_day int;
+alter table logistics add column if not exists last_short_rest_phase text;
+
 -- Fælles bytte/loot: løs liste af fund, hvem der bærer dem, og en delt guldpose.
 create table if not exists loot_items (
   id uuid primary key default gen_random_uuid(),
@@ -235,6 +244,39 @@ create table if not exists monster_library (
   updated_at timestamptz not null default now()
 );
 
+-- Handouts (handouts.html): breve, billeder og kort, som DM'en forbereder og
+-- viser for bordet. revealed_at = null betyder forberedt, men ikke vist endnu
+-- (kun i DM-visningen). on_table = den, der vises på Tavlen og popper op på
+-- Ved Bordet lige nu — højst én ad gangen. shown_at er sidste gang, den blev vist.
+create table if not exists handouts (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  body text,
+  image_url text,
+  revealed_at timestamptz,
+  shown_at timestamptz,
+  on_table boolean not null default false,
+  campaign_day int,
+  created_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Madam Evas Tarokka-læsning (tarokka.html): fem faste pladser. Kortet og
+-- hendes ord ser alle; betydningen (answer) vises først, når DM'en afslører
+-- den, og resolved markerer, at tingen er fundet / allieret / konfronteret.
+create table if not exists tarokka_reading (
+  slot text primary key,
+  card text,
+  prophecy text,
+  answer text,
+  answer_revealed boolean not null default false,
+  resolved boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+insert into tarokka_reading (slot) values ('tome'), ('symbol'), ('sword'), ('ally'), ('strahd')
+on conflict (slot) do nothing;
+
 -- Aftenens log (Ved Bordet): korte noter, skrevet undervejs i en session af
 -- hvem som helst ved bordet. session_id er null, så længe noten hører til den
 -- åbne log; når loggen laves om til et sessionsreferat, peger noterne på den
@@ -264,6 +306,8 @@ alter table encounters enable row level security;
 alter table encounter_combatants enable row level security;
 alter table session_log_entries enable row level security;
 alter table monster_library enable row level security;
+alter table handouts enable row level security;
+alter table tarokka_reading enable row level security;
 
 -- Rydder op efter en evt. tidligere, mere åben version af dette skema,
 -- så denne fil altid trygt kan køres igen fra toppen.
@@ -351,6 +395,18 @@ create policy "allow-listed users only" on session_log_entries
 
 drop policy if exists "allow-listed users only" on monster_library;
 create policy "allow-listed users only" on monster_library
+  for all
+  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
+  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+
+drop policy if exists "allow-listed users only" on handouts;
+create policy "allow-listed users only" on handouts
+  for all
+  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
+  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+
+drop policy if exists "allow-listed users only" on tarokka_reading;
+create policy "allow-listed users only" on tarokka_reading
   for all
   using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
   with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
@@ -452,7 +508,7 @@ do $$
 declare t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    foreach t in array array['encounters', 'encounter_combatants', 'characters', 'session_log_entries'] loop
+    foreach t in array array['encounters', 'encounter_combatants', 'characters', 'session_log_entries', 'logistics', 'handouts', 'tarokka_reading'] loop
       if not exists (
         select 1 from pg_publication_tables
         where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t

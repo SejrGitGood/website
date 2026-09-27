@@ -7,7 +7,7 @@
 <title>Eksportér &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=21">
+<link rel="stylesheet" href="css/styles.css?v=22">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -34,7 +34,7 @@
           <button class="btn" id="exportBtn">Generér eksport</button>
           <button class="btn secondary" id="downloadBtn" hidden>Download som fil</button>
         </div>
-        <p class="paste-hint" style="margin-top:10px;">Samler sessions, lore, mål, bytte, logistik og monsterbiblioteket i én tekst. Kan tage et par sekunder.</p>
+        <p class="paste-hint" style="margin-top:10px;">Samler sessions, lore, mål, bytte, logistik, handouts, Tarokka-læsningen og monsterbiblioteket i én tekst. Kan tage et par sekunder.</p>
       </div>
     </section>
 
@@ -51,7 +51,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=19"></script>
+<script src="js/app.js?v=20"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -63,13 +63,15 @@
   document.getElementById("exportBtn").addEventListener("click", async () => {
     const btn = document.getElementById("exportBtn");
     await withBusy(btn, "Henter…", async () => {
-      const [sessionsRes, loreRes, questsRes, lootRes, logisticsRes, monstersRes] = await Promise.all([
+      const [sessionsRes, loreRes, questsRes, lootRes, logisticsRes, monstersRes, handoutsRes, tarokkaRes] = await Promise.all([
         window.sb.from("sessions").select("*").order("number"),
         window.sb.from("lore_entries").select("*").order("title"),
         window.sb.from("quests").select("*").order("created_at"),
         window.sb.from("loot_items").select("*").order("created_at"),
         window.sb.from("logistics").select("*").eq("id", 1).maybeSingle(),
         window.sb.from("monster_library").select("name, source, overrides").order("name"),
+        window.sb.from("handouts").select("*").order("created_at"),
+        window.sb.from("tarokka_reading").select("*"),
       ]);
 
       const lines = [];
@@ -113,6 +115,29 @@
       if (logisticsRes.data) {
         lines.push(`Kampagnedag: ${logisticsRes.data.campaign_day || 1}`);
         if (logisticsRes.data.house_rules) lines.push(`Husregler: ${logisticsRes.data.house_rules}`);
+      }
+
+      if ((handoutsRes.data || []).length) {
+        lines.push("", "=== HANDOUTS ===", "");
+        handoutsRes.data.forEach((h) => {
+          lines.push(`# ${h.title}${h.revealed_at ? `${h.campaign_day ? ` (vist dag ${h.campaign_day})` : " (vist)"}` : " (forberedt, ikke vist)"}`);
+          if (h.image_url) lines.push(`Billede: ${h.image_url}`);
+          if (h.body) lines.push(stripImageMarkdown(h.body));
+          lines.push("");
+        });
+      }
+
+      const tarokka = (tarokkaRes.data || []).filter((t) => t.card || t.prophecy || t.answer);
+      if (tarokka.length) {
+        const TAROKKA_TITLES = { tome: "Tome of Strahd", symbol: "Holy Symbol of Ravenkind", sword: "Sunsword", ally: "Strahds fjende", strahd: "Strahds tilholdssted" };
+        lines.push("", "=== TAROKKA-LÆSNINGEN ===", "");
+        ["tome", "symbol", "sword", "ally", "strahd"].forEach((slot) => {
+          const t = tarokka.find((x) => x.slot === slot);
+          if (!t) return;
+          lines.push(`${TAROKKA_TITLES[slot]}: ${t.card || "?"}${t.resolved ? " [løst]" : ""}`);
+          if (t.prophecy) lines.push(`  Madam Eva: ${t.prophecy}`);
+          if (t.answer) lines.push(`  Betydning${t.answer_revealed ? "" : " (skjult for spillerne)"}: ${t.answer}`);
+        });
       }
 
       // Den indsatte stat block-tekst, så et monster kan sættes ind igen i

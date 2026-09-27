@@ -7,7 +7,7 @@
 <title>Kampbygger &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=21">
+<link rel="stylesheet" href="css/styles.css?v=22">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -157,7 +157,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=19"></script>
+<script src="js/app.js?v=20"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -952,12 +952,6 @@
     }
     return { cur: cb.hp_current, max: cb.hp_max, temp: cb.hp_temp || 0, synced: false };
   }
-  function healthWord(cur, max) {
-    if (cur <= 0) return "Besejret";
-    if (cur >= max) return "Uskadt";
-    return cur > max / 2 ? "Såret" : "Blodig";
-  }
-
   function renderTrackerHead() {
     const inRound = encounter.round > 0;
     $("trackerHead").innerHTML = `
@@ -1001,16 +995,9 @@
       ? { until: encounter.round + rounds, anchor: encounter.turn_combatant_id, rounds }
       : { until: 1 + rounds, anchor: null, rounds };
   }
-  // Et fjernet anchor tæller som rundens start.
-  function anchorIndex(t, list) {
-    return Math.max(0, t.anchor ? list.findIndex((c) => c.id === t.anchor) : 0);
-  }
   // Hvor mange gange anchors tur endnu skal starte, før tilstanden udløber (0 = udløbet).
-  function roundsLeft(t, list) {
-    if (encounter.round < 1) return t.until - 1;
-    const cur = list.findIndex((c) => c.id === encounter.turn_combatant_id);
-    return t.until - encounter.round + (cur < anchorIndex(t, list) ? 1 : 0);
-  }
+  // Selve regnestykket deles med Tavlen (conditionRoundsLeft i app.js).
+  const roundsLeft = (t, list) => conditionRoundsLeft(t, list, encounter.round, encounter.turn_combatant_id);
   const genitive = (name) => (/[sxz]$/i.test(name) ? `${name}'` : `${name}s`);
   function expiryText(t, list) {
     const anchor = t.anchor && combatants.find((c) => c.id === t.anchor);
