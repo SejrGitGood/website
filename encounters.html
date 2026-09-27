@@ -157,7 +157,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=18"></script>
+<script src="js/app.js?v=19"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -260,19 +260,36 @@
     return isSynced(c) ? pcInitBonus(c) : cb.init_bonus || 0;
   }
 
-  // Fulde stat blocks fra Open5e hentes kun, når de åbnes i detaljepanelet.
+  // Fulde stat blocks hentes kun, når de skal bruges. monster_slug er enten en
+  // Open5e-slug eller "lib:<id>" for et monster fra monsterbiblioteket.
   const statBlockCache = new Map();
   function fetchStatBlock(slug) {
     if (!statBlockCache.has(slug)) {
+      const libId = slug.startsWith("lib:") ? slug.slice(4) : null;
       statBlockCache.set(
         slug,
-        fetch(`https://api.open5e.com/v1/monsters/${encodeURIComponent(slug)}/`).then((res) => {
+        (async () => {
+          if (libId) {
+            const { data, error } = await window.sb.from("monster_library").select("name, block").eq("id", libId).maybeSingle();
+            if (error) throw new Error(error.message);
+            if (!data) throw new Error("monsteret findes ikke længere i monsterbiblioteket");
+            return { ...data.block, name: data.name };
+          }
+          const res = await fetch(`https://api.open5e.com/v1/monsters/${encodeURIComponent(slug)}/`);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.json();
-        })
+        })()
       );
     }
     return statBlockCache.get(slug);
+  }
+
+  // Monsterbiblioteket (monsterbibliotek.html) hentes ved hver søgning, så et
+  // monster lagt ind i en anden fane dukker op med det samme. Findes tabellen
+  // ikke endnu, søges der bare kun i SRD.
+  async function loadLibrary() {
+    const { data, error } = await window.sb.from("monster_library").select("id, name, block").order("name", { ascending: true });
+    return error ? [] : data || [];
   }
 
   // Nyere kolonner kræver små SQL-ændringer; indtil de er kørt, skjules
@@ -287,16 +304,6 @@
     notesSupported = !notes.error;
     extrasSupported = !extras.error;
   }
-
-  // Legendariske handlinger fra en Open5e stat block: antal pr. runde står i
-  // indledningen ("can take 3 legendary actions"), prisen i navnet ("Costs 2 Actions").
-  const NUMBER_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5 };
-  function legendaryCount(block) {
-    if (!Array.isArray(block.legendary_actions) || !block.legendary_actions.length) return 0;
-    const m = /can take (\d+|one|two|three|four|five) legendary actions?/i.exec(block.legendary_desc || "");
-    return m ? NUMBER_WORDS[m[1].toLowerCase()] ?? Number(m[1]) : 3;
-  }
-  const legendaryCost = (name) => Number((/\(costs? (\d+) actions?\)/i.exec(name || "") || [])[1] || 1);
 
   // --- Sværhedsgrad ---
   function multiplierFor(monsterCount, partySize) {
@@ -367,6 +374,23 @@
       count: 1,
     };
   }
+  function monsterFromLibrary(entry) {
+    const b = entry.block || {};
+    return {
+      key: "lib-" + entry.id,
+      slug: "lib:" + entry.id,
+      name: entry.name,
+      cr: b.cr ?? 0,
+      cr_label: b.challenge_rating || "?",
+      xp: CR_XP[b.cr] ?? 0,
+      hp: b.hit_points,
+      hit_dice: b.hit_dice || "",
+      ac: b.armor_class ?? null,
+      init_bonus: b.initiative ?? Math.floor(((b.dexterity ?? 10) - 10) / 2),
+      legendary: legendaryCount(b),
+      count: 1,
+    };
+  }
 
   // onAdd(monster, knap) tilføjer; klik på navnet åbner hele stat blocken i
   // detaljepanelet med en "Tilføj"-knap dér også.
@@ -393,10 +417,23 @@
     const resultsEl = container.querySelector('[data-role="results"]');
     const moreEl = container.querySelector('[data-role="more"]');
     let results = [];
+    let libResults = [];
     let nextUrl = null;
 
     function renderResults() {
-      resultsEl.innerHTML = results
+      const libRows = libResults
+        .map((entry, i) => {
+          const b = entry.block || {};
+          const legendary = legendaryCount(b);
+          return `
+        <div class="enc-row">
+          <span class="enc-name"><button type="button" class="text-link" data-view-lib="${i}" title="Vis stat block">${escapeHtml(entry.name)}</button><br><span class="enc-meta">CR ${escapeHtml(b.challenge_rating || "?")} &middot; ${fmt(CR_XP[b.cr] ?? 0)} XP &middot; HP ${b.hit_points ?? "?"} &middot; AC ${b.armor_class ?? "?"}${legendary ? ` &middot; ${legendary} legendariske` : ""}</span></span>
+          <button type="button" class="btn secondary" data-add-lib="${i}" style="padding:6px 12px;">Tilføj</button>
+        </div>`;
+        })
+        .join("");
+      const libSection = libRows ? `<h4 class="enc-sub">Dit bibliotek</h4>${libRows}${results.length ? `<h4 class="enc-sub">SRD (Open5e)</h4>` : ""}` : "";
+      resultsEl.innerHTML = libSection + results
         .map(
           (m, i) => `
         <div class="enc-row">
@@ -428,18 +465,39 @@
         statusEl.textContent = "Søger…";
         resultsEl.innerHTML = "";
         moreEl.innerHTML = "";
+        const needle = term.toLowerCase();
+        libResults = (await loadLibrary()).filter((entry) => {
+          const cr = (entry.block || {}).cr ?? 0;
+          return (!needle || entry.name.toLowerCase().includes(needle)) && (crMin === "" || cr >= Number(crMin)) && (crMax === "" || cr <= Number(crMax));
+        });
+        const libText = libResults.length ? `${libResults.length} fra dit bibliotek` : "";
         try {
           const data = await fetchPage(`https://api.open5e.com/v1/monsters/?${params}`);
           results = data.results || [];
-          statusEl.textContent = data.count ? `${data.count} ${data.count === 1 ? "monster" : "monstre"} fundet` : "Ingen monstre matcher.";
-          renderResults();
+          const srdText = data.count ? `${data.count} ${data.count === 1 ? "monster" : "monstre"} ${libText ? "fra SRD" : "fundet"}` : "";
+          statusEl.textContent = [libText, srdText].filter(Boolean).join(" · ") || "Ingen monstre matcher.";
         } catch (err) {
-          statusEl.textContent = "Søgningen fejlede: " + err.message;
+          results = [];
+          nextUrl = null;
+          statusEl.textContent = [libText, "SRD-søgningen fejlede: " + err.message].filter(Boolean).join(" · ");
         }
+        renderResults();
       });
     });
 
     container.addEventListener("click", async (e) => {
+      const addLib = e.target.closest("[data-add-lib]");
+      if (addLib) {
+        const entry = libResults[Number(addLib.dataset.addLib)];
+        if (entry) await onAdd(monsterFromLibrary(entry), addLib);
+        return;
+      }
+      const viewLib = e.target.closest("[data-view-lib]");
+      if (viewLib) {
+        const entry = libResults[Number(viewLib.dataset.viewLib)];
+        if (entry) openDrawer({ type: "statblock", block: { ...entry.block, name: entry.name }, onAdd: (btn) => onAdd(monsterFromLibrary(entry), btn) });
+        return;
+      }
       const add = e.target.closest("[data-add]");
       if (add) {
         const m = results[Number(add.dataset.add)];
@@ -487,6 +545,7 @@
           <textarea data-f="notes" style="min-height:70px;" placeholder="F.eks. Slam. +3 to hit, 1d6+1 bludgeoning. Undead Fortitude."></textarea>
         </div>
         <div><button class="btn secondary" type="submit">Tilføj</button></div>
+        <p class="enc-meta">Har du hele stat blocken? Læg monsteret i <a href="monsterbibliotek.html" target="_blank" rel="noopener">Monsterbiblioteket</a> &mdash; så kan det genbruges og findes i søgningen.</p>
       </form>`;
     const form = container.querySelector("form");
     form.addEventListener("submit", async (e) => {

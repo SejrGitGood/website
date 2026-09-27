@@ -219,6 +219,22 @@ alter table encounter_combatants add column if not exists legendary_used int not
 -- = udløber ved starten af anchors tur i runde 4 (uden anchor: ved rundens start).
 alter table encounter_combatants add column if not exists condition_timers jsonb not null default '{}';
 
+-- Monsterbibliotek (monsterbibliotek.html): egne monstre og NPC'er med fuld
+-- stat block — indsat som tekst og tolket til samme form som Open5e's data
+-- (block), så Kampbyggeren kan bruge dem som SRD-monstrene. source er den
+-- indsatte tekst og overrides det, der er rettet i hånden (navn, CR, HP …).
+-- Ligger bevidst uden for lore_entries, så spillerne ikke ser stats i Lore.
+create table if not exists monster_library (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  block jsonb not null default '{}',
+  source text,
+  overrides jsonb not null default '{}',
+  created_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 -- Aftenens log (Ved Bordet): korte noter, skrevet undervejs i en session af
 -- hvem som helst ved bordet. session_id er null, så længe noten hører til den
 -- åbne log; når loggen laves om til et sessionsreferat, peger noterne på den
@@ -247,6 +263,7 @@ alter table approved_personal_emails enable row level security;
 alter table encounters enable row level security;
 alter table encounter_combatants enable row level security;
 alter table session_log_entries enable row level security;
+alter table monster_library enable row level security;
 
 -- Rydder op efter en evt. tidligere, mere åben version af dette skema,
 -- så denne fil altid trygt kan køres igen fra toppen.
@@ -328,6 +345,12 @@ create policy "allow-listed users only" on encounter_combatants
 
 drop policy if exists "allow-listed users only" on session_log_entries;
 create policy "allow-listed users only" on session_log_entries
+  for all
+  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
+  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+
+drop policy if exists "allow-listed users only" on monster_library;
+create policy "allow-listed users only" on monster_library
   for all
   using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
   with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));

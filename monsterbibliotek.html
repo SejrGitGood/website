@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Monsterbibliotek &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=21">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#A6461C">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Valkyriegade">
+<script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">DM Tools</p>
+    <h1>Monsterbibliotek</h1>
+    <p>Dine egne monstre og NPC'er med fuld stat block &mdash; de dukker op i Kampbyggerens søgning ved siden af SRD-monstrene.</p>
+  </div>
+
+  <div class="wrap" style="max-width:760px;">
+    <p style="margin:-8px 0 4px;"><a href="dmtools.html" class="back-link">&larr; Alle DM Tools</a></p>
+
+    <section class="section">
+      <div class="section-title"><h2 id="formTitle">Nyt monster</h2></div>
+      <div class="card">
+        <form class="form" id="monsterForm">
+          <div class="field">
+            <label for="source">Stat block</label>
+            <textarea id="source" style="min-height:220px;" placeholder="Markér hele stat blocken på D&amp;D Beyond &mdash; fra navnet og ned til sidste handling &mdash; kopiér den, og sæt den ind her. Både 2014- og 2024-opsætningen virker."></textarea>
+            <p class="enc-meta" id="parseSummary" style="margin-top:8px;"></p>
+          </div>
+          <div class="row">
+            <div class="field" style="flex:2;min-width:180px;"><label for="oName">Navn</label><input type="text" id="oName"></div>
+            <div class="field" style="min-width:70px;"><label for="oCr">CR</label><input type="text" id="oCr" inputmode="decimal"></div>
+            <div class="field" style="min-width:70px;"><label for="oHp">HP</label><input type="number" id="oHp" min="1"></div>
+            <div class="field" style="min-width:70px;"><label for="oAc">AC</label><input type="number" id="oAc" min="1"></div>
+            <div class="field" style="min-width:70px;"><label for="oInit">Init.-bonus</label><input type="number" id="oInit"></div>
+            <div class="field" style="min-width:70px;"><label for="oLegendary" title="Legendariske handlinger pr. runde">Legendariske</label><input type="number" id="oLegendary" min="0" max="9"></div>
+          </div>
+          <p class="enc-meta">Felterne viser det, der er læst ud af stat blocken &mdash; skriv kun i dem, hvis noget skal rettes. Uden stat block kan du også bare udfylde dem.</p>
+          <div class="card-actions">
+            <button class="btn" type="submit">Gem i biblioteket</button>
+            <button class="btn secondary" type="button" id="cancelEdit" hidden>Annuller</button>
+          </div>
+        </form>
+      </div>
+      <details class="card" id="previewWrap" style="margin-top:12px;" hidden>
+        <summary class="enc-meta" style="cursor:pointer;">Sådan ser den ud i Kampbyggeren</summary>
+        <div id="preview" style="margin-top:12px;"></div>
+      </details>
+    </section>
+
+    <section class="section">
+      <div class="section-title"><h2>Dine monstre</h2></div>
+      <input type="search" id="filter" class="small-input" placeholder="Filtrér efter navn…" style="width:100%;margin-bottom:12px;" hidden>
+      <div id="libraryList"><div class="empty">Indlæser&hellip;</div></div>
+      <p class="enc-meta" style="margin-top:12px;">Biblioteket vises kun her og i Kampbyggeren &mdash; ikke i Lore eller søgningen, så spillerne ikke falder over stats.</p>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=19"></script>
+<script src="js/statblock.js?v=1"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("dmtools.html");
+
+  const $ = (id) => document.getElementById(id);
+  let entries = [];
+  let editingId = null;
+
+  const CR_LABEL = { 0.125: "1/8", 0.25: "1/4", 0.5: "1/2" };
+  const dexMod = (b) => (b.dexterity != null ? Math.floor((b.dexterity - 10) / 2) : null);
+  const plural = (n, one, many) => (n ? `${n} ${n === 1 ? one : many}` : "");
+
+  // Rettelser i felterne vinder over det, der er læst ud af teksten.
+  function readOverrides() {
+    const num = (id) => ($(id).value.trim() === "" ? null : parseInt($(id).value, 10));
+    const o = {};
+    if ($("oName").value.trim()) o.name = $("oName").value.trim();
+    if ($("oCr").value.trim()) o.cr = $("oCr").value.trim();
+    [["hp", "oHp"], ["ac", "oAc"], ["init", "oInit"], ["legendary", "oLegendary"]].forEach(([k, id]) => {
+      const v = num(id);
+      if (v != null && !Number.isNaN(v)) o[k] = v;
+    });
+    return o;
+  }
+  function merge(parsed, o) {
+    const b = JSON.parse(JSON.stringify(parsed));
+    if (o.name) b.name = o.name;
+    if (o.cr) {
+      const n = crToNumber(o.cr.replace(",", "."));
+      if (!Number.isNaN(n)) {
+        b.cr = n;
+        b.challenge_rating = CR_LABEL[n] ?? String(n);
+      }
+    }
+    if (o.hp != null) b.hit_points = o.hp;
+    if (o.ac != null) b.armor_class = o.ac;
+    if (o.init != null) b.initiative = o.init;
+    if (o.legendary != null) b.legendary_count = Math.max(0, Math.min(9, o.legendary));
+    return b;
+  }
+  const current = () => merge(parseStatBlock($("source").value), readOverrides());
+
+  function summaryHtml(parsed, b) {
+    const init = b.initiative ?? dexMod(b);
+    const legendary = legendaryCount(b);
+    const found = [
+      parsed.name && escapeHtml(parsed.name),
+      parsed.challenge_rating && `CR ${escapeHtml(parsed.challenge_rating)}`,
+      parsed.armor_class != null && `AC ${parsed.armor_class}`,
+      parsed.hit_points != null && `HP ${parsed.hit_points}${parsed.hit_dice ? ` (${escapeHtml(parsed.hit_dice)})` : ""}`,
+      init != null && `initiativ ${signedNumber(init)}`,
+      plural(parsed.special_abilities.length, "egenskab", "egenskaber"),
+      plural(parsed.actions.length, "handling", "handlinger"),
+      plural(parsed.bonus_actions.length, "bonushandling", "bonushandlinger"),
+      plural(parsed.reactions.length, "reaktion", "reaktioner"),
+      legendary && `${legendary} legendariske pr. runde`,
+    ].filter(Boolean);
+    const missing = statBlockWarnings(b);
+    return `<strong>Fundet:</strong> ${found.length ? found.join(" &middot; ") : "intet endnu"}${
+      missing.length ? `<br><span style="color:var(--blood);">Mangler: ${missing.join(", ")}${missing.some((m) => m !== "evneværdier") ? " &mdash; skriv det i felterne herunder" : ""}.</span>` : ""
+    }`;
+  }
+
+  // Tolkes igen, mens man skriver/indsætter — felterne viser resultatet som pladsholdere.
+  let parseTimer = null;
+  function refresh() {
+    const source = $("source").value;
+    const parsed = parseStatBlock(source);
+    const b = merge(parsed, readOverrides());
+    $("oName").placeholder = parsed.name || "";
+    $("oCr").placeholder = parsed.challenge_rating || "";
+    $("oHp").placeholder = parsed.hit_points ?? "";
+    $("oAc").placeholder = parsed.armor_class ?? "";
+    $("oInit").placeholder = parsed.initiative ?? dexMod(parsed) ?? "";
+    $("oLegendary").placeholder = legendaryCount(parsed) || "0";
+    const hasAnything = source.trim() || Object.keys(readOverrides()).length;
+    $("parseSummary").innerHTML = source.trim() ? summaryHtml(parsed, b) : "";
+    $("previewWrap").hidden = !hasAnything;
+    if (hasAnything) $("preview").innerHTML = monsterStatBlockHtml(b);
+  }
+  $("monsterForm").addEventListener("input", () => {
+    clearTimeout(parseTimer);
+    parseTimer = setTimeout(refresh, 200);
+  });
+
+  function resetForm() {
+    editingId = null;
+    $("monsterForm").reset();
+    $("formTitle").textContent = "Nyt monster";
+    $("cancelEdit").hidden = true;
+    refresh();
+  }
+  $("cancelEdit").addEventListener("click", resetForm);
+
+  $("monsterForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const b = current();
+    if (!b.name) {
+      alert("Monsteret mangler et navn.");
+      $("oName").focus();
+      return;
+    }
+    if (b.hit_points == null) {
+      alert("Monsteret mangler HP — skriv det i HP-feltet.");
+      $("oHp").focus();
+      return;
+    }
+    const clash = entries.find((x) => x.id !== editingId && x.name.toLowerCase() === b.name.toLowerCase());
+    if (clash && !confirm(`Der er allerede et monster, der hedder "${clash.name}". Gem alligevel?`)) return;
+    const row = { name: b.name, block: b, source: $("source").value, overrides: readOverrides(), updated_at: new Date().toISOString() };
+    await withBusy(e.target.querySelector('button[type="submit"]'), "Gemmer…", async () => {
+      const { error } = editingId
+        ? await window.sb.from("monster_library").update(row).eq("id", editingId)
+        : await window.sb.from("monster_library").insert({ ...row, created_by: getStoredAuthorName() || null });
+      if (error) {
+        alert("Kunne ikke gemme: " + error.message);
+        return;
+      }
+      resetForm();
+      await load();
+    });
+  });
+
+  function metaText(b) {
+    const legendary = legendaryCount(b);
+    return [
+      b.challenge_rating ? `CR ${escapeHtml(b.challenge_rating)}` : "CR ?",
+      `HP ${b.hit_points ?? "?"}`,
+      `AC ${b.armor_class ?? "?"}`,
+      legendary ? `${legendary} legendariske` : "",
+    ]
+      .filter(Boolean)
+      .join(" &middot; ");
+  }
+  function renderList() {
+    const term = $("filter").value.trim().toLowerCase();
+    const shown = entries.filter((x) => !term || x.name.toLowerCase().includes(term));
+    $("filter").hidden = entries.length < 6;
+    $("libraryList").innerHTML = shown.length
+      ? shown
+          .map(
+            (x) => `
+        <div class="card" data-id="${x.id}">
+          <h3>${escapeHtml(x.name)}</h3>
+          <p class="meta">${metaText(x.block)}${x.created_by ? ` &middot; ${escapeHtml(x.created_by)}` : ""}</p>
+          <div class="card-actions">
+            <button class="btn secondary" data-act="view">Vis stat block</button>
+            <button class="btn secondary" data-act="edit">Rediger</button>
+            <button class="btn danger" data-act="delete">Slet</button>
+          </div>
+          <div data-role="preview" style="margin-top:14px;" hidden></div>
+        </div>`
+          )
+          .join("")
+      : `<div class="empty">${entries.length ? "Ingen monstre matcher." : "Ingen monstre endnu &mdash; sæt den første stat block ind ovenfor."}</div>`;
+  }
+  $("filter").addEventListener("input", renderList);
+
+  $("libraryList").addEventListener("click", async (e) => {
+    const card = e.target.closest("[data-id]");
+    const act = e.target.closest("[data-act]")?.dataset.act;
+    const x = card && entries.find((y) => y.id === card.dataset.id);
+    if (!x || !act) return;
+    if (act === "view") {
+      const box = card.querySelector('[data-role="preview"]');
+      box.hidden = !box.hidden;
+      if (!box.hidden) box.innerHTML = monsterStatBlockHtml(x.block);
+      e.target.textContent = box.hidden ? "Vis stat block" : "Skjul stat block";
+    } else if (act === "edit") {
+      editingId = x.id;
+      $("source").value = x.source || "";
+      const o = x.overrides || {};
+      $("oName").value = o.name || "";
+      $("oCr").value = o.cr || "";
+      $("oHp").value = o.hp ?? "";
+      $("oAc").value = o.ac ?? "";
+      $("oInit").value = o.init ?? "";
+      $("oLegendary").value = o.legendary ?? "";
+      $("formTitle").textContent = `Rediger: ${x.name}`;
+      $("cancelEdit").hidden = false;
+      refresh();
+      $("formTitle").scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (act === "delete") {
+      if (!confirm(`Slet "${x.name}" fra biblioteket?\n\nKampe, der allerede bruger det, beholder HP og AC, men kan ikke længere vise stat blocken.`)) return;
+      const { error } = await window.sb.from("monster_library").delete().eq("id", x.id);
+      if (error) alert("Kunne ikke slette: " + error.message);
+      if (editingId === x.id) resetForm();
+      await load();
+    }
+  });
+
+  async function load() {
+    const { data, error } = await window.sb
+      .from("monster_library")
+      .select("id, name, block, source, overrides, created_by, updated_at")
+      .order("name", { ascending: true });
+    if (error) {
+      $("libraryList").innerHTML = /monster_library/.test(error.message)
+        ? `<div class="empty">Monsterbiblioteket er ikke sat op endnu &mdash; kør den nye SQL fra schema.sql i Supabase.</div>`
+        : `<div class="empty">Kunne ikke hente biblioteket: ${escapeHtml(error.message)}</div>`;
+      return;
+    }
+    entries = data || [];
+    renderList();
+  }
+
+  refresh();
+  await load();
+})();
+</script>
+</body>
+</html>

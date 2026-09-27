@@ -34,7 +34,7 @@
           <button class="btn" id="exportBtn">Generér eksport</button>
           <button class="btn secondary" id="downloadBtn" hidden>Download som fil</button>
         </div>
-        <p class="paste-hint" style="margin-top:10px;">Samler sessions, lore, mål, bytte og logistik i én tekst. Kan tage et par sekunder.</p>
+        <p class="paste-hint" style="margin-top:10px;">Samler sessions, lore, mål, bytte, logistik og monsterbiblioteket i én tekst. Kan tage et par sekunder.</p>
       </div>
     </section>
 
@@ -51,7 +51,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=18"></script>
+<script src="js/app.js?v=19"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -63,12 +63,13 @@
   document.getElementById("exportBtn").addEventListener("click", async () => {
     const btn = document.getElementById("exportBtn");
     await withBusy(btn, "Henter…", async () => {
-      const [sessionsRes, loreRes, questsRes, lootRes, logisticsRes] = await Promise.all([
+      const [sessionsRes, loreRes, questsRes, lootRes, logisticsRes, monstersRes] = await Promise.all([
         window.sb.from("sessions").select("*").order("number"),
         window.sb.from("lore_entries").select("*").order("title"),
         window.sb.from("quests").select("*").order("created_at"),
         window.sb.from("loot_items").select("*").order("created_at"),
         window.sb.from("logistics").select("*").eq("id", 1).maybeSingle(),
+        window.sb.from("monster_library").select("name, source, overrides").order("name"),
       ]);
 
       const lines = [];
@@ -112,6 +113,21 @@
       if (logisticsRes.data) {
         lines.push(`Kampagnedag: ${logisticsRes.data.campaign_day || 1}`);
         if (logisticsRes.data.house_rules) lines.push(`Husregler: ${logisticsRes.data.house_rules}`);
+      }
+
+      // Den indsatte stat block-tekst, så et monster kan sættes ind igen i
+      // Monsterbiblioteket; rettelser i felterne står over den.
+      if ((monstersRes.data || []).length) {
+        lines.push("", "=== MONSTERBIBLIOTEK ===", "");
+        monstersRes.data.forEach((m) => {
+          lines.push(`# ${m.name}`);
+          const o = m.overrides || {};
+          const fixes = [["navn", o.name], ["CR", o.cr], ["HP", o.hp], ["AC", o.ac], ["initiativ", o.init], ["legendariske", o.legendary]]
+            .filter(([, v]) => v != null && v !== "")
+            .map(([k, v]) => `${k} ${v}`);
+          if (fixes.length) lines.push(`Rettelser: ${fixes.join(", ")}`);
+          lines.push("", m.source || "", "", "---", "");
+        });
       }
 
       exportText = lines.join("\n");

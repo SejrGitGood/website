@@ -216,16 +216,31 @@ const CR_XP = {
   28: 120000, 29: 135000, 30: 155000,
 };
 function abilityModText(score) {
+  if (score == null) return "–";
   const m = Math.floor((score - 10) / 2);
   return m >= 0 ? `+${m}` : `${m}`;
 }
+const signedNumber = (v) => (v >= 0 ? `+${v}` : `${v}`);
 function monsterSpeedText(speed) {
-  if (!speed) return "—";
-  return Object.entries(speed)
+  const text = Object.entries(speed || {})
     .filter(([k]) => k !== "hover")
     .map(([k, v]) => (k === "walk" ? `${v} ft.` : `${k} ${v} ft.`))
     .join(", ");
+  return text || "—";
 }
+// Legendariske handlinger pr. runde står i indledningen — 2014: "can take 3
+// legendary actions", 2024: "Legendary Action Uses: 3". Prisen står i navnet
+// ("Wing Attack (Costs 2 Actions)").
+const NUMBER_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5 };
+function legendaryCount(block) {
+  // Et antal skrevet ind i monsterbiblioteket vinder over det, der står i teksten.
+  if (Number.isInteger(block.legendary_count)) return block.legendary_count;
+  if (!Array.isArray(block.legendary_actions) || !block.legendary_actions.length) return 0;
+  const desc = block.legendary_desc || "";
+  const m = /can take (\d+|one|two|three|four|five) legendary actions?/i.exec(desc) || /legendary action uses:?\s*(\d+)/i.exec(desc);
+  return m ? NUMBER_WORDS[m[1].toLowerCase()] ?? Number(m[1]) : 3;
+}
+const legendaryCost = (name) => Number((/\(costs? (\d+) actions?\)/i.exec(name || "") || [])[1] || 1);
 function monsterStatBlockHtml(m) {
   const typeLine = [m.size, m.type + (m.subtype ? ` (${m.subtype})` : ""), m.alignment].filter(Boolean).join(", ");
   const stats = [
@@ -237,16 +252,17 @@ function monsterStatBlockHtml(m) {
     ["INT", m.intelligence_save], ["WIS", m.wisdom_save], ["CHA", m.charisma_save],
   ]
     .filter(([, v]) => v !== null && v !== undefined)
-    .map(([k, v]) => `${k} +${v}`)
+    .map(([k, v]) => `${k} ${signedNumber(v)}`)
     .join(", ");
   const skills = m.skills && Object.keys(m.skills).length
-    ? Object.entries(m.skills).map(([k, v]) => `${k} +${v}`).join(", ")
+    ? Object.entries(m.skills).map(([k, v]) => `${k} ${signedNumber(v)}`).join(", ")
     : "";
+  // Indgange uden navn er en indledning (f.eks. til lair actions).
   const section = (label, list) =>
     list && list.length
       ? `<div style="margin-top:14px;">
           <p class="meta">${escapeHtml(label)}</p>
-          ${list.map((a) => `<p class="body"><strong>${escapeHtml(a.name)}.</strong> ${escapeHtml(a.desc)}</p>`).join("")}
+          ${list.map((a) => `<p class="body">${a.name ? `<strong>${escapeHtml(a.name)}.</strong> ` : ""}${escapeHtml(a.desc)}</p>`).join("")}
         </div>`
       : "";
   const xp = CR_XP[m.cr];
@@ -273,14 +289,17 @@ function monsterStatBlockHtml(m) {
     <h3 style="margin-top:8px;">${escapeHtml(m.name)}</h3>
     <p class="meta">${escapeHtml(typeLine)}</p>
     <p class="body">${core}</p>
-    <ul class="shop-items">${stats.map(([n, v]) => `<li><strong>${n}</strong> ${v} (${abilityModText(v)})</li>`).join("")}</ul>
+    <ul class="shop-items">${stats.map(([n, v]) => `<li><strong>${n}</strong> ${v ?? "–"} (${abilityModText(v)})</li>`).join("")}</ul>
     <p class="body" style="margin-top:14px;">${extra}</p>
     ${section("Egenskaber", m.special_abilities)}
     ${section("Handlinger", m.actions)}
     ${section("Bonushandlinger", m.bonus_actions)}
     ${section("Reaktioner", m.reactions)}
     ${m.legendary_desc ? `<p class="body" style="margin-top:14px;"><em>${escapeHtml(m.legendary_desc)}</em></p>` : ""}
-    ${section("Legendariske handlinger", m.legendary_actions)}`;
+    ${section("Legendariske handlinger", m.legendary_actions)}
+    ${section("Mytiske handlinger", m.mythic_actions)}
+    ${section("Lair-handlinger", m.lair_actions)}
+    ${section("Regionale effekter", m.regional_effects)}`;
 }
 
 // Initiativrækkefølge for kamptrackeren: højest først, uafgjort afgøres af
