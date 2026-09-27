@@ -1,0 +1,1213 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Kampbygger &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=17">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#A6461C">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Valkyriegade">
+<script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow" id="pageEyebrow">DM Tools</p>
+    <h1 id="pageTitle">Kampbygger</h1>
+    <p id="pageSubtitle">Byg en kamp, se sværhedsgraden, og kør den med initiativ, HP og tilstande &mdash; spillernes HP synkes live fra D&amp;D Beyond.</p>
+  </div>
+
+  <div class="wrap">
+    <p style="margin:-8px 0 4px;"><a href="dmtools.html" class="back-link" id="backLink">&larr; Alle DM Tools</a></p>
+    <div class="section" id="loading"><div class="empty">Indlæser&hellip;</div></div>
+
+    <!-- Oversigt -->
+    <div id="listView" hidden>
+      <section class="section">
+        <div class="card">
+          <form class="form" id="newForm">
+            <div class="field">
+              <label for="newName">Ny kamp</label>
+              <input type="text" id="newName" required placeholder="F.eks. Ulvene i Svalich-skoven">
+            </div>
+            <div><button class="btn" type="submit">Opret kamp</button></div>
+          </form>
+        </div>
+      </section>
+      <section class="section">
+        <div class="section-title"><h2>Kampe</h2></div>
+        <div id="encounterList"></div>
+      </section>
+    </div>
+
+    <!-- Bygger (kladde) -->
+    <div id="builderView" hidden>
+      <section class="section">
+        <div class="enc-grid">
+          <div class="card">
+            <div class="form">
+              <div class="field">
+                <label for="encName">Navn</label>
+                <input type="text" id="encName">
+              </div>
+              <div class="field">
+                <label for="encNotes">Noter</label>
+                <textarea id="encNotes" style="min-height:70px;" placeholder="Terræn, taktik, hvad monstrene vil&hellip;"></textarea>
+              </div>
+            </div>
+            <h4 class="enc-sub" style="margin-top:22px;">Sværhedsgrad</h4>
+            <div id="encDifficulty"></div>
+            <h4 class="enc-sub">Monstre</h4>
+            <div id="encMonsters"></div>
+            <h4 class="enc-sub">Selskabet</h4>
+            <div id="encParty"></div>
+            <div class="enc-actions">
+              <label class="enc-meta" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="checkbox" id="rollHp"> Rul monstrenes HP i stedet for gennemsnit
+              </label>
+            </div>
+            <div class="enc-actions">
+              <button class="btn" id="startBtn">Start kamp</button>
+              <button class="btn danger" id="deleteDraftBtn">Slet</button>
+            </div>
+          </div>
+          <div>
+            <div class="card">
+              <h4 class="enc-sub">Tilføj monstre</h4>
+              <div id="builderSearch"></div>
+            </div>
+            <div class="card" style="margin-top:14px;">
+              <h4 class="enc-sub">Eget monster</h4>
+              <div id="builderCustom"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Tracker (aktiv kamp) -->
+    <div id="trackerView" hidden>
+      <section class="section">
+        <div class="card">
+          <div id="trackerHead"></div>
+          <div class="sync-line">
+            <span><span class="sync-dot" id="syncDot"></span><span id="syncText"></span></span>
+            <label><input type="checkbox" id="liveSyncToggle"> Live-synk</label>
+            <button class="btn secondary" id="syncNowBtn" style="padding:6px 12px;">Synk nu</button>
+            <label title="Skjuler monstrenes præcise HP og AC — til en skærm spillerne kan se"><input type="checkbox" id="playerViewToggle"> Spillervisning</label>
+          </div>
+        </div>
+      </section>
+      <section class="section" style="padding-top:0;">
+        <div id="combatantList"></div>
+      </section>
+      <section class="section" style="padding-top:0;">
+        <details class="card">
+          <summary class="enc-sub" style="margin:0;cursor:pointer;">Tilføj deltager undervejs</summary>
+          <h4 class="enc-sub">Fra monsteropslag</h4>
+          <div id="trackerSearch"></div>
+          <h4 class="enc-sub">Eget monster eller NPC</h4>
+          <div id="trackerCustom"></div>
+        </details>
+      </section>
+    </div>
+
+    <!-- Afsluttet -->
+    <div id="doneView" hidden>
+      <section class="section"><div class="card" id="doneCard"></div></section>
+    </div>
+
+    <p class="paste-hint" style="text-align:center;margin-top:8px;">
+      Monstre fra <a href="https://open5e.com" target="_blank" rel="noopener">Open5e</a> (SRD 5.1).
+      Sværhedsgrad efter 2014-reglerne i Dungeon Master's Guide.
+    </p>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=17"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("dmtools.html");
+
+  // --- Regler (DMG 2014) ---
+  const CR_XP = {
+    0: 10, 0.125: 25, 0.25: 50, 0.5: 100, 1: 200, 2: 450, 3: 700, 4: 1100, 5: 1800,
+    6: 2300, 7: 2900, 8: 3900, 9: 5000, 10: 5900, 11: 7200, 12: 8400, 13: 10000,
+    14: 11500, 15: 13000, 16: 15000, 17: 18000, 18: 20000, 19: 22000, 20: 25000,
+    21: 33000, 22: 41000, 23: 50000, 24: 62000, 25: 75000, 26: 90000, 27: 105000,
+    28: 120000, 29: 135000, 30: 155000,
+  };
+  const CR_OPTIONS = [["0", 0], ["1/8", 0.125], ["1/4", 0.25], ["1/2", 0.5]].concat(
+    Array.from({ length: 30 }, (_, i) => [String(i + 1), i + 1])
+  );
+  // Let / Middel / Svær / Dødelig pr. karakterniveau.
+  const XP_THRESHOLDS = {
+    1: [25, 50, 75, 100], 2: [50, 100, 150, 200], 3: [75, 150, 225, 400], 4: [125, 250, 375, 500],
+    5: [250, 500, 750, 1100], 6: [300, 600, 900, 1400], 7: [350, 750, 1100, 1700], 8: [450, 900, 1400, 2100],
+    9: [550, 1100, 1600, 2400], 10: [600, 1200, 1900, 2800], 11: [800, 1600, 2400, 3600], 12: [1000, 2000, 3000, 4500],
+    13: [1100, 2200, 3400, 5100], 14: [1250, 2500, 3800, 5700], 15: [1400, 2800, 4300, 6400], 16: [1600, 3200, 4800, 7200],
+    17: [2000, 3900, 5900, 8800], 18: [2100, 4200, 6300, 9500], 19: [2400, 4900, 7300, 10900], 20: [2800, 5700, 8500, 12700],
+  };
+  const MULTIPLIERS = [0.5, 1, 1.5, 2, 2.5, 3, 4, 5];
+  const DIFFICULTY = { trivial: "Triviel", easy: "Let", medium: "Middel", hard: "Svær", deadly: "Dødelig" };
+  const CONDITIONS = [
+    "Blinded", "Charmed", "Deafened", "Exhaustion", "Frightened", "Grappled", "Incapacitated", "Invisible",
+    "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious", "Concentration",
+  ];
+  const STATUS_LABEL = { kladde: "Kladde", aktiv: "I gang", afsluttet: "Afsluttet" };
+  // Hvor ofte spillernes ark hentes fra D&D Beyond, mens en kamp kører. Alle
+  // enheder deler characters.updated_at, så kun én af dem henter pr. interval.
+  const LIVE_SYNC_MS = 30000;
+
+  const encId = new URLSearchParams(location.search).get("id");
+  const $ = (id) => document.getElementById(id);
+  let characters = [];
+  let encounter = null;
+  let combatants = [];
+
+  function getPref(key, fallback) {
+    try {
+      const v = localStorage.getItem(key);
+      return v === null ? fallback : v === "1";
+    } catch (e) {
+      return fallback;
+    }
+  }
+  function setPref(key, val) {
+    try {
+      localStorage.setItem(key, val ? "1" : "0");
+    } catch (e) {
+      // ignoreres — valget gælder stadig for denne visning
+    }
+  }
+
+  const fmt = (n) => Number(n || 0).toLocaleString("da-DK");
+  const signed = (n) => (n >= 0 ? `+${n}` : `${n}`);
+  const d20 = () => 1 + Math.floor(Math.random() * 20);
+  function rollHitDice(expr, fallback) {
+    const m = /^(\d+)d(\d+)\s*(?:([+-])\s*(\d+))?$/.exec((expr || "").trim());
+    if (!m) return fallback;
+    let total = 0;
+    for (let i = 0; i < Number(m[1]); i++) total += 1 + Math.floor(Math.random() * Number(m[2]));
+    if (m[3]) total += (m[3] === "-" ? -1 : 1) * Number(m[4]);
+    return Math.max(1, total);
+  }
+  function flash(btn, text) {
+    if (!btn) return;
+    const orig = btn.textContent;
+    btn.textContent = text;
+    btn.disabled = true;
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.disabled = false;
+    }, 900);
+  }
+
+  // --- Karakterer ---
+  async function loadCharacters() {
+    const { data } = await window.sb
+      .from("characters")
+      .select("id, character_name, player_name, is_public, data, updated_at, sort_order")
+      .order("sort_order", { ascending: true });
+    characters = data || [];
+  }
+  const charById = (id) => characters.find((c) => c.id === id);
+  const isSynced = (c) => !!(c && c.is_public && c.data && c.data.hp);
+  function syncedLevel(c) {
+    if (!c || !c.is_public || !c.data) return null;
+    return (c.data.classes || []).reduce((sum, cl) => sum + (cl.level || 0), 0) || null;
+  }
+  function dexMod(c) {
+    const s = c && c.data && (c.data.stats || []).find((x) => x.name === "DEX");
+    return s ? s.mod : 0;
+  }
+
+  // --- Sværhedsgrad ---
+  function multiplierFor(monsterCount, partySize) {
+    let idx = monsterCount <= 1 ? 1 : monsterCount === 2 ? 2 : monsterCount <= 6 ? 3 : monsterCount <= 10 ? 4 : monsterCount <= 14 ? 5 : 6;
+    if (partySize > 0 && partySize < 3) idx += 1;
+    else if (partySize >= 6) idx -= 1;
+    return MULTIPLIERS[Math.max(0, Math.min(MULTIPLIERS.length - 1, idx))];
+  }
+  function partyLevels(enc) {
+    return (enc.party || [])
+      .filter((p) => p.included && charById(p.character_id))
+      .map((p) => syncedLevel(charById(p.character_id)) || p.level || 1);
+  }
+  function computeDifficulty(levels, monsters) {
+    const th = [0, 0, 0, 0];
+    levels.forEach((lvl) => XP_THRESHOLDS[Math.max(1, Math.min(20, lvl))].forEach((v, i) => (th[i] += v)));
+    const count = monsters.reduce((s, m) => s + (m.count || 0), 0);
+    const baseXp = monsters.reduce((s, m) => s + (m.xp || 0) * (m.count || 0), 0);
+    const mult = count ? multiplierFor(count, levels.length) : 1;
+    const adjusted = Math.round(baseXp * mult);
+    let key = null;
+    if (levels.length && count) {
+      key = adjusted >= th[3] ? "deadly" : adjusted >= th[2] ? "hard" : adjusted >= th[1] ? "medium" : adjusted >= th[0] ? "easy" : "trivial";
+    }
+    return { th, count, baseXp, mult, adjusted, key };
+  }
+  const thresholdsText = (th) => ["Let", "Middel", "Svær", "Dødelig"].map((l, i) => `${l} ${fmt(th[i])}`).join(" &middot; ");
+
+  function difficultyHtml(enc) {
+    const levels = partyLevels(enc);
+    const d = computeDifficulty(levels, enc.monsters || []);
+    if (!levels.length) return `<p class="enc-meta">Vælg mindst én karakter i selskabet for at beregne sværhedsgraden.</p>`;
+    if (!d.count) return `<p class="enc-meta">Tilføj monstre for at se sværhedsgraden.<br>Grænser for selskabet: ${thresholdsText(d.th)}</p>`;
+    const scaleMax = Math.max(d.th[3] * 1.5, d.adjusted * 1.1);
+    const pct = (v) => Math.min(100, (v / scaleMax) * 100);
+    const zones = [
+      [d.th[0], d.th[1], "var(--mist)"],
+      [d.th[1], d.th[2], "var(--gold)"],
+      [d.th[2], d.th[3], "var(--ember)"],
+      [d.th[3], scaleMax, "var(--blood)"],
+    ]
+      .map(([a, b, color]) => `<span class="diff-zone" style="left:${pct(a)}%;width:${pct(b) - pct(a)}%;background:${color};opacity:0.55;"></span>`)
+      .join("");
+    return `
+      <div class="enc-row" style="border:none;padding:0;">
+        <span class="diff-badge ${d.key}">${DIFFICULTY[d.key]}</span>
+        <span class="enc-meta">Justeret XP ${fmt(d.adjusted)} (${fmt(d.baseXp)} XP &times; ${String(d.mult).replace(".", ",")})</span>
+      </div>
+      <div class="diff-meter"><div class="diff-track">${zones}</div><span class="diff-marker" style="left:${pct(d.adjusted)}%;"></span></div>
+      <p class="enc-meta">${thresholdsText(d.th)} &middot; ${levels.length} ${levels.length === 1 ? "karakter" : "karakterer"}</p>
+      <p class="enc-meta">${fmt(Math.floor(d.baseXp / levels.length))} XP pr. karakter ved sejr</p>`;
+  }
+
+  // --- Monstre: Open5e-søgning og egne monstre (bruges af både bygger og tracker) ---
+  function monsterFromOpen5e(m) {
+    return {
+      key: m.slug,
+      slug: m.slug,
+      name: m.name,
+      cr: m.cr,
+      cr_label: m.challenge_rating,
+      xp: CR_XP[m.cr] ?? 0,
+      hp: m.hit_points,
+      hit_dice: m.hit_dice || "",
+      ac: m.armor_class,
+      init_bonus: Math.floor(((m.dexterity ?? 10) - 10) / 2),
+      count: 1,
+    };
+  }
+
+  function mountMonsterSearch(container, onAdd) {
+    const crOptions = `<option value="">Alle</option>` + CR_OPTIONS.map(([label, val]) => `<option value="${val}">${label}</option>`).join("");
+    container.innerHTML = `
+      <form class="form" data-role="search">
+        <div class="field">
+          <label>Søg</label>
+          <input type="text" data-role="term" placeholder="F.eks. wolf, zombie, bandit">
+        </div>
+        <div class="row">
+          <div class="field" style="min-width:110px;"><label>CR fra</label><select data-role="crMin">${crOptions}</select></div>
+          <div class="field" style="min-width:110px;"><label>CR til</label><select data-role="crMax">${crOptions}</select></div>
+        </div>
+        <div><button class="btn" type="submit">Søg</button></div>
+      </form>
+      <p class="enc-meta" data-role="status" style="margin-top:12px;"></p>
+      <div data-role="results"></div>
+      <div data-role="more" style="margin-top:10px;"></div>`;
+
+    const form = container.querySelector('[data-role="search"]');
+    const statusEl = container.querySelector('[data-role="status"]');
+    const resultsEl = container.querySelector('[data-role="results"]');
+    const moreEl = container.querySelector('[data-role="more"]');
+    let results = [];
+    let nextUrl = null;
+
+    function renderResults() {
+      resultsEl.innerHTML = results
+        .map(
+          (m, i) => `
+        <div class="enc-row">
+          <span class="enc-name">${escapeHtml(m.name)}<br><span class="enc-meta">CR ${escapeHtml(m.challenge_rating)} &middot; ${fmt(CR_XP[m.cr] ?? 0)} XP &middot; ${escapeHtml(m.type || "")} &middot; HP ${m.hit_points} &middot; AC ${m.armor_class}</span></span>
+          <button type="button" class="btn secondary" data-add="${i}" style="padding:6px 12px;">Tilføj</button>
+        </div>`
+        )
+        .join("");
+      moreEl.innerHTML = nextUrl ? `<button type="button" class="btn secondary" data-role="moreBtn">Vis flere</button>` : "";
+    }
+    async function fetchPage(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      nextUrl = data.next ? data.next.replace(/^http:/, "https:") : null;
+      return data;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const params = new URLSearchParams({ document__slug: "wotc-srd", ordering: "cr", limit: "25" });
+      const term = form.querySelector('[data-role="term"]').value.trim();
+      const crMin = form.querySelector('[data-role="crMin"]').value;
+      const crMax = form.querySelector('[data-role="crMax"]').value;
+      if (term) params.set("search", term);
+      if (crMin !== "") params.set("cr__gte", crMin);
+      if (crMax !== "") params.set("cr__lte", crMax);
+      await withBusy(form.querySelector('button[type="submit"]'), "Søger…", async () => {
+        statusEl.textContent = "Søger…";
+        resultsEl.innerHTML = "";
+        moreEl.innerHTML = "";
+        try {
+          const data = await fetchPage(`https://api.open5e.com/v1/monsters/?${params}`);
+          results = data.results || [];
+          statusEl.textContent = data.count ? `${data.count} ${data.count === 1 ? "monster" : "monstre"} fundet` : "Ingen monstre matcher.";
+          renderResults();
+        } catch (err) {
+          statusEl.textContent = "Søgningen fejlede: " + err.message;
+        }
+      });
+    });
+
+    container.addEventListener("click", async (e) => {
+      const add = e.target.closest("[data-add]");
+      if (add) {
+        const m = results[Number(add.dataset.add)];
+        if (m) await onAdd(monsterFromOpen5e(m), add);
+        return;
+      }
+      const more = e.target.closest('[data-role="moreBtn"]');
+      if (more && nextUrl) {
+        await withBusy(more, "Henter…", async () => {
+          try {
+            const data = await fetchPage(nextUrl);
+            results = results.concat(data.results || []);
+            renderResults();
+          } catch (err) {
+            statusEl.textContent = "Kunne ikke hente flere: " + err.message;
+          }
+        });
+      }
+    });
+  }
+
+  function mountCustomMonsterForm(container, onAdd) {
+    const crOptions = CR_OPTIONS.map(([label, val]) => `<option value="${val}" ${val === 1 ? "selected" : ""}>${label}</option>`).join("");
+    container.innerHTML = `
+      <form class="form">
+        <div class="field">
+          <label>Navn</label>
+          <input type="text" data-f="name" required placeholder="F.eks. Strahd-zombie">
+        </div>
+        <div class="row">
+          <div class="field" style="min-width:80px;"><label>CR</label><select data-f="cr">${crOptions}</select></div>
+          <div class="field" style="min-width:80px;"><label>HP</label><input type="number" min="1" data-f="hp" required></div>
+          <div class="field" style="min-width:80px;"><label>AC</label><input type="number" min="0" data-f="ac"></div>
+          <div class="field" style="min-width:80px;"><label>Init.-bonus</label><input type="number" data-f="init" value="0"></div>
+        </div>
+        <div><button class="btn secondary" type="submit">Tilføj</button></div>
+      </form>`;
+    const form = container.querySelector("form");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const get = (f) => form.querySelector(`[data-f="${f}"]`).value;
+      const name = get("name").trim();
+      if (!name) return;
+      const cr = Number(get("cr"));
+      const m = {
+        key: "custom-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        slug: null,
+        name,
+        cr,
+        cr_label: (CR_OPTIONS.find(([, v]) => v === cr) || [String(cr)])[0],
+        xp: CR_XP[cr] ?? 0,
+        hp: Math.max(1, parseInt(get("hp"), 10) || 1),
+        hit_dice: "",
+        ac: get("ac") === "" ? null : parseInt(get("ac"), 10),
+        init_bonus: parseInt(get("init"), 10) || 0,
+        count: 1,
+      };
+      await onAdd(m, form.querySelector('button[type="submit"]'));
+      form.reset();
+    });
+  }
+
+  // --- Visninger ---
+  function showView(id) {
+    ["listView", "builderView", "trackerView", "doneView"].forEach((v) => ($(v).hidden = v !== id));
+    $("loading").hidden = true;
+  }
+  function setHead(eyebrow, title, subtitleVisible) {
+    $("pageEyebrow").textContent = eyebrow;
+    $("pageTitle").textContent = title;
+    $("pageSubtitle").hidden = !subtitleVisible;
+    document.title = `${title} · Blessings of Valkyriegade`;
+    const back = $("backLink");
+    if (subtitleVisible) {
+      back.href = "dmtools.html";
+      back.innerHTML = "&larr; Alle DM Tools";
+    } else {
+      back.href = "encounters.html";
+      back.innerHTML = "&larr; Alle kampe";
+    }
+  }
+
+  // --- Oversigt ---
+  function encounterCardHtml(enc) {
+    const d = computeDifficulty(partyLevels(enc), enc.monsters || []);
+    const monsters = (enc.monsters || []).map((m) => `${m.count} &times; ${escapeHtml(m.name)}`).join(", ") || "Ingen monstre endnu";
+    return `
+      <a class="card" href="encounters.html?id=${enc.id}" style="display:block;">
+        <span class="badge">${STATUS_LABEL[enc.status] || escapeHtml(enc.status)}</span>
+        ${d.key ? `<span class="diff-badge ${d.key}" style="margin-left:6px;">${DIFFICULTY[d.key]}</span>` : ""}
+        <h3 style="margin-top:8px;">${escapeHtml(enc.name)}</h3>
+        <p class="body">${monsters}${enc.status === "aktiv" && enc.round ? ` &middot; Runde ${enc.round}` : ""}</p>
+      </a>`;
+  }
+  async function renderListView() {
+    setHead("DM Tools", "Kampbygger", true);
+    showView("listView");
+    const list = $("encounterList");
+    const { data, error } = await window.sb.from("encounters").select("*").order("updated_at", { ascending: false });
+    if (error) {
+      list.innerHTML = `<div class="empty">Kunne ikke hente kampe: ${escapeHtml(error.message)}</div>`;
+      return;
+    }
+    const order = { aktiv: 0, kladde: 1, afsluttet: 2 };
+    const rows = (data || []).sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3));
+    list.innerHTML = rows.length
+      ? `<div class="grid">${rows.map(encounterCardHtml).join("")}</div>`
+      : `<div class="empty">Ingen kampe endnu &mdash; opret den første ovenfor.</div>`;
+  }
+
+  // Nye kampe arver niveauerne fra sidste kamp for karakterer, der ikke er
+  // offentlige på D&D Beyond; ellers selskabets højeste kendte niveau.
+  async function defaultParty() {
+    const { data: last } = await window.sb.from("encounters").select("party").order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const lastLevels = {};
+    ((last && last.party) || []).forEach((p) => (lastLevels[p.character_id] = p.level));
+    const known = characters.map(syncedLevel).filter(Boolean);
+    const fallback = known.length ? Math.max(...known) : 1;
+    return characters.map((c) => ({ character_id: c.id, included: true, level: syncedLevel(c) || lastLevels[c.id] || fallback }));
+  }
+
+  $("newForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await withBusy(e.target.querySelector('button[type="submit"]'), "Opretter…", async () => {
+      const name = $("newName").value.trim();
+      if (!name) return;
+      const { data, error } = await window.sb
+        .from("encounters")
+        .insert({ name, party: await defaultParty(), monsters: [], created_by: getStoredAuthorName() || null })
+        .select("id")
+        .single();
+      if (error) {
+        alert("Kunne ikke oprette kampen: " + error.message);
+        return;
+      }
+      location.href = `encounters.html?id=${data.id}`;
+    });
+  });
+
+  // --- Bygger ---
+  let saveTimer = null;
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveDraft, 400);
+  }
+  async function saveDraft() {
+    clearTimeout(saveTimer);
+    const { error } = await window.sb
+      .from("encounters")
+      .update({
+        name: (encounter.name || "").trim() || "Unavngivet kamp",
+        notes: encounter.notes || null,
+        party: encounter.party,
+        monsters: encounter.monsters,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", encounter.id);
+    if (error) alert("Kunne ikke gemme kladden: " + error.message);
+  }
+
+  function renderDifficulty() {
+    $("encDifficulty").innerHTML = difficultyHtml(encounter);
+  }
+  function renderMonsterList() {
+    const monsters = encounter.monsters || [];
+    $("encMonsters").innerHTML = monsters.length
+      ? monsters
+          .map(
+            (m) => `
+        <div class="enc-row">
+          <span class="enc-name">${escapeHtml(m.name)}<br><span class="enc-meta">CR ${escapeHtml(m.cr_label ?? String(m.cr))} &middot; ${fmt(m.xp)} XP &middot; HP ${m.hp ?? "?"} &middot; AC ${m.ac ?? "?"}</span></span>
+          <span class="qty">
+            <button type="button" class="icon-btn" data-qty="-1" data-key="${escapeHtml(m.key)}" aria-label="Færre ${escapeHtml(m.name)}">&minus;</button>
+            <span>${m.count}</span>
+            <button type="button" class="icon-btn" data-qty="1" data-key="${escapeHtml(m.key)}" aria-label="Flere ${escapeHtml(m.name)}">+</button>
+          </span>
+          <button type="button" class="icon-btn" data-remove-monster="${escapeHtml(m.key)}" aria-label="Fjern ${escapeHtml(m.name)}">&times;</button>
+        </div>`
+          )
+          .join("")
+      : `<p class="enc-meta">Ingen monstre endnu &mdash; søg efter nogle, eller tilføj dit eget.</p>`;
+  }
+  function renderPartyList() {
+    $("encParty").innerHTML = encounter.party.length
+      ? encounter.party
+          .map((p) => {
+            const c = charById(p.character_id);
+            const name = escapeHtml(c.character_name);
+            const lvl = syncedLevel(c);
+            return `
+        <div class="enc-row">
+          <input type="checkbox" data-include="${c.id}" ${p.included ? "checked" : ""} aria-label="Medtag ${name}">
+          ${portraitHtml(c, name)}
+          <span class="enc-name">${name}</span>
+          ${
+            lvl
+              ? `<span class="enc-meta">Niveau ${lvl} &middot; D&amp;D Beyond</span>`
+              : `<label class="enc-meta">Niveau <input type="number" min="1" max="20" class="small-input" data-level="${c.id}" value="${p.level || 1}"></label>`
+          }
+        </div>`;
+          })
+          .join("")
+      : `<p class="enc-meta">Ingen karakterer i rosteret endnu.</p>`;
+  }
+
+  function addMonsterToDraft(m, btn) {
+    const existing = encounter.monsters.find((x) => x.key === m.key);
+    if (existing) existing.count += 1;
+    else encounter.monsters.push(m);
+    renderMonsterList();
+    renderDifficulty();
+    scheduleSave();
+    flash(btn, "Tilføjet");
+  }
+
+  let builderReady = false;
+  function initBuilder() {
+    if (builderReady) return;
+    builderReady = true;
+    // Karakterer, der er kommet til rosteret siden kladden blev oprettet.
+    characters.forEach((c) => {
+      if (!encounter.party.some((p) => p.character_id === c.id)) {
+        encounter.party.push({ character_id: c.id, included: true, level: syncedLevel(c) || 1 });
+      }
+    });
+    encounter.party = encounter.party.filter((p) => charById(p.character_id));
+    encounter.monsters = encounter.monsters || [];
+
+    $("encName").value = encounter.name;
+    $("encNotes").value = encounter.notes || "";
+    $("encName").addEventListener("input", () => {
+      encounter.name = $("encName").value;
+      $("pageTitle").textContent = encounter.name.trim() || "Unavngivet kamp";
+      scheduleSave();
+    });
+    $("encNotes").addEventListener("input", () => {
+      encounter.notes = $("encNotes").value;
+      scheduleSave();
+    });
+
+    $("builderView").addEventListener("click", (e) => {
+      const qty = e.target.closest("[data-qty]");
+      if (qty) {
+        const m = encounter.monsters.find((x) => x.key === qty.dataset.key);
+        if (!m) return;
+        m.count = Math.max(1, m.count + Number(qty.dataset.qty));
+        renderMonsterList();
+        renderDifficulty();
+        scheduleSave();
+        return;
+      }
+      const rm = e.target.closest("[data-remove-monster]");
+      if (rm) {
+        encounter.monsters = encounter.monsters.filter((x) => x.key !== rm.dataset.removeMonster);
+        renderMonsterList();
+        renderDifficulty();
+        scheduleSave();
+      }
+    });
+    // Kun sværhedsgraden gentegnes her — selve rækken røres ikke, så et
+    // talfelt ikke mister fokus midt i at man klikker på dets pile.
+    $("builderView").addEventListener("change", (e) => {
+      const inc = e.target.closest("[data-include]");
+      if (inc) {
+        const p = encounter.party.find((x) => x.character_id === inc.dataset.include);
+        if (p) p.included = inc.checked;
+        renderDifficulty();
+        scheduleSave();
+        return;
+      }
+      const lvl = e.target.closest("[data-level]");
+      if (lvl) {
+        const p = encounter.party.find((x) => x.character_id === lvl.dataset.level);
+        if (p) p.level = Math.max(1, Math.min(20, parseInt(lvl.value, 10) || 1));
+        renderDifficulty();
+        scheduleSave();
+      }
+    });
+
+    mountMonsterSearch($("builderSearch"), async (m, btn) => addMonsterToDraft(m, btn));
+    mountCustomMonsterForm($("builderCustom"), async (m, btn) => addMonsterToDraft(m, btn));
+
+    $("deleteDraftBtn").addEventListener("click", async () => {
+      if (!confirm(`Slet "${encounter.name}"?`)) return;
+      clearTimeout(saveTimer);
+      await window.sb.from("encounters").delete().eq("id", encounter.id);
+      location.href = "encounters.html";
+    });
+    $("startBtn").addEventListener("click", () => withBusy($("startBtn"), "Starter…", startEncounter));
+  }
+
+  // Seneste AC/maks-HP pr. karakter fra tidligere kampe — AC findes ikke i
+  // D&D Beyond-synken, så den skal kun skrives ind én gang.
+  async function lastPcValues(ids) {
+    if (!ids.length) return {};
+    const { data } = await window.sb
+      .from("encounter_combatants")
+      .select("character_id, ac, hp_max, created_at")
+      .eq("kind", "pc")
+      .in("character_id", ids)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    const out = {};
+    (data || []).forEach((r) => {
+      const o = (out[r.character_id] = out[r.character_id] || { ac: null, hp_max: null });
+      if (o.ac == null && r.ac != null) o.ac = r.ac;
+      if (o.hp_max == null && r.hp_max != null) o.hp_max = r.hp_max;
+    });
+    return out;
+  }
+
+  async function startEncounter() {
+    await saveDraft();
+    const party = encounter.party.filter((p) => p.included && charById(p.character_id));
+    const totals = {};
+    encounter.monsters.forEach((m) => (totals[m.name] = (totals[m.name] || 0) + m.count));
+    const seen = {};
+    const rollHp = $("rollHp").checked;
+    const monsterRows = [];
+    encounter.monsters.forEach((m) => {
+      for (let i = 0; i < m.count; i++) {
+        seen[m.name] = (seen[m.name] || 0) + 1;
+        const hp = rollHp && m.hit_dice ? rollHitDice(m.hit_dice, m.hp) : m.hp;
+        monsterRows.push({
+          encounter_id: encounter.id,
+          kind: "monster",
+          name: totals[m.name] > 1 ? `${m.name} ${seen[m.name]}` : m.name,
+          init_bonus: m.init_bonus || 0,
+          hp_max: hp,
+          hp_current: hp,
+          ac: m.ac ?? null,
+          xp: m.xp || 0,
+          monster_slug: m.slug || null,
+        });
+      }
+    });
+    if (!party.length && !monsterRows.length) {
+      alert("Tilføj mindst ét monster eller én karakter først.");
+      return;
+    }
+    const last = await lastPcValues(party.map((p) => p.character_id));
+    const pcRows = party.map((p) => {
+      const c = charById(p.character_id);
+      const prev = last[c.id] || {};
+      const manualHp = isSynced(c) ? null : prev.hp_max ?? null;
+      return {
+        encounter_id: encounter.id,
+        kind: "pc",
+        character_id: c.id,
+        name: c.character_name,
+        init_bonus: dexMod(c),
+        ac: prev.ac ?? null,
+        hp_max: manualHp,
+        hp_current: manualHp,
+      };
+    });
+    const { error } = await window.sb.from("encounter_combatants").insert([...pcRows, ...monsterRows]);
+    if (error) {
+      alert("Kunne ikke starte kampen: " + error.message);
+      return;
+    }
+    const { error: encErr } = await window.sb
+      .from("encounters")
+      .update({ status: "aktiv", round: 0, turn_combatant_id: null, updated_at: new Date().toISOString() })
+      .eq("id", encounter.id);
+    if (encErr) {
+      alert("Kunne ikke starte kampen: " + encErr.message);
+      return;
+    }
+    await reloadEncounter();
+    render();
+  }
+
+  // --- Tracker ---
+  let playerView = getPref("encPlayerView", false);
+  let liveSync = getPref("encLiveSync", true);
+  let syncBusy = false;
+  let syncError = "";
+  let lastSyncAttempt = 0;
+  let pendingRender = false;
+
+  async function reloadEncounter() {
+    const [{ data: enc }, { data: cbs }, { data: chars }] = await Promise.all([
+      window.sb.from("encounters").select("*").eq("id", encId).maybeSingle(),
+      window.sb.from("encounter_combatants").select("*").eq("encounter_id", encId),
+      window.sb
+        .from("characters")
+        .select("id, character_name, player_name, is_public, data, updated_at, sort_order")
+        .order("sort_order", { ascending: true }),
+    ]);
+    if (!enc) {
+      location.href = "encounters.html";
+      return false;
+    }
+    encounter = enc;
+    combatants = cbs || [];
+    characters = chars || [];
+    return true;
+  }
+
+  // Monstre på 0 HP springes over i turrækkefølgen; spillere på 0 HP gør
+  // ikke (de slår dødsslag).
+  const isOut = (cb) => cb.kind === "monster" && cb.hp_max != null && (cb.hp_current ?? 0) <= 0;
+  function hpOf(cb) {
+    const c = cb.character_id ? charById(cb.character_id) : null;
+    if (cb.kind === "pc" && isSynced(c)) {
+      return { cur: c.data.hp.current, max: c.data.hp.max, temp: c.data.hp.temp || 0, synced: true };
+    }
+    return { cur: cb.hp_current, max: cb.hp_max, temp: cb.hp_temp || 0, synced: false };
+  }
+  function healthWord(cur, max) {
+    if (cur <= 0) return "Besejret";
+    if (cur >= max) return "Uskadt";
+    return cur > max / 2 ? "Såret" : "Blodig";
+  }
+
+  function renderTrackerHead() {
+    const list = sortCombatants(combatants);
+    const current = list.find((c) => c.id === encounter.turn_combatant_id);
+    const inRound = encounter.round > 0;
+    $("trackerHead").innerHTML = `
+      <div class="section-title" style="margin-bottom:4px;">
+        <h2>${inRound ? `Runde ${encounter.round}` : "Initiativ"}</h2>
+        ${inRound && current ? `<span class="enc-meta">Tur: <strong>${escapeHtml(current.name)}</strong></span>` : ""}
+      </div>
+      ${
+        inRound
+          ? ""
+          : `<p class="enc-meta">Skriv spillernes initiativ ind (eller slå for dem med d20-knappen), slå for monstrene, og tryk så "Begynd kamp".</p>`
+      }
+      <div class="enc-actions" style="margin-top:12px;">
+        ${
+          inRound
+            ? `<button class="btn secondary" data-act="prev">&lsaquo; Forrige</button><button class="btn" data-act="next">Næste tur &rsaquo;</button>`
+            : `<button class="btn secondary" data-act="roll-monsters">Slå initiativ for monstre</button><button class="btn" data-act="begin">Begynd kamp</button>`
+        }
+        <button class="btn secondary" data-act="end">Afslut kamp</button>
+      </div>`;
+  }
+
+  function combatantHtml(cb) {
+    const isPc = cb.kind === "pc";
+    const c = isPc && cb.character_id ? charById(cb.character_id) : null;
+    const hp = hpOf(cb);
+    const hideStats = playerView && !isPc;
+    const current = encounter.round > 0 && cb.id === encounter.turn_combatant_id;
+    const down = isPc && hp.max != null && hp.cur <= 0;
+    const name = escapeHtml(cb.name);
+    const avatar = c ? portraitHtml(c, name) : `<span class="hp-portrait-fallback">${escapeHtml((cb.name || "?").charAt(0).toUpperCase())}</span>`;
+
+    let hpHtml;
+    if (hp.max == null) {
+      hpHtml = isPc
+        ? `<label class="enc-meta">Maks HP <input type="number" min="1" class="small-input" data-field="hp_max"></label><span class="enc-meta">(ikke offentlig på D&amp;D Beyond)</span>`
+        : `<span class="enc-meta">Ukendt HP</span>`;
+    } else if (hideStats) {
+      hpHtml = `<span class="enc-meta">${healthWord(hp.cur, hp.max)}</span>`;
+    } else {
+      const pct = hp.max ? Math.max(0, Math.min(100, Math.round((hp.cur / hp.max) * 100))) : 0;
+      const cls = pct <= 25 ? "critical" : pct <= 50 ? "wounded" : "";
+      hpHtml = `<span class="cb-hp-track"><span class="cb-hp-fill ${cls}" style="width:${pct}%;"></span></span><span class="cb-hp-text">${hp.cur}/${hp.max}${hp.temp ? ` (+${hp.temp})` : ""}</span>`;
+    }
+
+    const conditions = cb.conditions || [];
+    const chips = conditions
+      .map((k) => `<button type="button" class="cond-chip" data-remove-cond="${escapeHtml(k)}" title="Fjern ${escapeHtml(k)}">${escapeHtml(k)} &times;</button>`)
+      .join("");
+    const condOptions = CONDITIONS.filter((k) => !conditions.includes(k))
+      .map((k) => `<option value="${k}">${k}</option>`)
+      .join("");
+
+    let controls = "";
+    if (hp.synced) {
+      controls = `<p class="enc-meta">HP styres på D&amp;D Beyond og synkes automatisk.</p>`;
+    } else if (hp.max != null && !hideStats) {
+      controls = `
+        <div class="cb-controls">
+          <input type="number" min="0" class="small-input" data-role="amount" placeholder="0" aria-label="Antal HP for ${name}">
+          <button type="button" class="btn secondary" data-act="dmg">Skade</button>
+          <button type="button" class="btn secondary" data-act="heal">Hel</button>
+          <button type="button" class="btn secondary" data-act="temp">Midl. HP</button>
+        </div>`;
+    }
+
+    return `
+      <div class="combatant ${current ? "current" : ""} ${isOut(cb) ? "defeated" : ""}" data-id="${cb.id}">
+        <div class="cb-init">
+          <input type="number" class="small-input" data-field="initiative" value="${cb.initiative ?? ""}" placeholder="–" aria-label="Initiativ for ${name}">
+          <button type="button" class="icon-btn" data-act="roll-init" title="Slå initiativ (d20 ${signed(cb.init_bonus || 0)})">d20</button>
+        </div>
+        <div class="cb-body">
+          <div class="cb-head">
+            ${avatar}
+            <span class="cb-name">${name}</span>
+            ${hp.synced ? `<span class="badge">D&amp;D Beyond</span>` : ""}
+            ${down ? `<span class="status-badge dead">Nede</span>` : ""}
+            <span class="cb-spacer"></span>
+            ${hideStats ? "" : `<label class="enc-meta">AC <input type="number" min="0" class="small-input" style="width:52px;" data-field="ac" value="${cb.ac ?? ""}"></label>`}
+            <button type="button" class="icon-btn" data-act="remove" aria-label="Fjern ${name} fra kampen">&times;</button>
+          </div>
+          <div class="cb-hp">${hpHtml}</div>
+          <div class="cb-conds">
+            ${chips}
+            <select class="small-input" data-role="add-cond" aria-label="Tilføj tilstand til ${name}"><option value="">+ Tilstand</option>${condOptions}</select>
+          </div>
+          ${controls}
+        </div>
+      </div>`;
+  }
+
+  function renderCombatants() {
+    const list = sortCombatants(combatants);
+    $("combatantList").innerHTML = list.length
+      ? list.map(combatantHtml).join("")
+      : `<div class="empty">Ingen deltagere &mdash; tilføj nogle nedenfor.</div>`;
+  }
+
+  function newestSync() {
+    return characters.reduce((max, c) => Math.max(max, Date.parse(c.updated_at) || 0), 0);
+  }
+  function updateSyncText() {
+    const pcs = combatants.filter((cb) => cb.kind === "pc");
+    const live = pcs.filter((cb) => isSynced(charById(cb.character_id))).length;
+    const newest = newestSync();
+    const ago = Math.max(0, Math.round((Date.now() - newest) / 1000));
+    $("syncDot").classList.toggle("live", liveSync && !syncError);
+    let text;
+    if (syncBusy) text = "Henter spillernes ark fra D&D Beyond…";
+    else if (syncError) text = `Synk fejlede: ${syncError}`;
+    else {
+      const when = !newest ? "Ikke synket endnu" : ago < 60 ? `Synket for ${ago} sek. siden` : `Synket for ${Math.round(ago / 60)} min. siden`;
+      text = pcs.length
+        ? `${when} · ${live} af ${pcs.length} karakterer live${live < pcs.length ? " (resten er ikke offentlige på D&D Beyond)" : ""}`
+        : when;
+    }
+    $("syncText").textContent = text;
+  }
+
+  async function syncNow() {
+    syncBusy = true;
+    lastSyncAttempt = Date.now();
+    updateSyncText();
+    try {
+      const { error } = await window.sb.functions.invoke("refresh-characters");
+      syncError = error ? error.message : "";
+    } catch (err) {
+      syncError = err.message;
+    }
+    await loadCharacters();
+    syncBusy = false;
+    updateSyncText();
+    requestRender();
+  }
+
+  // Gentegner ikke mens man skriver i et felt i listen (ellers forsvinder det
+  // man er ved at taste) — det sker i stedet, når fokus forlader feltet.
+  function isEditing() {
+    const a = document.activeElement;
+    return !!(a && a.matches("input, select, textarea") && a.closest("#combatantList"));
+  }
+  function requestRender() {
+    if (isEditing()) {
+      pendingRender = true;
+      return;
+    }
+    pendingRender = false;
+    render();
+  }
+
+  async function updateCombatant(cb, patch) {
+    Object.assign(cb, patch);
+    requestRender();
+    const { error } = await window.sb.from("encounter_combatants").update(patch).eq("id", cb.id);
+    if (error) {
+      alert("Kunne ikke gemme: " + error.message);
+      if (await reloadEncounter()) requestRender();
+    }
+  }
+  async function updateEncounter(patch) {
+    Object.assign(encounter, patch);
+    requestRender();
+    const { error } = await window.sb
+      .from("encounters")
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq("id", encounter.id);
+    if (error) alert("Kunne ikke gemme: " + error.message);
+  }
+
+  async function advanceTurn(dir, excludeId) {
+    const list = sortCombatants(combatants);
+    if (!list.length) return;
+    let idx = list.findIndex((c) => c.id === encounter.turn_combatant_id);
+    if (idx === -1) idx = dir > 0 ? -1 : list.length;
+    let round = encounter.round;
+    for (let step = 0; step < list.length; step++) {
+      idx += dir;
+      if (idx >= list.length) {
+        idx = 0;
+        round += 1;
+      } else if (idx < 0) {
+        idx = list.length - 1;
+        round = Math.max(1, round - 1);
+      }
+      const c = list[idx];
+      if (c.id !== excludeId && !isOut(c)) {
+        await updateEncounter({ turn_combatant_id: c.id, round });
+        return;
+      }
+    }
+  }
+  async function beginCombat() {
+    const list = sortCombatants(combatants);
+    const missing = list.filter((c) => c.initiative == null).length;
+    if (missing && !confirm(`${missing} ${missing === 1 ? "deltager mangler" : "deltagere mangler"} initiativ og kommer sidst i rækkefølgen. Begynd alligevel?`)) return;
+    const first = list.find((c) => !isOut(c));
+    await updateEncounter({ round: 1, turn_combatant_id: first ? first.id : null });
+  }
+  async function rollMonsterInitiative() {
+    const targets = combatants.filter((c) => c.kind === "monster" && c.initiative == null);
+    targets.forEach((c) => (c.initiative = d20() + (c.init_bonus || 0)));
+    requestRender();
+    await Promise.all(
+      targets.map((c) => window.sb.from("encounter_combatants").update({ initiative: c.initiative }).eq("id", c.id))
+    );
+  }
+  async function removeCombatant(cb) {
+    if (encounter.round > 0 && encounter.turn_combatant_id === cb.id) await advanceTurn(1, cb.id);
+    combatants = combatants.filter((x) => x.id !== cb.id);
+    requestRender();
+    await window.sb.from("encounter_combatants").delete().eq("id", cb.id);
+  }
+  async function addCombatantFromMonster(m, btn) {
+    const same = combatants.filter((c) => c.kind === "monster" && (c.name === m.name || c.name.startsWith(m.name + " ")));
+    const row = {
+      encounter_id: encounter.id,
+      kind: "monster",
+      name: same.length ? `${m.name} ${same.length + 1}` : m.name,
+      init_bonus: m.init_bonus || 0,
+      initiative: encounter.round > 0 ? d20() + (m.init_bonus || 0) : null,
+      hp_max: m.hp,
+      hp_current: m.hp,
+      ac: m.ac ?? null,
+      xp: m.xp || 0,
+      monster_slug: m.slug || null,
+    };
+    const { data, error } = await window.sb.from("encounter_combatants").insert(row).select("*").single();
+    if (error) {
+      alert("Kunne ikke tilføje: " + error.message);
+      return;
+    }
+    combatants.push(data);
+    requestRender();
+    flash(btn, "Tilføjet");
+  }
+
+  let trackerReady = false;
+  function initTracker() {
+    if (trackerReady) return;
+    trackerReady = true;
+
+    $("liveSyncToggle").checked = liveSync;
+    $("playerViewToggle").checked = playerView;
+    $("liveSyncToggle").addEventListener("change", () => {
+      liveSync = $("liveSyncToggle").checked;
+      setPref("encLiveSync", liveSync);
+      updateSyncText();
+      if (liveSync) tick();
+    });
+    $("playerViewToggle").addEventListener("change", () => {
+      playerView = $("playerViewToggle").checked;
+      setPref("encPlayerView", playerView);
+      requestRender();
+    });
+    $("syncNowBtn").addEventListener("click", () => withBusy($("syncNowBtn"), "Synker…", syncNow));
+
+    $("trackerHead").addEventListener("click", async (e) => {
+      const act = e.target.closest("[data-act]")?.dataset.act;
+      if (act === "next") await advanceTurn(1);
+      else if (act === "prev") await advanceTurn(-1);
+      else if (act === "begin") await beginCombat();
+      else if (act === "roll-monsters") await rollMonsterInitiative();
+      else if (act === "end" && confirm("Afslut kampen?")) await updateEncounter({ status: "afsluttet" });
+    });
+
+    const list = $("combatantList");
+    list.addEventListener("change", async (e) => {
+      const row = e.target.closest(".combatant");
+      const cb = row && combatants.find((x) => x.id === row.dataset.id);
+      if (!cb) return;
+      const field = e.target.dataset.field;
+      if (field === "initiative" || field === "ac") {
+        const v = parseInt(e.target.value, 10);
+        await updateCombatant(cb, { [field]: Number.isNaN(v) ? null : v });
+      } else if (field === "hp_max") {
+        const v = parseInt(e.target.value, 10);
+        if (v > 0) await updateCombatant(cb, { hp_max: v, hp_current: v });
+      } else if (e.target.dataset.role === "add-cond" && e.target.value) {
+        const value = e.target.value;
+        e.target.blur();
+        await updateCombatant(cb, { conditions: [...(cb.conditions || []), value] });
+      }
+    });
+    list.addEventListener("click", async (e) => {
+      const row = e.target.closest(".combatant");
+      const cb = row && combatants.find((x) => x.id === row.dataset.id);
+      if (!cb) return;
+      const chip = e.target.closest("[data-remove-cond]");
+      if (chip) {
+        await updateCombatant(cb, { conditions: (cb.conditions || []).filter((k) => k !== chip.dataset.removeCond) });
+        return;
+      }
+      const act = e.target.closest("[data-act]")?.dataset.act;
+      if (!act) return;
+      if (act === "roll-init") {
+        await updateCombatant(cb, { initiative: d20() + (cb.init_bonus || 0) });
+        return;
+      }
+      if (act === "remove") {
+        if (confirm(`Fjern ${cb.name} fra kampen?`)) await removeCombatant(cb);
+        return;
+      }
+      const amountInput = row.querySelector('[data-role="amount"]');
+      const amount = parseInt(amountInput && amountInput.value, 10);
+      if (!(amount >= 0)) {
+        if (amountInput) amountInput.focus();
+        return;
+      }
+      const cur = cb.hp_current ?? 0;
+      const temp = cb.hp_temp || 0;
+      if (act === "dmg") {
+        const absorbed = Math.min(temp, amount);
+        await updateCombatant(cb, { hp_temp: temp - absorbed, hp_current: Math.max(0, cur - (amount - absorbed)) });
+      } else if (act === "heal") {
+        await updateCombatant(cb, { hp_current: Math.min(cb.hp_max ?? cur + amount, cur + amount) });
+      } else if (act === "temp") {
+        await updateCombatant(cb, { hp_temp: amount });
+      }
+    });
+    list.addEventListener("focusout", () =>
+      setTimeout(() => {
+        if (pendingRender && !isEditing()) requestRender();
+      }, 0)
+    );
+
+    mountMonsterSearch($("trackerSearch"), addCombatantFromMonster);
+    mountCustomMonsterForm($("trackerCustom"), addCombatantFromMonster);
+
+    subscribeToChanges(`encounter-${encId}`, ["encounters", "encounter_combatants", "characters"], async () => {
+      if (await reloadEncounter()) requestRender();
+    });
+    setInterval(tick, 5000);
+  }
+
+  // Hvert 5. sekund: opdater "synket for X sek. siden", hent fra D&D Beyond
+  // hvis ingen enhed har gjort det inden for LIVE_SYNC_MS, og hent ellers
+  // kampen igen hvert 15. sekund, hvis Realtime skulle være slået fra.
+  let tickCount = 0;
+  async function tick() {
+    if (!encounter || encounter.status !== "aktiv") return;
+    tickCount += 1;
+    updateSyncText();
+    if (document.hidden || syncBusy) return;
+    const now = Date.now();
+    if (liveSync && now - newestSync() >= LIVE_SYNC_MS && now - lastSyncAttempt >= LIVE_SYNC_MS) {
+      await syncNow();
+    } else if (tickCount % 3 === 0 && (await reloadEncounter())) {
+      requestRender();
+    }
+  }
+
+  // --- Afsluttet ---
+  function renderDone() {
+    const monsters = sortCombatants(combatants).filter((c) => c.kind === "monster");
+    const pcs = combatants.filter((c) => c.kind === "pc");
+    const xp = monsters.filter(isOut).reduce((s, c) => s + (c.xp || 0), 0);
+    $("doneCard").innerHTML = `
+      <span class="badge">Afsluttet</span>
+      <h3 style="margin-top:8px;">${escapeHtml(encounter.name)}</h3>
+      ${encounter.round ? `<p class="body">Varede ${encounter.round} ${encounter.round === 1 ? "runde" : "runder"}.</p>` : ""}
+      ${
+        monsters.length
+          ? `<ul class="shop-items">${monsters
+              .map((c) => `<li>${escapeHtml(c.name)} &middot; ${fmt(c.xp)} XP &middot; ${isOut(c) ? "Besejret" : "Overlevede"}</li>`)
+              .join("")}</ul>`
+          : ""
+      }
+      <p class="body"><strong>${fmt(xp)} XP</strong> for besejrede monstre${pcs.length ? ` &mdash; ${fmt(Math.floor(xp / pcs.length))} XP til hver af ${pcs.length} ${pcs.length === 1 ? "karakter" : "karakterer"}` : ""}.</p>
+      ${encounter.notes ? `<p class="body">${escapeHtml(encounter.notes)}</p>` : ""}
+      <div class="enc-actions">
+        <button class="btn secondary" data-act="reopen">Genoptag kampen</button>
+        <button class="btn danger" data-act="delete">Slet</button>
+      </div>`;
+  }
+  $("doneCard").addEventListener("click", async (e) => {
+    const act = e.target.closest("[data-act]")?.dataset.act;
+    if (act === "reopen") {
+      await updateEncounter({ status: "aktiv" });
+    } else if (act === "delete" && confirm(`Slet "${encounter.name}"?`)) {
+      await window.sb.from("encounters").delete().eq("id", encounter.id);
+      location.href = "encounters.html";
+    }
+  });
+
+  function render() {
+    if (encounter.status === "kladde") {
+      setHead("Kladde", encounter.name, false);
+      showView("builderView");
+      initBuilder();
+      renderDifficulty();
+      renderMonsterList();
+      renderPartyList();
+    } else if (encounter.status === "aktiv") {
+      setHead("Kamp i gang", encounter.name, false);
+      showView("trackerView");
+      initTracker();
+      renderTrackerHead();
+      renderCombatants();
+      updateSyncText();
+    } else {
+      setHead("Afsluttet kamp", encounter.name, false);
+      showView("doneView");
+      initTracker();
+      renderDone();
+    }
+  }
+
+  await loadCharacters();
+  if (!encId) {
+    await renderListView();
+    return;
+  }
+  if (await reloadEncounter()) render();
+})();
+</script>
+</body>
+</html>

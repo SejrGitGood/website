@@ -7,7 +7,7 @@
 <title>Ved Bordet &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=16">
+<link rel="stylesheet" href="css/styles.css?v=17">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -26,6 +26,14 @@
   </div>
 
   <div class="wrap">
+    <section class="section" id="combatSection" hidden>
+      <div class="section-title">
+        <h2>Kamp i gang</h2>
+        <a href="encounters.html" id="combatLink">Åbn trackeren &rarr;</a>
+      </div>
+      <div class="card" id="combatCard"></div>
+    </section>
+
     <section class="section" id="hpSection">
       <div class="section-title">
         <h2>Selskabets Helbred</h2>
@@ -62,6 +70,7 @@
       <div class="section-title"><h2>Hurtige opslag</h2></div>
       <div class="card">
         <div class="card-actions">
+          <a class="btn secondary" href="encounters.html">Kampbygger</a>
           <a class="btn secondary" href="monsters.html">Monstre</a>
           <a class="btn secondary" href="spells.html">Besværgelser</a>
           <a class="btn secondary" href="conditions.html">Tilstande</a>
@@ -75,7 +84,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=16"></script>
+<script src="js/app.js?v=17"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -83,13 +92,57 @@
   renderNav("ved-bordet.html");
   wireLoreMentionPreviews();
 
-  const { data: charRows } = await window.sb
-    .from("characters")
-    .select("*")
-    .order("sort_order", { ascending: true });
   const hpCard = document.getElementById("hpCard");
-  hpCard.innerHTML = hpWidgetHtml(charRows);
+  async function loadHp() {
+    const { data: charRows } = await window.sb
+      .from("characters")
+      .select("*")
+      .order("sort_order", { ascending: true });
+    hpCard.innerHTML = hpWidgetHtml(charRows);
+  }
+  await loadHp();
   wireHpWidget(hpCard);
+
+  async function loadCombat() {
+    const section = document.getElementById("combatSection");
+    const { data: enc } = await window.sb
+      .from("encounters")
+      .select("id, name, round, turn_combatant_id")
+      .eq("status", "aktiv")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!enc) {
+      section.hidden = true;
+      return;
+    }
+    const { data: cbs } = await window.sb
+      .from("encounter_combatants")
+      .select("id, name, kind, initiative, init_bonus, hp_current, hp_max")
+      .eq("encounter_id", enc.id);
+    const rows = sortCombatants(cbs || [])
+      .map((c) => {
+        const out = c.kind === "monster" && c.hp_max != null && (c.hp_current ?? 0) <= 0;
+        const name = out ? `<s>${escapeHtml(c.name)}</s>` : escapeHtml(c.name);
+        const isTurn = enc.round > 0 && c.id === enc.turn_combatant_id;
+        return `<li>${isTurn ? `<strong>${name}</strong> &larr; tur` : name} <span class="enc-meta">&middot; ${c.initiative ?? "–"}</span></li>`;
+      })
+      .join("");
+    document.getElementById("combatLink").href = `encounters.html?id=${enc.id}`;
+    document.getElementById("combatCard").innerHTML = `
+      <h3>${escapeHtml(enc.name)}</h3>
+      <p class="meta">${enc.round ? `Runde ${enc.round}` : "Initiativ slås"}</p>
+      ${rows ? `<ul class="shop-items">${rows}</ul>` : ""}`;
+    section.hidden = false;
+  }
+  await loadCombat();
+
+  // Kører kamptrackeren på en anden enhed, henter den spillernes HP fra D&D
+  // Beyond løbende — de ændringer (og turskift) dukker op her med det samme.
+  subscribeToChanges("ved-bordet", ["encounters", "encounter_combatants", "characters"], () => {
+    loadHp();
+    loadCombat();
+  });
 
   const { data: logistics } = await window.sb.from("logistics").select("*").eq("id", 1).maybeSingle();
   const statusCard = document.getElementById("statusCard");

@@ -189,6 +189,46 @@ function wireHpWidget(containerEl) {
   });
 }
 
+// Kalder onChange (samlet op, så en stribe ændringer kun giver ét kald), når
+// en række i en af tabellerne ændres — af hvem som helst, på en hvilken som
+// helst enhed. Kræver at tabellerne er med i supabase_realtime-publikationen
+// (se bunden af schema.sql); ellers sker der bare ingenting.
+function subscribeToChanges(channelName, tables, onChange) {
+  let timer = null;
+  const fire = () => {
+    clearTimeout(timer);
+    timer = setTimeout(onChange, 200);
+  };
+  let channel = window.sb.channel(channelName);
+  tables.forEach((table) => {
+    channel = channel.on("postgres_changes", { event: "*", schema: "public", table }, fire);
+  });
+  channel.subscribe();
+  return channel;
+}
+
+// Initiativrækkefølge for kamptrackeren: højest først, uafgjort afgøres af
+// initiativbonus og derefter spillerkarakterer før monstre. Deltagere uden
+// initiativ endnu kommer sidst.
+function sortCombatants(list) {
+  const byName = (a, b) => (a.name || "").localeCompare(b.name || "", "da", { numeric: true });
+  return [...(list || [])].sort((a, b) => {
+    const ai = a.initiative;
+    const bi = b.initiative;
+    if (ai == null || bi == null) {
+      if (ai != null) return -1;
+      if (bi != null) return 1;
+      if (a.kind !== b.kind) return a.kind === "pc" ? -1 : 1;
+      return byName(a, b);
+    }
+    if (bi !== ai) return bi - ai;
+    const bonus = (b.init_bonus || 0) - (a.init_bonus || 0);
+    if (bonus) return bonus;
+    if (a.kind !== b.kind) return a.kind === "pc" ? -1 : 1;
+    return byName(a, b);
+  });
+}
+
 // Deaktiverer `btn` og viser `busyLabel`, mens `fn` kører — forhindrer
 // dobbelt-indsendelse og giver et tegn på, at noget sker, på en langsom
 // forbindelse. Gendanner altid knappen bagefter, uanset om fn fejler.

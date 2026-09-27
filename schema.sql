@@ -170,6 +170,45 @@ create table if not exists map_markers (
   created_at timestamptz not null default now()
 );
 
+-- Kampbygger (encounters.html): en kamp bygges som kladde (party + monstre
+-- som jsonb), og når den startes, foldes den ud til én række pr. deltager i
+-- encounter_combatants, som initiativ, HP og tilstande spores på.
+-- status: 'kladde' | 'aktiv' | 'afsluttet'. round 0 = initiativ slås endnu.
+create table if not exists encounters (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  notes text,
+  party jsonb not null default '[]',
+  monsters jsonb not null default '[]',
+  status text not null default 'kladde',
+  round int not null default 0,
+  turn_combatant_id uuid,
+  created_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Spillerkarakterers HP læses live fra characters.data (D&D Beyond), ikke
+-- herfra — hp_*-kolonnerne bruges kun for monstre og for karakterer, der
+-- ikke er sat til offentlig på D&D Beyond.
+create table if not exists encounter_combatants (
+  id uuid primary key default gen_random_uuid(),
+  encounter_id uuid not null references encounters(id) on delete cascade,
+  kind text not null,
+  character_id uuid references characters(id) on delete set null,
+  name text not null,
+  initiative int,
+  init_bonus int not null default 0,
+  hp_current int,
+  hp_max int,
+  hp_temp int not null default 0,
+  ac int,
+  xp int not null default 0,
+  conditions text[] not null default '{}',
+  monster_slug text,
+  created_at timestamptz not null default now()
+);
+
 alter table sessions enable row level security;
 alter table lore_entries enable row level security;
 alter table logistics enable row level security;
@@ -182,6 +221,8 @@ alter table character_private_notes enable row level security;
 alter table maps enable row level security;
 alter table map_markers enable row level security;
 alter table approved_personal_emails enable row level security;
+alter table encounters enable row level security;
+alter table encounter_combatants enable row level security;
 
 -- Rydder op efter en evt. tidligere, mere åben version af dette skema,
 -- så denne fil altid trygt kan køres igen fra toppen.
@@ -245,6 +286,18 @@ create policy "allow-listed users only" on maps
 
 drop policy if exists "allow-listed users only" on map_markers;
 create policy "allow-listed users only" on map_markers
+  for all
+  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
+  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+
+drop policy if exists "allow-listed users only" on encounters;
+create policy "allow-listed users only" on encounters
+  for all
+  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
+  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+
+drop policy if exists "allow-listed users only" on encounter_combatants;
+create policy "allow-listed users only" on encounter_combatants
   for all
   using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
   with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
@@ -338,3 +391,21 @@ create policy "allow-listed can delete photos" on storage.objects
     bucket_id = 'photos'
     and exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email')
   );
+
+-- Live-opdatering (Supabase Realtime) af kamptrackeren og Ved Bordet på tværs
+-- af enheder. RLS gælder stadig for hvad hver abonnent får at se. Idempotent:
+-- tilføjer kun tabeller, der ikke allerede er med i publikationen.
+do $$
+declare t text;
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    foreach t in array array['encounters', 'encounter_combatants', 'characters'] loop
+      if not exists (
+        select 1 from pg_publication_tables
+        where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+      ) then
+        execute format('alter publication supabase_realtime add table public.%I', t);
+      end if;
+    end loop;
+  end if;
+end $$;
