@@ -8,81 +8,16 @@
 //      service_role-nøglen med jævne mellemrum (se CRON_SETUP.md).
 //
 // Kører server-side, så D&D Beyonds manglende CORS-understøttelse er ligegyldig her.
+// Selve udtrækket (AC, initiativ, angreb, handlinger, besværgelser ...) ligger
+// i summarize.js, så det kan testes i en browser mod gemte ark.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { summarize } from "./summarize.js";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-const STAT_NAMES: Record<number, string> = { 1: "STR", 2: "DEX", 3: "CON", 4: "INT", 5: "WIS", 6: "CHA" };
-const ALIGNMENTS: Record<number, string> = {
-  1: "Lovlig god", 2: "Neutral god", 3: "Kaotisk god",
-  4: "Lovlig neutral", 5: "Neutral", 6: "Kaotisk neutral",
-  7: "Lovlig ond", 8: "Neutral ond", 9: "Kaotisk ond",
-};
-
-// `baseHitPoints` fra D&D Beyond er KUN summen af hit dice (f.eks. 8+5+5 for
-// en niveau 3-klasse med d8) — Konstitution-bonussen pr. niveau, og ethvert
-// feat/race der giver "hit-points-per-level" (f.eks. Tough), er IKKE talt med
-// og skal lægges til manuelt, ellers vises max-HP for lavt.
-function totalLevel(classes: any[]): number {
-  return (classes || []).reduce((sum: number, c: any) => sum + (c.level ?? 0), 0);
-}
-
-function hitPointsPerLevelBonus(modifiers: any): number {
-  const allMods = Object.values(modifiers || {}).flat() as any[];
-  return allMods.reduce((sum: number, m: any) => {
-    if (m?.subType === "hit-points-per-level" && m?.isGranted !== false) {
-      return sum + (m.value ?? 0);
-    }
-    return sum;
-  }, 0);
-}
-
-function summarize(data: any) {
-  const stats: Record<number, number> = {};
-  (data.stats || []).forEach((s: any) => (stats[s.id] = s.value));
-  const bonus: Record<number, number> = {};
-  (data.bonusStats || []).forEach((s: any) => (bonus[s.id] = s.value || 0));
-  const override: Record<number, number | null> = {};
-  (data.overrideStats || []).forEach((s: any) => (override[s.id] = s.value));
-
-  const finalStats = [1, 2, 3, 4, 5, 6].map((id) => {
-    const val = override[id] ?? (stats[id] ?? 10) + (bonus[id] ?? 0);
-    return { name: STAT_NAMES[id], score: val, mod: Math.floor((val - 10) / 2) };
-  });
-
-  const level = totalLevel(data.classes);
-  const conMod = finalStats.find((s) => s.name === "CON")?.mod ?? 0;
-  const hpBonusPerLevel = hitPointsPerLevelBonus(data.modifiers);
-  const maxHp =
-    data.overrideHitPoints ??
-    (data.baseHitPoints ?? 0) + (data.bonusHitPoints ?? 0) + conMod * level + hpBonusPerLevel * level;
-  const currentHp = maxHp - (data.removedHitPoints ?? 0);
-
-  const equipped = (data.inventory || [])
-    .filter((it: any) => it.equipped)
-    .map((it: any) => ({ name: it.definition?.name, type: it.definition?.type }));
-
-  return {
-    name: data.name,
-    race: data.race?.fullName ?? null,
-    classes: (data.classes || []).map((c: any) => ({
-      name: c.definition?.name,
-      level: c.level,
-      subclass: c.subclassDefinition?.name ?? null,
-    })),
-    background: data.background?.definition?.name ?? null,
-    alignment: ALIGNMENTS[data.alignmentId] ?? null,
-    hp: { current: currentHp, max: maxHp, temp: data.temporaryHitPoints ?? 0 },
-    stats: finalStats,
-    portraitUrl: data.decorations?.avatarUrl ?? data.race?.avatarUrl ?? null,
-    equipped,
-    sheetUrl: data.readonlyUrl ?? null,
-  };
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {

@@ -208,6 +208,9 @@ create table if not exists encounter_combatants (
   monster_slug text,
   created_at timestamptz not null default now()
 );
+-- Frie noter pr. deltager (vises i detaljepanelet) — f.eks. handlingerne for
+-- et eget monster, der ikke findes i Open5e.
+alter table encounter_combatants add column if not exists notes text;
 
 -- Aftenens log (Ved Bordet): korte noter, skrevet undervejs i en session af
 -- hvem som helst ved bordet. session_id er null, så længe noten hører til den

@@ -183,14 +183,14 @@ footer.site-footer{
 .card + .card{margin-top:14px;}
 a.card{transition:box-shadow .15s ease;}
 a.card:hover{text-decoration:none;box-shadow:0 12px 30px -12px rgba(43,32,22,0.5);}
-.card h3{font-size:1.15rem;}
+.card h3, .drawer h3{font-size:1.15rem;}
 .card h3 a{color:inherit;text-decoration:none;}
 .card h3 a:hover{color:var(--ember);text-decoration:underline;}
-.card .meta{
+.card .meta, .drawer .meta{
   font-family:"Cinzel",serif;font-size:0.7rem;letter-spacing:0.06em;text-transform:uppercase;
   color:var(--ink-faint);margin-top:4px;
 }
-.card .body{margin-top:10px;color:var(--ink-soft);white-space:pre-wrap;}
+.card .body, .drawer .body{margin-top:10px;color:var(--ink-soft);white-space:pre-wrap;}
 .card .teaser{margin-top:8px;font-style:italic;color:var(--ink);}
 .card-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
 
@@ -409,7 +409,20 @@ select.small-input{width:auto;}
   padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);
 }
 .combatant + .combatant{margin-top:8px;}
-.combatant.current{border-color:var(--ember);box-shadow:0 0 0 1px var(--ember);}
+.combatant{cursor:pointer;transition:background-color .2s ease,box-shadow .2s ease;}
+.combatant.current{
+  border-color:var(--ember);border-left-width:6px;
+  background:color-mix(in srgb, var(--ember) 10%, var(--surface));
+  box-shadow:0 0 0 1px var(--ember), 0 12px 28px -16px var(--ember);
+}
+.combatant.current .cb-name{color:var(--ember);font-size:1.05rem;}
+.combatant.selected{outline:2px dashed var(--ink-faint);outline-offset:3px;}
+.turn-tag, .next-tag{
+  display:inline-block;font-family:"Cinzel",serif;font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase;
+  padding:2px 8px;border-radius:999px;
+}
+.turn-tag{background:var(--ember);color:var(--surface);}
+.next-tag{border:1px solid var(--ink-faint);color:var(--ink-soft);}
 .combatant.defeated{opacity:0.5;}
 .combatant.defeated .cb-name{text-decoration:line-through;}
 .cb-init{display:flex;flex-direction:column;align-items:center;gap:6px;}
@@ -439,8 +452,55 @@ select.small-input{width:auto;}
 .sync-dot.live{background:var(--ember);animation:sync-pulse 2s ease-in-out infinite;}
 @keyframes sync-pulse{0%,100%{opacity:1;}50%{opacity:0.35;}}
 @media (prefers-reduced-motion: reduce){.sync-dot.live{animation:none;}}
+.text-link{background:none;border:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left;}
+.text-link:hover{color:var(--ember);text-decoration:underline;}
+
+/* Detaljepanel til højre (monstre og spillere) */
+.drawer{
+  position:fixed;top:0;right:0;bottom:0;z-index:50;width:min(440px,100vw);overflow-y:auto;
+  background:var(--surface);border-left:1px solid var(--line);box-shadow:-18px 0 40px -24px rgba(0,0,0,0.55);
+  padding:18px 20px 110px;
+}
+.drawer-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;}
+.drawer .enc-sub{margin-top:20px;}
+.drawer textarea{width:100%;min-height:80px;resize:vertical;}
+.stat-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin-top:12px;}
+.stat-box{text-align:center;border:1px solid var(--line);border-radius:8px;padding:6px 2px;}
+.stat-box b{display:block;font-family:"Cinzel",serif;font-size:0.6rem;letter-spacing:0.06em;color:var(--ink-faint);font-weight:600;}
+.stat-box span{display:block;font-size:1.05rem;color:var(--ink);}
+.stat-box small{display:block;font-size:0.72rem;color:var(--ink-soft);}
+.pill-row{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;font-size:0.9rem;color:var(--ink-soft);}
+.pill-row strong{color:var(--ink);font-weight:600;}
+.slot-pips{letter-spacing:2px;color:var(--ember);}
+
+/* Fast turbjælke nederst i kamptrackeren */
+.turn-bar{
+  position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--surface);
+  border-top:2px solid var(--ember);box-shadow:0 -12px 30px -18px rgba(0,0,0,0.6);
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+}
+.turn-bar-inner{max-width:920px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px 16px;flex-wrap:wrap;}
+.turn-now{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;min-width:0;}
+.turn-name{font-family:"Cinzel",serif;font-size:1.15rem;color:var(--ember);}
+.turn-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+body.has-turnbar{padding-bottom:110px;}
+.toast{
+  position:fixed;left:50%;bottom:104px;transform:translateX(-50%);z-index:45;
+  display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);
+  background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:10px;box-shadow:var(--shadow);font-size:0.92rem;
+}
+.toast .btn{padding:6px 12px;background:transparent;border:1px solid currentColor;color:inherit;}
+
+@media (min-width:1180px){
+  body.drawer-open main, body.drawer-open .site-footer{padding-right:440px;}
+  body.drawer-open .turn-bar{right:440px;}
+}
 @media (max-width:760px){
   .enc-grid{grid-template-columns:1fr;}
+  .kbd-hint{display:none;}
+  body.has-turnbar{padding-bottom:150px;}
+  .toast{bottom:146px;}
+  .drawer{padding-bottom:150px;}
 }
 
 [hidden]{display:none !important;}

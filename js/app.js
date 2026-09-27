@@ -207,6 +207,82 @@ function subscribeToChanges(channelName, tables, onChange) {
   return channel;
 }
 
+// --- Monstre fra Open5e: delt af monsteropslaget og kampbyggeren. ---
+const CR_XP = {
+  0: 10, 0.125: 25, 0.25: 50, 0.5: 100, 1: 200, 2: 450, 3: 700, 4: 1100, 5: 1800,
+  6: 2300, 7: 2900, 8: 3900, 9: 5000, 10: 5900, 11: 7200, 12: 8400, 13: 10000,
+  14: 11500, 15: 13000, 16: 15000, 17: 18000, 18: 20000, 19: 22000, 20: 25000,
+  21: 33000, 22: 41000, 23: 50000, 24: 62000, 25: 75000, 26: 90000, 27: 105000,
+  28: 120000, 29: 135000, 30: 155000,
+};
+function abilityModText(score) {
+  const m = Math.floor((score - 10) / 2);
+  return m >= 0 ? `+${m}` : `${m}`;
+}
+function monsterSpeedText(speed) {
+  if (!speed) return "—";
+  return Object.entries(speed)
+    .filter(([k]) => k !== "hover")
+    .map(([k, v]) => (k === "walk" ? `${v} ft.` : `${k} ${v} ft.`))
+    .join(", ");
+}
+function monsterStatBlockHtml(m) {
+  const typeLine = [m.size, m.type + (m.subtype ? ` (${m.subtype})` : ""), m.alignment].filter(Boolean).join(", ");
+  const stats = [
+    ["STR", m.strength], ["DEX", m.dexterity], ["CON", m.constitution],
+    ["INT", m.intelligence], ["WIS", m.wisdom], ["CHA", m.charisma],
+  ];
+  const saves = [
+    ["STR", m.strength_save], ["DEX", m.dexterity_save], ["CON", m.constitution_save],
+    ["INT", m.intelligence_save], ["WIS", m.wisdom_save], ["CHA", m.charisma_save],
+  ]
+    .filter(([, v]) => v !== null && v !== undefined)
+    .map(([k, v]) => `${k} +${v}`)
+    .join(", ");
+  const skills = m.skills && Object.keys(m.skills).length
+    ? Object.entries(m.skills).map(([k, v]) => `${k} +${v}`).join(", ")
+    : "";
+  const section = (label, list) =>
+    list && list.length
+      ? `<div style="margin-top:14px;">
+          <p class="meta">${escapeHtml(label)}</p>
+          ${list.map((a) => `<p class="body"><strong>${escapeHtml(a.name)}.</strong> ${escapeHtml(a.desc)}</p>`).join("")}
+        </div>`
+      : "";
+  const xp = CR_XP[m.cr];
+  // Afsnittene holdes på én linje: .body bevarer linjeskift (white-space:pre-wrap).
+  const core = [
+    `<strong>AC</strong> ${m.armor_class}${m.armor_desc ? ` (${escapeHtml(m.armor_desc)})` : ""}`,
+    `<strong>HP</strong> ${m.hit_points}${m.hit_dice ? ` (${escapeHtml(m.hit_dice)})` : ""}`,
+    `<strong>Speed</strong> ${escapeHtml(monsterSpeedText(m.speed))}`,
+  ].join("<br>");
+  const extra = [
+    saves && `<strong>Saves</strong> ${escapeHtml(saves)}`,
+    skills && `<strong>Skills</strong> ${escapeHtml(skills)}`,
+    m.damage_vulnerabilities && `<strong>Vulnerable</strong> ${escapeHtml(m.damage_vulnerabilities)}`,
+    m.damage_resistances && `<strong>Resistant</strong> ${escapeHtml(m.damage_resistances)}`,
+    m.damage_immunities && `<strong>Immune (skade)</strong> ${escapeHtml(m.damage_immunities)}`,
+    m.condition_immunities && `<strong>Immune (tilstand)</strong> ${escapeHtml(m.condition_immunities)}`,
+    `<strong>Senses</strong> ${escapeHtml(m.senses || "—")}`,
+    `<strong>Languages</strong> ${escapeHtml(m.languages || "—")}`,
+  ]
+    .filter(Boolean)
+    .join("<br>");
+  return `
+    <span class="badge">CR ${escapeHtml(m.challenge_rating)}${xp ? ` &middot; ${xp} XP` : ""}</span>
+    <h3 style="margin-top:8px;">${escapeHtml(m.name)}</h3>
+    <p class="meta">${escapeHtml(typeLine)}</p>
+    <p class="body">${core}</p>
+    <ul class="shop-items">${stats.map(([n, v]) => `<li><strong>${n}</strong> ${v} (${abilityModText(v)})</li>`).join("")}</ul>
+    <p class="body" style="margin-top:14px;">${extra}</p>
+    ${section("Egenskaber", m.special_abilities)}
+    ${section("Handlinger", m.actions)}
+    ${section("Bonushandlinger", m.bonus_actions)}
+    ${section("Reaktioner", m.reactions)}
+    ${m.legendary_desc ? `<p class="body" style="margin-top:14px;"><em>${escapeHtml(m.legendary_desc)}</em></p>` : ""}
+    ${section("Legendariske handlinger", m.legendary_actions)}`;
+}
+
 // Initiativrækkefølge for kamptrackeren: højest først, uafgjort afgøres af
 // initiativbonus og derefter spillerkarakterer før monstre. Deltagere uden
 // initiativ endnu kommer sidst.

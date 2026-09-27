@@ -7,7 +7,7 @@
 <title>Kampbygger &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=18">
+<link rel="stylesheet" href="css/styles.css?v=20">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -132,25 +132,38 @@
   </div>
 </main>
 
+<aside class="drawer" id="detailDrawer" hidden aria-label="Detaljer">
+  <div class="drawer-head">
+    <span class="enc-sub" id="drawerKicker" style="margin:0;"></span>
+    <button type="button" class="icon-btn" id="drawerClose" aria-label="Luk detaljer">&times;</button>
+  </div>
+  <div id="drawerBody"></div>
+</aside>
+
+<div class="turn-bar" id="turnBar" hidden>
+  <div class="turn-bar-inner">
+    <div class="turn-now" id="turnNow"></div>
+    <div class="turn-actions" id="turnActions"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden role="status" aria-live="polite">
+  <span id="toastText"></span>
+  <button type="button" class="btn" id="toastAction" hidden></button>
+</div>
+
 <footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=17"></script>
+<script src="js/app.js?v=18"></script>
 <script>
 (async function () {
   const session = await guardPage();
   if (!session) return;
   renderNav("dmtools.html");
 
-  // --- Regler (DMG 2014) ---
-  const CR_XP = {
-    0: 10, 0.125: 25, 0.25: 50, 0.5: 100, 1: 200, 2: 450, 3: 700, 4: 1100, 5: 1800,
-    6: 2300, 7: 2900, 8: 3900, 9: 5000, 10: 5900, 11: 7200, 12: 8400, 13: 10000,
-    14: 11500, 15: 13000, 16: 15000, 17: 18000, 18: 20000, 19: 22000, 20: 25000,
-    21: 33000, 22: 41000, 23: 50000, 24: 62000, 25: 75000, 26: 90000, 27: 105000,
-    28: 120000, 29: 135000, 30: 155000,
-  };
+  // --- Regler (DMG 2014) — CR_XP ligger i app.js, delt med monsteropslaget ---
   const CR_OPTIONS = [["0", 0], ["1/8", 0.125], ["1/4", 0.25], ["1/2", 0.5]].concat(
     Array.from({ length: 30 }, (_, i) => [String(i + 1), i + 1])
   );
@@ -231,9 +244,40 @@
     if (!c || !c.is_public || !c.data) return null;
     return (c.data.classes || []).reduce((sum, cl) => sum + (cl.level || 0), 0) || null;
   }
-  function dexMod(c) {
+  // Initiativbonus fra D&D Beyond-synken (inkl. f.eks. Alert); ældre synk-data
+  // uden feltet falder tilbage til DEX.
+  function pcInitBonus(c) {
+    if (c && c.data && c.data.initiative != null) return c.data.initiative;
     const s = c && c.data && (c.data.stats || []).find((x) => x.name === "DEX");
     return s ? s.mod : 0;
+  }
+  const syncedAc = (c) => (isSynced(c) && c.data.ac != null ? c.data.ac : null);
+  function initBonusOf(cb) {
+    const c = cb.kind === "pc" && cb.character_id ? charById(cb.character_id) : null;
+    return isSynced(c) ? pcInitBonus(c) : cb.init_bonus || 0;
+  }
+
+  // Fulde stat blocks fra Open5e hentes kun, når de åbnes i detaljepanelet.
+  const statBlockCache = new Map();
+  function fetchStatBlock(slug) {
+    if (!statBlockCache.has(slug)) {
+      statBlockCache.set(
+        slug,
+        fetch(`https://api.open5e.com/v1/monsters/${encodeURIComponent(slug)}/`).then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+      );
+    }
+    return statBlockCache.get(slug);
+  }
+
+  // encounter_combatants.notes kræver en lille SQL-ændring; indtil den er kørt,
+  // skjules notefeltet i stedet for at "Start kamp" fejler.
+  let notesSupported = false;
+  async function detectNotesColumn() {
+    const { error } = await window.sb.from("encounter_combatants").select("notes").limit(1);
+    notesSupported = !error;
   }
 
   // --- Sværhedsgrad ---
@@ -305,6 +349,8 @@
     };
   }
 
+  // onAdd(monster, knap) tilføjer; klik på navnet åbner hele stat blocken i
+  // detaljepanelet med en "Tilføj"-knap dér også.
   function mountMonsterSearch(container, onAdd) {
     const crOptions = `<option value="">Alle</option>` + CR_OPTIONS.map(([label, val]) => `<option value="${val}">${label}</option>`).join("");
     container.innerHTML = `
@@ -335,7 +381,7 @@
         .map(
           (m, i) => `
         <div class="enc-row">
-          <span class="enc-name">${escapeHtml(m.name)}<br><span class="enc-meta">CR ${escapeHtml(m.challenge_rating)} &middot; ${fmt(CR_XP[m.cr] ?? 0)} XP &middot; ${escapeHtml(m.type || "")} &middot; HP ${m.hit_points} &middot; AC ${m.armor_class}</span></span>
+          <span class="enc-name"><button type="button" class="text-link" data-view="${i}" title="Vis stat block">${escapeHtml(m.name)}</button><br><span class="enc-meta">CR ${escapeHtml(m.challenge_rating)} &middot; ${fmt(CR_XP[m.cr] ?? 0)} XP &middot; ${escapeHtml(m.type || "")} &middot; HP ${m.hit_points} &middot; AC ${m.armor_class}</span></span>
           <button type="button" class="btn secondary" data-add="${i}" style="padding:6px 12px;">Tilføj</button>
         </div>`
         )
@@ -381,6 +427,12 @@
         if (m) await onAdd(monsterFromOpen5e(m), add);
         return;
       }
+      const view = e.target.closest("[data-view]");
+      if (view) {
+        const m = results[Number(view.dataset.view)];
+        if (m) openDrawer({ type: "statblock", block: m, onAdd: (btn) => onAdd(monsterFromOpen5e(m), btn) });
+        return;
+      }
       const more = e.target.closest('[data-role="moreBtn"]');
       if (more && nextUrl) {
         await withBusy(more, "Henter…", async () => {
@@ -410,6 +462,10 @@
           <div class="field" style="min-width:80px;"><label>AC</label><input type="number" min="0" data-f="ac"></div>
           <div class="field" style="min-width:80px;"><label>Init.-bonus</label><input type="number" data-f="init" value="0"></div>
         </div>
+        <div class="field">
+          <label>Handlinger / noter <span class="enc-meta">(valgfrit — vises i detaljepanelet)</span></label>
+          <textarea data-f="notes" style="min-height:70px;" placeholder="F.eks. Slam. +3 to hit, 1d6+1 bludgeoning. Undead Fortitude."></textarea>
+        </div>
         <div><button class="btn secondary" type="submit">Tilføj</button></div>
       </form>`;
     const form = container.querySelector("form");
@@ -430,6 +486,7 @@
         hit_dice: "",
         ac: get("ac") === "" ? null : parseInt(get("ac"), 10),
         init_bonus: parseInt(get("init"), 10) || 0,
+        notes: get("notes").trim() || null,
         count: 1,
       };
       await onAdd(m, form.querySelector('button[type="submit"]'));
@@ -545,7 +602,7 @@
           .map(
             (m) => `
         <div class="enc-row">
-          <span class="enc-name">${escapeHtml(m.name)}<br><span class="enc-meta">CR ${escapeHtml(m.cr_label ?? String(m.cr))} &middot; ${fmt(m.xp)} XP &middot; HP ${m.hp ?? "?"} &middot; AC ${m.ac ?? "?"}</span></span>
+          <span class="enc-name"><button type="button" class="text-link" data-view-monster="${escapeHtml(m.key)}" title="Vis detaljer">${escapeHtml(m.name)}</button><br><span class="enc-meta">CR ${escapeHtml(m.cr_label ?? String(m.cr))} &middot; ${fmt(m.xp)} XP &middot; HP ${m.hp ?? "?"} &middot; AC ${m.ac ?? "?"}</span></span>
           <span class="qty">
             <button type="button" class="icon-btn" data-qty="-1" data-key="${escapeHtml(m.key)}" aria-label="Færre ${escapeHtml(m.name)}">&minus;</button>
             <span>${m.count}</span>
@@ -616,6 +673,12 @@
     });
 
     $("builderView").addEventListener("click", (e) => {
+      const view = e.target.closest("[data-view-monster]");
+      if (view) {
+        const m = encounter.monsters.find((x) => x.key === view.dataset.viewMonster);
+        if (m) openDrawer({ type: "draft-monster", monster: m });
+        return;
+      }
       const qty = e.target.closest("[data-qty]");
       if (qty) {
         const m = encounter.monsters.find((x) => x.key === qty.dataset.key);
@@ -666,8 +729,8 @@
     $("startBtn").addEventListener("click", () => withBusy($("startBtn"), "Starter…", startEncounter));
   }
 
-  // Seneste AC/maks-HP pr. karakter fra tidligere kampe — AC findes ikke i
-  // D&D Beyond-synken, så den skal kun skrives ind én gang.
+  // Seneste AC/maks-HP pr. karakter fra tidligere kampe — for karakterer, der
+  // ikke er offentlige på D&D Beyond, skal de så kun skrives ind én gang.
   async function lastPcValues(ids) {
     if (!ids.length) return {};
     const { data } = await window.sb
@@ -709,6 +772,7 @@
           ac: m.ac ?? null,
           xp: m.xp || 0,
           monster_slug: m.slug || null,
+          ...(notesSupported ? { notes: m.notes || null } : {}),
         });
       }
     });
@@ -720,18 +784,21 @@
     const pcRows = party.map((p) => {
       const c = charById(p.character_id);
       const prev = last[c.id] || {};
-      const manualHp = isSynced(c) ? null : prev.hp_max ?? null;
+      const synced = isSynced(c);
+      const manualHp = synced ? null : prev.hp_max ?? null;
       return {
         encounter_id: encounter.id,
         kind: "pc",
         character_id: c.id,
         name: c.character_name,
-        init_bonus: dexMod(c),
-        ac: prev.ac ?? null,
+        init_bonus: pcInitBonus(c),
+        // Synkede karakterer får AC fra D&D Beyond; feltet her er kun til at overskrive.
+        ac: synced && c.data.ac != null ? null : prev.ac ?? null,
         hp_max: manualHp,
         hp_current: manualHp,
         xp: 0,
         monster_slug: null,
+        ...(notesSupported ? { notes: null } : {}),
       };
     });
     // Samme felter i alle rækker: ved en samlet insert udfylder Supabase felter,
@@ -797,38 +864,49 @@
   }
 
   function renderTrackerHead() {
-    const list = sortCombatants(combatants);
-    const current = list.find((c) => c.id === encounter.turn_combatant_id);
     const inRound = encounter.round > 0;
     $("trackerHead").innerHTML = `
       <div class="section-title" style="margin-bottom:4px;">
         <h2>${inRound ? `Runde ${encounter.round}` : "Initiativ"}</h2>
-        ${inRound && current ? `<span class="enc-meta">Tur: <strong>${escapeHtml(current.name)}</strong></span>` : ""}
+        <button class="btn secondary" data-act="end" style="padding:6px 12px;">Afslut kamp</button>
       </div>
-      ${
+      <p class="enc-meta">${
         inRound
-          ? ""
-          : `<p class="enc-meta">Skriv spillernes initiativ ind (eller slå for dem med d20-knappen), slå for monstrene, og tryk så "Begynd kamp".</p>`
-      }
-      <div class="enc-actions" style="margin-top:12px;">
-        ${
-          inRound
-            ? `<button class="btn secondary" data-act="prev">&lsaquo; Forrige</button><button class="btn" data-act="next">Næste tur &rsaquo;</button>`
-            : `<button class="btn secondary" data-act="roll-monsters">Slå initiativ for monstre</button><button class="btn" data-act="begin">Begynd kamp</button>`
-        }
-        <button class="btn secondary" data-act="end">Afslut kamp</button>
-      </div>`;
+          ? "Klik på en deltager for at se handlinger, besværgelser og stat block."
+          : "Skriv spillernes initiativ ind (eller slå for dem med d20-knappen), slå for monstrene, og tryk så &quot;Begynd kamp&quot; nederst."
+      }</p>`;
   }
 
-  function combatantHtml(cb) {
+  function avatarHtml(cb) {
+    const c = cb.kind === "pc" && cb.character_id ? charById(cb.character_id) : null;
+    const name = escapeHtml(cb.name);
+    return c ? portraitHtml(c, name) : `<span class="hp-portrait-fallback">${escapeHtml((cb.name || "?").charAt(0).toUpperCase())}</span>`;
+  }
+  // Den der står for tur efter den nuværende (springer besejrede monstre over).
+  function upcoming(list) {
+    const idx = list.findIndex((c) => c.id === encounter.turn_combatant_id);
+    for (let step = 1; step <= list.length; step++) {
+      const c = list[(idx + step + list.length) % list.length];
+      if (c && !isOut(c)) return c;
+    }
+    return null;
+  }
+  const deathSavesText = (ds) =>
+    `${"✓".repeat(ds.success)}${"○".repeat(Math.max(0, 3 - ds.success))} · ${"✗".repeat(ds.fail)}${"○".repeat(Math.max(0, 3 - ds.fail))}${ds.stable ? " · stabil" : ""}`;
+
+  function combatantHtml(cb, list) {
     const isPc = cb.kind === "pc";
     const c = isPc && cb.character_id ? charById(cb.character_id) : null;
     const hp = hpOf(cb);
     const hideStats = playerView && !isPc;
-    const current = encounter.round > 0 && cb.id === encounter.turn_combatant_id;
+    const inRound = encounter.round > 0;
+    const current = inRound && cb.id === encounter.turn_combatant_id;
+    const next = inRound && !current && upcoming(list) === cb;
+    const selected = drawerState && drawerState.type === "combatant" && drawerState.id === cb.id;
     const down = isPc && hp.max != null && hp.cur <= 0;
     const name = escapeHtml(cb.name);
-    const avatar = c ? portraitHtml(c, name) : `<span class="hp-portrait-fallback">${escapeHtml((cb.name || "?").charAt(0).toUpperCase())}</span>`;
+    const avatar = avatarHtml(cb);
+    const acFromDdb = syncedAc(c);
 
     let hpHtml;
     if (hp.max == null) {
@@ -864,23 +942,31 @@
         </div>`;
     }
 
+    const ds = hp.synced && down && c.data.deathSaves;
+    const acInput = hideStats
+      ? ""
+      : `<label class="enc-meta" ${acFromDdb != null ? `title="Fra D&amp;D Beyond — skriv et tal for at overskrive"` : ""}>AC <input type="number" min="0" class="small-input" style="width:52px;" data-field="ac" value="${cb.ac ?? ""}" placeholder="${acFromDdb ?? ""}"></label>`;
+
     return `
-      <div class="combatant ${current ? "current" : ""} ${isOut(cb) ? "defeated" : ""}" data-id="${cb.id}">
+      <div class="combatant ${current ? "current" : ""} ${isOut(cb) ? "defeated" : ""} ${selected ? "selected" : ""}" data-id="${cb.id}">
         <div class="cb-init">
           <input type="number" class="small-input" data-field="initiative" value="${cb.initiative ?? ""}" placeholder="–" aria-label="Initiativ for ${name}">
-          <button type="button" class="icon-btn" data-act="roll-init" title="Slå initiativ (d20 ${signed(cb.init_bonus || 0)})">d20</button>
+          <button type="button" class="icon-btn" data-act="roll-init" title="Slå initiativ (d20 ${signed(initBonusOf(cb))})">d20</button>
         </div>
         <div class="cb-body">
           <div class="cb-head">
+            ${current ? `<span class="turn-tag">Tur</span>` : ""}
+            ${next ? `<span class="next-tag">Næste</span>` : ""}
             ${avatar}
-            <span class="cb-name">${name}</span>
+            <button type="button" class="text-link cb-name" data-act="details" title="Vis detaljer">${name}</button>
             ${hp.synced ? `<span class="badge">D&amp;D Beyond</span>` : ""}
             ${down ? `<span class="status-badge dead">Nede</span>` : ""}
             <span class="cb-spacer"></span>
-            ${hideStats ? "" : `<label class="enc-meta">AC <input type="number" min="0" class="small-input" style="width:52px;" data-field="ac" value="${cb.ac ?? ""}"></label>`}
+            ${acInput}
             <button type="button" class="icon-btn" data-act="remove" aria-label="Fjern ${name} fra kampen">&times;</button>
           </div>
           <div class="cb-hp">${hpHtml}</div>
+          ${ds ? `<p class="enc-meta">Dødsslag ${deathSavesText(ds)}</p>` : ""}
           <div class="cb-conds">
             ${chips}
             <select class="small-input" data-role="add-cond" aria-label="Tilføj tilstand til ${name}"><option value="">+ Tilstand</option>${condOptions}</select>
@@ -890,11 +976,258 @@
       </div>`;
   }
 
+  let lastTurnShown = null;
   function renderCombatants() {
     const list = sortCombatants(combatants);
     $("combatantList").innerHTML = list.length
-      ? list.map(combatantHtml).join("")
+      ? list.map((cb) => combatantHtml(cb, list)).join("")
       : `<div class="empty">Ingen deltagere &mdash; tilføj nogle nedenfor.</div>`;
+    // Skifter turen, rulles den nye aktive deltager ind i billedet.
+    if (encounter.round > 0 && encounter.turn_combatant_id !== lastTurnShown) {
+      lastTurnShown = encounter.turn_combatant_id;
+      const el = document.querySelector(`.combatant[data-id="${lastTurnShown}"]`);
+      if (el) {
+        const r = el.getBoundingClientRect();
+        if (r.top < 90 || r.bottom > window.innerHeight - 130) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }
+
+  function renderTurnBar() {
+    const show = !!encounter && encounter.status === "aktiv";
+    $("turnBar").hidden = !show;
+    document.body.classList.toggle("has-turnbar", show);
+    if (!show) return;
+    const list = sortCombatants(combatants);
+    if (encounter.round > 0) {
+      const current = list.find((c) => c.id === encounter.turn_combatant_id);
+      const next = current ? upcoming(list) : null;
+      $("turnNow").innerHTML = current
+        ? `<span class="enc-meta">Runde ${encounter.round}</span>
+           ${avatarHtml(current)}
+           <span><span class="enc-meta">Tur:</span> <button type="button" class="text-link turn-name" data-act="details-current" title="Vis detaljer">${escapeHtml(current.name)}</button></span>
+           ${next && next.id !== current.id ? `<span class="enc-meta">Næste: ${escapeHtml(next.name)}</span>` : ""}`
+        : `<span class="enc-meta">Runde ${encounter.round}</span>`;
+      $("turnActions").innerHTML = `
+        <span class="enc-meta kbd-hint">Tast N / F</span>
+        <button class="btn secondary" data-act="prev">&lsaquo; Forrige</button>
+        <button class="btn" data-act="next">Næste tur &rsaquo;</button>`;
+    } else {
+      const missing = list.filter((c) => c.initiative == null).length;
+      $("turnNow").innerHTML = `<span class="turn-name">Initiativ</span>${missing ? `<span class="enc-meta">${missing} mangler initiativ</span>` : `<span class="enc-meta">Alle har initiativ</span>`}`;
+      $("turnActions").innerHTML = `
+        <button class="btn secondary" data-act="roll-monsters">Slå for monstre</button>
+        <button class="btn" data-act="begin">Begynd kamp</button>`;
+    }
+  }
+
+  // --- Detaljepanel ---
+  let drawerState = null;
+  const statBlocks = new Map(); // slug -> hentet stat block (til at tegne uden "henter…"-blink)
+  const KIND_LABELS = [["action", "Handlinger"], ["bonus", "Bonushandlinger"], ["reaction", "Reaktioner"], ["other", "Andet"]];
+  const SPELL_KIND = { bonus: "bonushandling", reaction: "reaktion" };
+
+  function openDrawer(state) {
+    drawerState = state;
+    $("detailDrawer").hidden = false;
+    document.body.classList.add("drawer-open");
+    renderDrawer();
+    if (encounter && encounter.status === "aktiv") requestRender();
+  }
+  function closeDrawer() {
+    drawerState = null;
+    $("detailDrawer").hidden = true;
+    document.body.classList.remove("drawer-open");
+    if (encounter && encounter.status === "aktiv") requestRender();
+  }
+
+  function actionHtml(a) {
+    const uses = a.uses
+      ? ` <span class="enc-meta">&middot; ${Math.max(0, a.uses.max - a.uses.used)}/${a.uses.max} tilbage${a.uses.reset ? ` (${a.uses.reset})` : ""}</span>`
+      : "";
+    return `<p class="body"><strong>${escapeHtml(a.name)}.</strong>${uses}${a.text ? ` ${escapeHtml(a.text)}` : ""}</p>`;
+  }
+  function spellsHtml(spells) {
+    if (!spells || !spells.length) return "";
+    const byLevel = {};
+    spells.forEach((s) => (byLevel[s.level] = byLevel[s.level] || []).push(s));
+    const rows = Object.keys(byLevel)
+      .sort((a, b) => a - b)
+      .map((l) => {
+        const names = byLevel[l]
+          .map((s) => `${escapeHtml(s.name)}${s.concentration ? ` <span class="enc-meta">(K)</span>` : ""}${SPELL_KIND[s.kind] ? ` <span class="enc-meta">(${SPELL_KIND[s.kind]})</span>` : ""}`)
+          .join(", ");
+        return `<p class="body"><strong>${Number(l) === 0 ? "Cantrips" : `${l}. niveau`}:</strong> ${names}</p>`;
+      })
+      .join("");
+    return `${rows}<p class="enc-meta">(K) = koncentration</p>`;
+  }
+  function pcDetailsHtml(c) {
+    const d = c.data;
+    const stats = (d.stats || [])
+      .map((s) => `<div class="stat-box"><b>${s.name}</b><span>${signed(s.mod)}</span><small>${s.score}</small></div>`)
+      .join("");
+    const saves = (d.saves || []).map((s) => (s.proficient ? `<strong>${s.name} ${signed(s.mod)}</strong>` : `${s.name} ${signed(s.mod)}`)).join(" &middot; ");
+    const def = d.defenses || {};
+    const defenses = [["Resistens", def.resistances], ["Immun", def.immunities], ["Sårbar", def.vulnerabilities]]
+      .filter(([, l]) => l && l.length)
+      .map(([label, l]) => `<strong>${label}</strong> ${l.map(escapeHtml).join(", ")}`)
+      .join("<br>");
+    const ds = d.deathSaves;
+    const attacks = (d.attacks || []).length
+      ? `<h4 class="enc-sub">Angreb</h4><ul class="shop-items">${d.attacks
+          .map((a) => `<li><strong>${escapeHtml(a.name)}</strong> ${signed(a.toHit)} &middot; ${escapeHtml(a.damage)} ${escapeHtml(a.damageType)} <span class="enc-meta">&middot; ${escapeHtml(a.range)}</span></li>`)
+          .join("")}</ul>`
+      : "";
+    const actions = KIND_LABELS.map(([kind, label]) => {
+      const list = (d.actions || []).filter((a) => a.kind === kind);
+      return list.length ? `<h4 class="enc-sub">${label}</h4>${list.map(actionHtml).join("")}` : "";
+    }).join("");
+    const casting = (d.spellcasting || []).map((s) => `${escapeHtml(s.className)}: spell attack ${signed(s.attack)} &middot; DC ${s.dc}`).join("<br>");
+    const slots = (d.spellSlots || [])
+      .map((s) => `<span>${s.level}. niveau <span class="slot-pips">${"●".repeat(Math.max(0, s.max - s.used))}${"○".repeat(Math.min(s.max, s.used))}</span></span>`)
+      .join("");
+    const spells = spellsHtml(d.spells);
+    return `
+      <div class="stat-grid">${stats}</div>
+      <div class="pill-row">
+        <span><strong>Speed</strong> ${d.speed ?? 30} ft.</span>
+        <span><strong>Prof.</strong> ${signed(d.proficiencyBonus ?? 2)}</span>
+        <span><strong>Passiv Perception</strong> ${d.passivePerception ?? "–"}</span>
+      </div>
+      ${saves ? `<p class="body"><strong>Saves</strong> ${saves}</p>` : ""}
+      ${defenses ? `<p class="body">${defenses}</p>` : ""}
+      ${ds && d.hp && d.hp.current <= 0 ? `<p class="body"><strong>Dødsslag</strong> ${deathSavesText(ds)}</p>` : ""}
+      ${attacks}
+      ${actions}
+      ${casting || slots || spells ? `<h4 class="enc-sub">Besværgelser</h4>${casting ? `<p class="body">${casting}</p>` : ""}${slots ? `<div class="pill-row">${slots}</div>` : ""}${spells}` : ""}
+      ${d.sheetUrl ? `<p class="body"><a href="${escapeHtml(d.sheetUrl)}" target="_blank" rel="noopener">Åbn arket på D&amp;D Beyond &rarr;</a></p>` : ""}`;
+  }
+  // Stat block fra Open5e: tegnes med det samme, hvis den allerede er hentet.
+  function statBlockSlotHtml(slug) {
+    if (statBlocks.has(slug)) return monsterStatBlockHtml(statBlocks.get(slug));
+    const state = drawerState;
+    fetchStatBlock(slug)
+      .then((block) => {
+        statBlocks.set(slug, block);
+        if (drawerState === state) renderDrawer();
+      })
+      .catch((err) => {
+        const slot = $("drawerBody").querySelector("[data-statblock]");
+        if (slot) slot.textContent = "Kunne ikke hente stat block: " + err.message;
+      });
+    return `<p class="enc-meta" data-statblock>Henter stat block&hellip;</p>`;
+  }
+  function customMonsterHtml(m) {
+    return `
+      <h3>${escapeHtml(m.name)}</h3>
+      <p class="meta">Eget monster${m.cr_label != null ? ` &middot; CR ${escapeHtml(m.cr_label)}` : ""}${m.xp ? ` &middot; ${fmt(m.xp)} XP` : ""}</p>
+      <div class="pill-row">
+        ${m.hp != null ? `<span><strong>HP</strong> ${m.hp}</span>` : ""}
+        ${m.ac != null ? `<span><strong>AC</strong> ${m.ac}</span>` : ""}
+        <span><strong>Initiativ</strong> ${signed(m.init_bonus || 0)}</span>
+      </div>
+      ${m.notes ? `<p class="body">${escapeHtml(m.notes)}</p>` : `<p class="enc-meta" style="margin-top:10px;">Ingen handlinger skrevet ind.</p>`}`;
+  }
+
+  function combatantDrawerHtml(cb) {
+    const isPc = cb.kind === "pc";
+    const c = isPc && cb.character_id ? charById(cb.character_id) : null;
+    const hp = hpOf(cb);
+    const hideStats = playerView && !isPc;
+    const ac = cb.ac ?? syncedAc(c);
+    const sub = isPc
+      ? c && isSynced(c)
+        ? [(c.data.classes || []).map((cl) => `${cl.name} ${cl.level}`).join(" / "), c.data.race].filter(Boolean).map(escapeHtml).join(" &middot; ")
+        : "Spillerkarakter"
+      : "Monster";
+    const hpText = hp.max == null ? "?" : hideStats ? healthWord(hp.cur, hp.max) : `${hp.cur}/${hp.max}${hp.temp ? ` (+${hp.temp})` : ""}`;
+    const conds = (cb.conditions || []).map((k) => `<span class="cond-chip" style="cursor:default;">${escapeHtml(k)}</span>`).join("");
+    let details = "";
+    if (isPc && isSynced(c)) details = pcDetailsHtml(c);
+    else if (isPc) details = `<p class="enc-meta" style="margin-top:14px;">Karakteren er ikke offentlig på D&amp;D Beyond. Sæt arket til &quot;Public&quot;, så vises AC, handlinger og besværgelser her automatisk.</p>`;
+    else if (!hideStats && cb.monster_slug) details = `<div style="margin-top:16px;">${statBlockSlotHtml(cb.monster_slug)}</div>`;
+    const notes =
+      notesSupported && !playerView
+        ? `<h4 class="enc-sub">Noter</h4><textarea class="small-input" data-notes="${cb.id}" placeholder="${isPc ? "Noter om karakteren i denne kamp" : "Handlinger, taktik, hvad monsteret vil …"}">${escapeHtml(cb.notes || "")}</textarea>`
+        : cb.notes && !hideStats
+          ? `<h4 class="enc-sub">Noter</h4><p class="body">${escapeHtml(cb.notes)}</p>`
+          : "";
+    return `
+      <div class="enc-row" style="border:none;padding-top:0;">
+        ${avatarHtml(cb)}
+        <span class="enc-name"><strong style="font-family:'Cinzel',serif;">${escapeHtml(cb.name)}</strong><br><span class="enc-meta">${sub}</span></span>
+      </div>
+      <div class="pill-row">
+        <span><strong>HP</strong> ${hpText}</span>
+        ${hideStats || ac == null ? "" : `<span><strong>AC</strong> ${ac}</span>`}
+        <span><strong>Initiativ</strong> ${cb.initiative ?? "–"} <span class="enc-meta">(${signed(initBonusOf(cb))})</span></span>
+      </div>
+      ${conds ? `<div class="cb-conds" style="margin-top:10px;">${conds}</div>` : ""}
+      ${details}
+      ${notes}`;
+  }
+
+  function renderDrawer() {
+    if (!drawerState) return;
+    const s = drawerState;
+    const body = $("drawerBody");
+    if (s.type === "statblock") {
+      $("drawerKicker").textContent = "Monster";
+      body.innerHTML = monsterStatBlockHtml(s.block) + (s.onAdd ? `<div class="enc-actions"><button class="btn" data-drawer-act="add">Tilføj til kampen</button></div>` : "");
+      return;
+    }
+    if (s.type === "draft-monster") {
+      $("drawerKicker").textContent = "Monster";
+      body.innerHTML = s.monster.slug ? statBlockSlotHtml(s.monster.slug) : customMonsterHtml(s.monster);
+      return;
+    }
+    const cb = combatants.find((x) => x.id === s.id);
+    if (!cb) {
+      closeDrawer();
+      return;
+    }
+    $("drawerKicker").textContent = cb.kind === "pc" ? "Spiller" : "Monster";
+    body.innerHTML = combatantDrawerHtml(cb);
+  }
+
+  // --- Kvittering nederst (med fortryd) ---
+  let toastTimer = null;
+  function showToast(text, actionLabel, onAction) {
+    const toast = $("toast");
+    $("toastText").textContent = text;
+    const btn = $("toastAction");
+    btn.hidden = !actionLabel;
+    btn.textContent = actionLabel || "";
+    btn.onclick = actionLabel
+      ? async () => {
+          toast.hidden = true;
+          await onAction();
+        }
+      : null;
+    toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => (toast.hidden = true), 9000);
+  }
+  const concentrationDc = (damage) => Math.max(10, Math.floor(damage / 2));
+
+  // Tager en synket karakter skade på D&D Beyond, mens den koncentrerer sig,
+  // mindes DM'en om koncentrationsslaget — skaden sker jo ikke her i trackeren.
+  const lastSyncedHp = new Map();
+  function checkSyncedDamage() {
+    combatants
+      .filter((cb) => cb.kind === "pc")
+      .forEach((cb) => {
+        const c = charById(cb.character_id);
+        if (!isSynced(c)) return;
+        const total = c.data.hp.current + (c.data.hp.temp || 0);
+        const before = lastSyncedHp.get(c.id);
+        lastSyncedHp.set(c.id, total);
+        if (before != null && total < before && (cb.conditions || []).includes("Concentration")) {
+          const dmg = before - total;
+          showToast(`${cb.name} tog ${dmg} skade — koncentrationsslag DC ${concentrationDc(dmg)}`);
+        }
+      });
   }
 
   function newestSync() {
@@ -934,11 +1267,11 @@
     requestRender();
   }
 
-  // Gentegner ikke mens man skriver i et felt i listen (ellers forsvinder det
-  // man er ved at taste) — det sker i stedet, når fokus forlader feltet.
+  // Gentegner ikke mens man skriver i et felt i listen eller panelet (ellers
+  // forsvinder det man er ved at taste) — det sker i stedet, når fokus forlader feltet.
   function isEditing() {
     const a = document.activeElement;
-    return !!(a && a.matches("input, select, textarea") && a.closest("#combatantList"));
+    return !!(a && a.matches("input, select, textarea") && a.closest("#combatantList, #detailDrawer"));
   }
   function requestRender() {
     if (isEditing()) {
@@ -1024,6 +1357,7 @@
       ac: m.ac ?? null,
       xp: m.xp || 0,
       monster_slug: m.slug || null,
+      ...(notesSupported && m.notes ? { notes: m.notes } : {}),
     };
     const { data, error } = await window.sb.from("encounter_combatants").insert(row).select("*").single();
     if (error) {
@@ -1055,13 +1389,35 @@
     });
     $("syncNowBtn").addEventListener("click", () => withBusy($("syncNowBtn"), "Synker…", syncNow));
 
-    $("trackerHead").addEventListener("click", async (e) => {
-      const act = e.target.closest("[data-act]")?.dataset.act;
+    async function trackerAction(act) {
       if (act === "next") await advanceTurn(1);
       else if (act === "prev") await advanceTurn(-1);
       else if (act === "begin") await beginCombat();
       else if (act === "roll-monsters") await rollMonsterInitiative();
       else if (act === "end" && confirm("Afslut kampen?")) await updateEncounter({ status: "afsluttet" });
+      else if (act === "details-current" && encounter.turn_combatant_id) openDrawer({ type: "combatant", id: encounter.turn_combatant_id });
+    }
+    const onActionClick = (e) => {
+      const act = e.target.closest("[data-act]")?.dataset.act;
+      if (act) trackerAction(act);
+    };
+    $("trackerHead").addEventListener("click", onActionClick);
+    $("turnBar").addEventListener("click", onActionClick);
+
+    // N = næste tur, F (eller P) = forrige — ikke mens man skriver i et felt.
+    document.addEventListener("keydown", (e) => {
+      if (!encounter || encounter.status !== "aktiv" || encounter.round < 1) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const a = document.activeElement;
+      if (a && a.matches("input, select, textarea")) return;
+      const k = e.key.toLowerCase();
+      if (k === "n") {
+        e.preventDefault();
+        trackerAction("next");
+      } else if (k === "f" || k === "p") {
+        e.preventDefault();
+        trackerAction("prev");
+      }
     });
 
     const list = $("combatantList");
@@ -1092,9 +1448,17 @@
         return;
       }
       const act = e.target.closest("[data-act]")?.dataset.act;
-      if (!act) return;
+      if (!act) {
+        // Klik på selve kortet (ikke et felt eller en knap) åbner detaljepanelet.
+        if (!e.target.closest("input, select, button, label, textarea, a")) openDrawer({ type: "combatant", id: cb.id });
+        return;
+      }
+      if (act === "details") {
+        openDrawer({ type: "combatant", id: cb.id });
+        return;
+      }
       if (act === "roll-init") {
-        await updateCombatant(cb, { initiative: d20() + (cb.init_bonus || 0) });
+        await updateCombatant(cb, { initiative: d20() + initBonusOf(cb) });
         return;
       }
       if (act === "remove") {
@@ -1109,20 +1473,50 @@
       }
       const cur = cb.hp_current ?? 0;
       const temp = cb.hp_temp || 0;
+      const before = { hp_current: cur, hp_temp: temp };
+      const undo = () => {
+        const target = combatants.find((x) => x.id === cb.id);
+        return target ? updateCombatant(target, before) : null;
+      };
       if (act === "dmg") {
         const absorbed = Math.min(temp, amount);
         await updateCombatant(cb, { hp_temp: temp - absorbed, hp_current: Math.max(0, cur - (amount - absorbed)) });
+        const conc = amount > 0 && (cb.conditions || []).includes("Concentration");
+        showToast(`${cb.name}: −${amount} HP${conc ? ` · koncentrationsslag DC ${concentrationDc(amount)}` : ""}`, "Fortryd", undo);
       } else if (act === "heal") {
         await updateCombatant(cb, { hp_current: Math.min(cb.hp_max ?? cur + amount, cur + amount) });
+        showToast(`${cb.name}: +${amount} HP`, "Fortryd", undo);
       } else if (act === "temp") {
         await updateCombatant(cb, { hp_temp: amount });
+        showToast(`${cb.name}: ${amount} midlertidige HP`, "Fortryd", undo);
       }
     });
-    list.addEventListener("focusout", () =>
+    // Enter i HP-feltet = Skade.
+    list.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" || e.target.dataset.role !== "amount") return;
+      e.preventDefault();
+      const btn = e.target.closest(".combatant").querySelector('[data-act="dmg"]');
+      e.target.blur();
+      btn.click();
+    });
+    document.addEventListener("focusout", () =>
       setTimeout(() => {
         if (pendingRender && !isEditing()) requestRender();
       }, 0)
     );
+
+    // Noter i detaljepanelet gemmes løbende.
+    let notesTimer = null;
+    $("drawerBody").addEventListener("input", (e) => {
+      const id = e.target.dataset.notes;
+      if (!id) return;
+      const value = e.target.value;
+      clearTimeout(notesTimer);
+      notesTimer = setTimeout(() => {
+        const cb = combatants.find((x) => x.id === id);
+        if (cb) updateCombatant(cb, { notes: value.trim() || null });
+      }, 600);
+    });
 
     mountMonsterSearch($("trackerSearch"), addCombatantFromMonster);
     mountCustomMonsterForm($("trackerCustom"), addCombatantFromMonster);
@@ -1195,6 +1589,7 @@
       setHead("Kamp i gang", encounter.name, false);
       showView("trackerView");
       initTracker();
+      checkSyncedDamage();
       renderTrackerHead();
       renderCombatants();
       updateSyncText();
@@ -1204,13 +1599,26 @@
       initTracker();
       renderDone();
     }
+    renderTurnBar();
+    renderDrawer();
   }
+
+  // Detaljepanelet bruges både i byggeren og i trackeren.
+  $("drawerClose").addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && drawerState) closeDrawer();
+  });
+  $("drawerBody").addEventListener("click", async (e) => {
+    const btn = e.target.closest('[data-drawer-act="add"]');
+    if (btn && drawerState && drawerState.onAdd) await drawerState.onAdd(btn);
+  });
 
   await loadCharacters();
   if (!encId) {
     await renderListView();
     return;
   }
+  await detectNotesColumn();
   if (await reloadEncounter()) render();
 })();
 </script>
