@@ -701,6 +701,7 @@
         monsterRows.push({
           encounter_id: encounter.id,
           kind: "monster",
+          character_id: null,
           name: totals[m.name] > 1 ? `${m.name} ${seen[m.name]}` : m.name,
           init_bonus: m.init_bonus || 0,
           hp_max: hp,
@@ -729,8 +730,12 @@
         ac: prev.ac ?? null,
         hp_max: manualHp,
         hp_current: manualHp,
+        xp: 0,
+        monster_slug: null,
       };
     });
+    // Samme felter i alle rækker: ved en samlet insert udfylder Supabase felter,
+    // som kun nogle af rækkerne har, med NULL i de andre — ikke kolonnens default.
     const { error } = await window.sb.from("encounter_combatants").insert([...pcRows, ...monsterRows]);
     if (error) {
       alert("Kunne ikke starte kampen: " + error.message);
