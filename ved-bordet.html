@@ -7,7 +7,7 @@
 <title>Ved Bordet &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=17">
+<link rel="stylesheet" href="css/styles.css?v=18">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -22,7 +22,7 @@
   <div class="page-head">
     <p class="eyebrow">Lige nu</p>
     <h1>Ved Bordet</h1>
-    <p>Det I har brug for midt i en session &mdash; helbred, holdninger og mål, samlet ét sted.</p>
+    <p>Det I har brug for midt i en session &mdash; helbred, noter, holdninger og mål, samlet ét sted.</p>
   </div>
 
   <div class="wrap">
@@ -32,6 +32,37 @@
         <a href="encounters.html" id="combatLink">Åbn trackeren &rarr;</a>
       </div>
       <div class="card" id="combatCard"></div>
+    </section>
+
+    <section class="section" id="logSection">
+      <div class="section-title">
+        <h2>Aftenens log</h2>
+        <a href="sessions.html?fraLog=1" id="makeRecapLink" hidden>Lav referat &rarr;</a>
+      </div>
+      <div class="card">
+        <form class="form" id="logForm">
+          <div class="row">
+            <div class="field" style="flex:3;min-width:200px;">
+              <label for="logBody">Hvad skete der?</label>
+              <input type="text" id="logBody" required maxlength="500" placeholder="F.eks. Mødte Ismark ved kirken" autocomplete="off">
+            </div>
+            <div class="field" style="flex:1;min-width:120px;">
+              <label for="logAuthor">Hvem skriver?</label>
+              <input type="text" id="logAuthor" list="authorNames" placeholder="Dit navn">
+              <datalist id="authorNames">
+                <option value="Emil"></option>
+                <option value="Jacob"></option>
+                <option value="Markus"></option>
+                <option value="Sejr"></option>
+                <option value="Thomas"></option>
+              </datalist>
+            </div>
+          </div>
+          <div><button class="btn" type="submit">Tilføj</button></div>
+        </form>
+        <p class="paste-hint" style="margin-top:10px;">Korte noter undervejs, synlige for alle med det samme. Bagefter bliver de til udkastet til sessionens referat.</p>
+        <div id="logList" style="margin-top:6px;"></div>
+      </div>
     </section>
 
     <section class="section" id="hpSection">
@@ -143,6 +174,81 @@
     loadHp();
     loadCombat();
   });
+
+  // --- Aftenens log: noter uden session_id hører til den åbne log. ---
+  let loreIndex = [];
+  async function loadLoreIndex() {
+    const [{ data: loreData }, { data: charData }, { data: sessionData }] = await Promise.all([
+      window.sb.from("lore_entries").select("id, title, category, body, relationship, status"),
+      window.sb.from("characters").select("id, character_name, teaser"),
+      window.sb.from("sessions").select("id, title, summary"),
+    ]);
+    loreIndex = [...(loreData || []), ...characterMentionEntries(charData), ...sessionMentionEntries(sessionData)];
+    setLorePreviewData(loreIndex);
+  }
+
+  const logList = document.getElementById("logList");
+  async function loadLog() {
+    const { data, error } = await window.sb
+      .from("session_log_entries")
+      .select("*")
+      .is("session_id", null)
+      .order("created_at", { ascending: false });
+    if (error) {
+      logList.innerHTML = `<p class="enc-meta">Kunne ikke hente loggen: ${escapeHtml(error.message)}</p>`;
+      return;
+    }
+    const rows = data || [];
+    document.getElementById("makeRecapLink").hidden = !rows.length;
+    logList.innerHTML = rows.length
+      ? rows
+          .map((e) => {
+            const time = new Date(e.created_at).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" });
+            const meta = [e.author, e.campaign_day ? `Dag ${e.campaign_day}` : null].filter(Boolean).map(escapeHtml).join(" &middot; ");
+            return `
+        <div class="enc-row">
+          <span class="enc-meta" style="flex:0 0 auto;">${time}</span>
+          <span class="enc-name">${linkifyLoreMentions(renderBodyHtml(e.body), loreIndex)}${meta ? `<br><span class="enc-meta">${meta}</span>` : ""}</span>
+          <button type="button" class="icon-btn" data-del-log="${e.id}" aria-label="Slet noten">&times;</button>
+        </div>`;
+          })
+          .join("")
+      : `<p class="enc-meta">Ingen noter endnu i aften.</p>`;
+  }
+
+  wireAuthorField(document.getElementById("logAuthor"));
+  document.getElementById("logForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const bodyInput = document.getElementById("logBody");
+    const body = bodyInput.value.trim();
+    if (!body) return;
+    await withBusy(e.target.querySelector('button[type="submit"]'), "Gemmer…", async () => {
+      // Dagen hentes frisk, da DM'en kan have talt den op undervejs.
+      const { data: dayRow } = await window.sb.from("logistics").select("campaign_day").eq("id", 1).maybeSingle();
+      const { error } = await window.sb.from("session_log_entries").insert({
+        body,
+        author: document.getElementById("logAuthor").value.trim() || null,
+        campaign_day: dayRow ? dayRow.campaign_day : null,
+      });
+      if (error) {
+        alert("Kunne ikke gemme noten: " + error.message);
+        return;
+      }
+      bodyInput.value = "";
+      await loadLog();
+    });
+    bodyInput.focus();
+  });
+  logList.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-del-log]");
+    if (!btn || !confirm("Slet noten?")) return;
+    await window.sb.from("session_log_entries").delete().eq("id", btn.dataset.delLog);
+    await loadLog();
+  });
+
+  await loadLoreIndex();
+  await loadLog();
+  subscribeToChanges("ved-bordet-log", ["session_log_entries"], loadLog);
 
   const { data: logistics } = await window.sb.from("logistics").select("*").eq("id", 1).maybeSingle();
   const statusCard = document.getElementById("statusCard");

@@ -209,6 +209,19 @@ create table if not exists encounter_combatants (
   created_at timestamptz not null default now()
 );
 
+-- Aftenens log (Ved Bordet): korte noter, skrevet undervejs i en session af
+-- hvem som helst ved bordet. session_id er null, så længe noten hører til den
+-- åbne log; når loggen laves om til et sessionsreferat, peger noterne på den
+-- session (og forsvinder med den, hvis referatet slettes).
+create table if not exists session_log_entries (
+  id uuid primary key default gen_random_uuid(),
+  body text not null,
+  author text,
+  campaign_day int,
+  session_id uuid references sessions(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
 alter table sessions enable row level security;
 alter table lore_entries enable row level security;
 alter table logistics enable row level security;
@@ -223,6 +236,7 @@ alter table map_markers enable row level security;
 alter table approved_personal_emails enable row level security;
 alter table encounters enable row level security;
 alter table encounter_combatants enable row level security;
+alter table session_log_entries enable row level security;
 
 -- Rydder op efter en evt. tidligere, mere åben version af dette skema,
 -- så denne fil altid trygt kan køres igen fra toppen.
@@ -298,6 +312,12 @@ create policy "allow-listed users only" on encounters
 
 drop policy if exists "allow-listed users only" on encounter_combatants;
 create policy "allow-listed users only" on encounter_combatants
+  for all
+  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
+  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+
+drop policy if exists "allow-listed users only" on session_log_entries;
+create policy "allow-listed users only" on session_log_entries
   for all
   using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
   with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
@@ -399,7 +419,7 @@ do $$
 declare t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    foreach t in array array['encounters', 'encounter_combatants', 'characters'] loop
+    foreach t in array array['encounters', 'encounter_combatants', 'characters', 'session_log_entries'] loop
       if not exists (
         select 1 from pg_publication_tables
         where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t

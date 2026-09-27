@@ -7,7 +7,7 @@
 <title>Sessions &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=17">
+<link rel="stylesheet" href="css/styles.css?v=18">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -43,6 +43,7 @@
 
     <section class="section" id="addSection">
       <div class="section-title"><h2>Tilføj ny session</h2></div>
+      <p class="notice ember" id="draftNotice" hidden style="margin-bottom:14px;"></p>
       <div class="card">
         <form class="form" id="addForm">
           <div class="row">
@@ -224,6 +225,46 @@
   wireInlinePasteUpload(document.getElementById("summary"));
   wireAuthorField(document.getElementById("author"));
 
+  // --- Udkast fra Aftenens log (Ved Bordet → "Lav referat") ---
+  // Kun de noter, der blev hentet ind i udkastet, knyttes til sessionen ved
+  // gem — skriver nogen en ny note imens, bliver den i loggen til næste gang.
+  let draftEntryIds = [];
+  function logToSummary(entries) {
+    const hasDays = entries.some((e) => e.campaign_day != null);
+    const lines = [];
+    let lastDay;
+    entries.forEach((e) => {
+      if (hasDays && e.campaign_day != null && e.campaign_day !== lastDay) {
+        if (lines.length) lines.push("");
+        lines.push(`Dag ${e.campaign_day}`);
+        lastDay = e.campaign_day;
+      }
+      lines.push(`- ${e.body}`);
+    });
+    return lines.join("\n");
+  }
+  async function prefillFromLog() {
+    const notice = document.getElementById("draftNotice");
+    const [{ data: entries }, { data: last }] = await Promise.all([
+      window.sb.from("session_log_entries").select("*").is("session_id", null).order("created_at", { ascending: true }),
+      window.sb.from("sessions").select("number").order("number", { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    notice.hidden = false;
+    if (!entries || !entries.length) {
+      notice.textContent = "Aftenens log er tom — der er ikke noget at lave et referat ud fra.";
+      return;
+    }
+    draftEntryIds = entries.map((e) => e.id);
+    const today = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    document.getElementById("number").value = Math.max(2, ((last && last.number) || 1) + 1);
+    document.getElementById("sessionDate").value = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+    document.getElementById("summary").value = logToSummary(entries);
+    notice.textContent = `Udkastet er hentet fra aftenens log (${entries.length} ${entries.length === 1 ? "note" : "noter"}). Giv det en titel, ret teksten til, og gem — så tømmes loggen.`;
+    document.getElementById("addSection").scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("title").focus({ preventScroll: true });
+  }
+
   document.getElementById("addForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const submitBtn = e.target.querySelector('button[type="submit"]');
@@ -233,22 +274,38 @@
       const sessionDate = document.getElementById("sessionDate").value || null;
       const author = document.getElementById("author").value.trim();
       const summary = document.getElementById("summary").value.trim();
-      const { error } = await window.sb.from("sessions").insert({
-        number,
-        title,
-        session_date: sessionDate,
-        summary,
-        created_by: author,
-      });
+      const { data: created, error } = await window.sb
+        .from("sessions")
+        .insert({
+          number,
+          title,
+          session_date: sessionDate,
+          summary,
+          created_by: author,
+        })
+        .select("id")
+        .single();
       if (error) {
         alert("Kunne ikke gemme: " + error.message);
         return;
+      }
+      if (draftEntryIds.length) {
+        const { error: logErr } = await window.sb
+          .from("session_log_entries")
+          .update({ session_id: created.id })
+          .in("id", draftEntryIds);
+        if (logErr) alert("Sessionen er gemt, men loggen kunne ikke tømmes: " + logErr.message);
+        draftEntryIds = [];
+        document.getElementById("draftNotice").hidden = true;
+        history.replaceState(null, "", "sessions.html");
       }
       e.target.reset();
       document.getElementById("author").value = author;
       load();
     });
   });
+
+  if (!onlyId && new URLSearchParams(location.search).has("fraLog")) await prefillFromLog();
 
   await loadLoreIndex();
   load();
