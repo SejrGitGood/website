@@ -85,6 +85,14 @@
     characters = c.data || [];
     shared = s.data || [];
     render();
+    // "N venter" i menuen følger med, når nogen godkendes eller afvises her.
+    const nav = document.getElementById("navPending");
+    const waiting = members.filter((x) => x.status === "pending").length;
+    if (nav) {
+      nav.hidden = !waiting;
+      nav.textContent = `${waiting} venter`;
+      nav.title = `${waiting} ${waiting === 1 ? "konto venter" : "konti venter"} på godkendelse`;
+    }
   }
 
   const charOf = (member) => characters.find((ch) => ch.owner_email === member.email);
