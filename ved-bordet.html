@@ -122,7 +122,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=2"></script>
-<script src="js/app.js?v=25"></script>
+<script src="js/app.js?v=26"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -328,7 +328,7 @@
       .eq("done", false)
       .order("created_at", { ascending: true });
     questRows = (data || []).sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1));
-    questsCard.innerHTML = questRows.length
+    const html = questRows.length
       ? `<div class="card"><ul class="shop-items" id="questList">${questRows
           .map(
             (q) => `
@@ -344,6 +344,11 @@
           )
           .join("")}</ul></div>`
       : `<div class="empty">Ingen aktive mål lige nu. <a href="quests.html">Tilføj et</a>.</div>`;
+    // Kun tegnet om, hvis noget har ændret sig (Realtime giver også besked om ens egne ændringer).
+    if (html !== questsCard.dataset.html) {
+      questsCard.innerHTML = html;
+      questsCard.dataset.html = html;
+    }
   }
   // Et mål, der krydses af, forsvinder med det samme — med "Fortryd", hvis det var et fejltryk.
   const setQuestDone = (id, done) => window.sb.from("quests").update({ done, updated_at: new Date().toISOString() }).eq("id", id);
@@ -386,7 +391,7 @@
       .eq("category", "NPC")
       .order("title", { ascending: true });
     const rows = loreRows || [];
-    npcCard.innerHTML = rows.length
+    const html = rows.length
       ? `<div class="card"><ul class="shop-items">${rows
           .map(
             (l) => `
@@ -398,6 +403,11 @@
           )
           .join("")}</ul></div>`
       : `<div class="empty">Ingen NPC'er i Lore endnu. <a href="lore.html">Tilføj en</a>.</div>`;
+    // Kun tegnet om, hvis noget har ændret sig — f.eks. ikke når nogen retter en lore-tekst.
+    if (html !== npcCard.dataset.html) {
+      npcCard.innerHTML = html;
+      npcCard.dataset.html = html;
+    }
   }
   // Holdning og status gemmes med det samme — med en kort bekræftelse, så man ved, det skete.
   npcCard.addEventListener("change", async (e) => {
@@ -424,6 +434,12 @@
   });
   subscribeToChanges("ved-bordet-log", ["session_log_entries"], loadLog);
   subscribeToChanges("ved-bordet-status", ["logistics"], loadStatus);
+  // Mål og NPC-holdninger, som andre ændrer undervejs.
+  subscribeToChanges("ved-bordet-quests", ["quests"], loadQuests);
+  subscribeToChanges("ved-bordet-lore", ["lore_entries"], () => {
+    loadNpcs();
+    loadLoreIndex().then(loadLog);
+  });
 })();
 </script>
 </body>

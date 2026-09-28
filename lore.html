@@ -127,7 +127,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=2"></script>
-<script src="js/app.js?v=25"></script>
+<script src="js/app.js?v=26"></script>
 <script src="js/shops.js?v=5"></script>
 <script>
 (async function () {
@@ -395,6 +395,11 @@
   await Promise.all([loadLoreIndex(), load()]);
   render();
   wireAddToggle(document.getElementById("addToggle"), !onlyId && !rowsCache.length);
+  // Ny eller rettet lore fra en anden enhed dukker op her (og bliver til links).
+  subscribeToList("lore", ["lore_entries"], list, async () => {
+    await Promise.all([loadLoreIndex(), load()]);
+    render();
+  });
 })();
 </script>
 </body>

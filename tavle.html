@@ -28,7 +28,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=2"></script>
-<script src="js/app.js?v=25"></script>
+<script src="js/app.js?v=26"></script>
 <script>
 (async function () {
   // app.js sætter brugerens eget tema, når den indlæses — Tavlen er altid mørk (eller "blod").
@@ -214,11 +214,11 @@
   render();
   keepAwake();
 
-  subscribeToChanges("tavle", [...FIGHT_TABLES, "logistics", "session_log_entries"], async () => {
+  subscribeToChanges("tavle", [...FIGHT_TABLES, "logistics", "session_log_entries", "quests"], async () => {
     await Promise.all([loadLogistics(), loadCombat(), loadIdle()]);
     render();
   });
-  // Mål er ikke med i Realtime — hentes jævnligt i stedet (og alt andet som en sikkerhed).
+  // Hentes også jævnligt, som en sikkerhed, hvis forbindelsen har været væk.
   setInterval(async () => {
     if (document.hidden) return;
     await Promise.all([loadLogistics(), loadCombat(), loadIdle()]);

@@ -73,7 +73,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=2"></script>
-<script src="js/app.js?v=25"></script>
+<script src="js/app.js?v=26"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -224,6 +224,8 @@
 
   const rows = await load();
   wireAddToggle(document.getElementById("addToggle"), !!rows && !rows.length);
+  // Krydser nogen et mål af på en anden enhed, ses det her med det samme.
+  subscribeToList("quests", ["quests"], document.querySelector("main"), load);
 })();
 </script>
 </body>

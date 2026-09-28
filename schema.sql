@@ -649,7 +649,8 @@ do $$
 declare t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    foreach t in array array['encounters', 'encounter_combatants', 'characters', 'session_log_entries', 'logistics', 'handouts', 'tarokka_reading', 'fight_board'] loop
+    foreach t in array array['encounters', 'encounter_combatants', 'characters', 'session_log_entries', 'logistics', 'handouts', 'tarokka_reading', 'fight_board',
+                             'quests', 'lore_entries', 'loot_items', 'party_treasury'] loop
       if not exists (
         select 1 from pg_publication_tables
         where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t

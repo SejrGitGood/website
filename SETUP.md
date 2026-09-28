@@ -132,3 +132,4 @@ Automatic D&D Beyond refresh is fully set up: the Edge Function is deployed, the
 - *Front page*: a "Kamp i gang" banner (DM → tracker, players → Tavle), the handout banner, and the time of day next to the day.
 - *Ved Bordet*: monsters in the fight card show their health word (Såret/Blodig) and conditions; quest notes are normal readable text; Skattekammer is a quick link.
 - *Phones*: the Helbred rows keep the name and HP on one line with the bar under it.
+- *Live lists*: Mål, Lore and Skattekammer (and the quests and NPC attitudes on Ved Bordet, and the Tavle's quests) refresh by themselves when someone else changes them. A card you're editing is left alone until you close it. Needs `quests`, `lore_entries`, `loot_items` and `party_treasury` in the `supabase_realtime` publication (the Realtime block at the bottom of schema.sql); before that, the pages just don't update live.

@@ -264,6 +264,23 @@ function subscribeToChanges(channelName, tables, onChange) {
   return channel;
 }
 
+// Som subscribeToChanges, til en liste med kort, der kan rettes (Mål, Lore,
+// Skattekammer): genindlæser, når andre ændrer noget — men ikke mens man selv
+// har et kort åbent til redigering i containerEl, for så ville ens rettelser
+// forsvinde. Så venter den, til kortet lukkes med Annuller (Gem genindlæser selv).
+function subscribeToList(channelName, tables, containerEl, reload) {
+  let pending = false;
+  const editing = () => [...containerEl.querySelectorAll(".edit")].some((el) => !el.hidden);
+  const run = () => {
+    pending = false;
+    reload();
+  };
+  containerEl.addEventListener("click", (e) => {
+    if (pending && e.target.closest(".cancelBtn")) setTimeout(() => !editing() && run(), 0);
+  });
+  return subscribeToChanges(channelName, tables, () => (editing() ? (pending = true) : run()));
+}
+
 // --- Monstre fra Open5e: delt af monsteropslaget og kampbyggeren. ---
 const CR_XP = {
   0: 10, 0.125: 25, 0.25: 50, 0.5: 100, 1: 200, 2: 450, 3: 700, 4: 1100, 5: 1800,
