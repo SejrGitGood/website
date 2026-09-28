@@ -7,7 +7,7 @@
 <title>Spillere &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=24">
+<link rel="stylesheet" href="css/styles.css?v=25">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -22,7 +22,7 @@
   <div class="page-head">
     <p class="eyebrow">DM Tools</p>
     <h1>Spillere</h1>
-    <p>Hvem har adgang til kampagnen: godkend nye konti, giv dem deres karakter, og luk den fælles login, når alle er med.</p>
+    <p id="pageIntro">Hvem har adgang til kampagnen: godkend nye konti, giv dem deres karakter, og bestem, hvem der må godkende.</p>
   </div>
 
   <div class="wrap" style="max-width:820px;">
@@ -33,10 +33,10 @@
       <div id="pendingList"><div class="empty">Indlæser&hellip;</div></div>
     </section>
 
-    <section class="section">
+    <section class="section" id="memberSection">
       <div class="section-title"><h2>Selskabet</h2></div>
       <div class="card" id="memberList"><div class="empty">Indlæser&hellip;</div></div>
-      <p class="paste-hint" style="margin-top:8px;">Navnet bruges som "skrevet af" overalt på siden. En DM ser og styrer DM-værktøjerne; spillere ser alt andet.</p>
+      <p class="paste-hint" style="margin-top:8px;">Navnet bruges som "skrevet af" overalt på siden. En DM ser og styrer DM-værktøjerne; spillere ser alt andet. "Må godkende" giver en spiller lov til at godkende nye konti (altid som spillere) — intet andet.</p>
     </section>
 
     <section class="section">
@@ -55,16 +55,26 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=2"></script>
-<script src="js/app.js?v=22"></script>
+<script src="js/app.js?v=23"></script>
 <script>
 (async function () {
   const session = await guardPage();
   if (!session) return;
   renderNav("dmtools.html");
-  if (!requireDm()) return;
+  // DM'en styrer alt her; godkendere (spillere med "Må godkende") ser kun ventelisten.
+  const dm = isDm();
+  if (!dm && !(window.__member && window.__member.canApprove)) {
+    requireDm();
+    return;
+  }
 
   const $ = (id) => document.getElementById(id);
   const me = window.__member;
+  if (!dm) {
+    ["memberSection", "rejectedSection"].forEach((id) => ($(id).hidden = true));
+    $("sharedCard").closest("section").hidden = true;
+    $("pageIntro").textContent = "Godkend nye spillere, når de opretter en konto, og giv dem deres karakter.";
+  }
   let members = [];
   let characters = [];
   let shared = [];
@@ -147,6 +157,7 @@
               <option value="dm" ${x.role === "dm" ? "selected" : ""}>DM</option>
             </select>
             ${characterSelect(x)}
+            ${"can_approve" in x && x.role !== "dm" ? `<label class="enc-meta" style="display:inline-flex;align-items:center;gap:6px;"><input type="checkbox" data-field="can_approve" ${x.can_approve ? "checked" : ""}> Må godkende</label>` : ""}
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">${self ? "" : `<button class="btn secondary" data-act="reset" style="padding:6px 12px;">Nulstil adgangskode</button><button class="btn secondary" data-act="remove" style="padding:6px 12px;">Fjern adgang</button>`}</div>
           ${tempPasswords[x.user_id] ? `<div class="temp-password" style="grid-column:1 / -1;"><span class="enc-meta">Midlertidig adgangskode til ${escapeHtml(x.display_name || x.email)}:</span><code>${escapeHtml(tempPasswords[x.user_id])}</code><button class="btn secondary" data-act="copy" style="padding:4px 10px;">Kopiér</button><span class="enc-meta">Giv den videre ved bordet — de vælger deres egen, når de logger ind.</span></div>` : ""}
@@ -155,7 +166,7 @@
           .join("")
       : `<div class="empty">Ingen godkendte konti endnu.</div>`;
 
-    $("rejectedSection").hidden = !rejected.length;
+    $("rejectedSection").hidden = !dm || !rejected.length;
     $("rejectedList").innerHTML = rejected
       .map(
         (x) => `
@@ -170,7 +181,7 @@
     // Den fælles login: hvor mange karakterer har fået en spillerkonto?
     const linked = characters.filter((ch) => ch.owner_email && members.some((x) => x.email === ch.owner_email && x.status === "approved")).length;
     // Den fælles login er fjernet — afsnittet vises kun, hvis der stadig ligger en i allowed_users.
-    $("sharedCard").closest("section").hidden = !shared.length;
+    $("sharedCard").closest("section").hidden = !dm || !shared.length;
     $("sharedCard").innerHTML = shared.length
       ? `<p class="body">Den fælles login (${shared.map((s) => escapeHtml(s.email)).join(", ")}) virker stadig &mdash; alle, der kender den fælles adgangskode, kan se det, spillerne ser.</p>
          <p class="body" style="margin-top:8px;"><strong>${linked} af ${characters.length}</strong> karakterer har en godkendt spillerkonto.</p>
@@ -185,6 +196,11 @@
   async function updateMember(x, patch) {
     const { error } = await window.sb.from("members").update(patch).eq("user_id", x.user_id);
     if (error) alert("Kunne ikke gemme: " + error.message);
+  }
+  async function approveAsApprover(x, approve) {
+    const { error } = await window.sb.rpc("approve_member", { target: x.user_id, approve });
+    if (error) alert("Kunne ikke " + (approve ? "godkende" : "afvise") + ": " + error.message);
+    return !error;
   }
   // Én karakter pr. konto: den gamle slippes, den nye gives til kontoen.
   async function setCharacter(x, charId) {
@@ -205,6 +221,7 @@
   document.querySelector("main").addEventListener("click", async (e) => {
     const act = e.target.closest("[data-act]")?.dataset.act;
     if (!act) return;
+    if (!dm && act !== "approve" && act !== "reject") return;
     if (act === "close-shared") {
       if (!confirm("Luk den fælles login? Derefter kan kun godkendte, personlige konti se kampagnen.")) return;
       const { error } = await window.sb.from("allowed_users").delete().in("email", shared.map((s) => s.email));
@@ -215,12 +232,15 @@
     const x = row && byId(row.dataset.id);
     if (!x) return;
     if (act === "approve") {
-      await updateMember(x, { status: "approved", approved_at: new Date().toISOString() });
+      // Godkendere går gennem approve_member (kun ventende konti, altid som spiller).
+      if (dm) await updateMember(x, { status: "approved", approved_at: new Date().toISOString() });
+      else if (!(await approveAsApprover(x, true))) return;
       const sel = row.querySelector('[data-field="character"]');
       if (sel && sel.value) await setCharacter(x, sel.value);
     } else if (act === "reject") {
       if (!confirm(`Afvis ${x.display_name || x.email}?`)) return;
-      await updateMember(x, { status: "rejected" });
+      if (dm) await updateMember(x, { status: "rejected" });
+      else await approveAsApprover(x, false);
     } else if (act === "copy") {
       try {
         await navigator.clipboard.writeText(tempPasswords[x.user_id]);
@@ -262,8 +282,10 @@
     const row = e.target.closest("[data-id]");
     const x = row && byId(row.dataset.id);
     const field = e.target.dataset.field;
-    if (!x || !field || x.status !== "approved") return;
-    if (field === "name") {
+    if (!x || !field || x.status !== "approved" || !dm) return;
+    if (field === "can_approve") {
+      await updateMember(x, { can_approve: e.target.checked });
+    } else if (field === "name") {
       await updateMember(x, { display_name: e.target.value.trim() || null });
     } else if (field === "role") {
       if (e.target.value === "player" && x.role === "dm" && !otherDms(x.user_id)) {

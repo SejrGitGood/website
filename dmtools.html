@@ -7,7 +7,7 @@
 <title>DM Tools &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=24">
+<link rel="stylesheet" href="css/styles.css?v=25">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -33,7 +33,7 @@
           <h3 style="margin-top:8px;">Kampbygger</h3>
           <p class="body">Byg en kamp med sværhedsgrad som på D&amp;D Beyond, og kør den med initiativ, HP og tilstande &mdash; spillernes HP synkes live.</p>
         </a>
-        <a class="card" href="spillere.html" style="display:block;" data-dm-only>
+        <a class="card" href="spillere.html" style="display:block;" data-approver-only>
           <span class="badge">Adgang</span>
           <h3 style="margin-top:8px;">Spillere</h3>
           <p class="body">Godkend nye konti, giv dem deres karakter, og luk den fælles login, når alle er med.</p>
@@ -97,7 +97,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=2"></script>
-<script src="js/app.js?v=22"></script>
+<script src="js/app.js?v=23"></script>
 <script>
 (async function () {
   const session = await guardPage();

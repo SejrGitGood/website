@@ -641,3 +641,5 @@ html:not(.is-dm) [data-dm-only]{display:none !important;}
   border:1px dashed var(--ember);border-radius:8px;background:color-mix(in srgb, var(--ember) 8%, var(--surface));
 }
 .temp-password code{font-size:1.1rem;letter-spacing:0.05em;color:var(--ink);}
+/* Godkendere (spillere med "Må godkende") ser Spillere-kortet; alle andre ikke */
+html:not(.is-dm):not(.is-approver) [data-approver-only]{display:none !important;}

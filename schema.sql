@@ -336,6 +336,29 @@ $$;
 revoke all on function public.set_my_name(text) from public;
 grant execute on function public.set_my_name(text) to authenticated;
 
+-- Godkendere: DM'en kan give udvalgte spillere lov til at godkende nye konti
+-- (spillere.html → "Må godkende"). De kan kun godkende eller afvise ventende
+-- konti — altid som spiller — og ikke ændre roller, navne eller andet.
+alter table members add column if not exists can_approve boolean not null default false;
+create or replace function public.is_approver() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from members m where m.user_id = auth.uid() and m.status = 'approved' and (m.role = 'dm' or m.can_approve));
+$$;
+create or replace function public.approve_member(target uuid, approve boolean) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_approver() then
+    raise exception 'Kun DM''en og godkendere kan godkende nye spillere.';
+  end if;
+  update members
+     set status = case when approve then 'approved' else 'rejected' end,
+         role = case when approve then 'player' else role end,
+         approved_at = case when approve then now() else approved_at end
+   where user_id = target and status = 'pending';
+end $$;
+revoke all on function public.approve_member(uuid, boolean) from public;
+grant execute on function public.approve_member(uuid, boolean) to authenticated;
+
 -- En ny konto bliver automatisk en ventende spiller (navnet sendes med ved oprettelsen).
 create or replace function public.handle_new_member() returns trigger
 language plpgsql security definer set search_path = public as $$

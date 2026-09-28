@@ -491,7 +491,10 @@ function loadMember() {
       ]);
       const rolesEnabled = !own.error;
       const row = own.data;
-      if (row && row.status === "approved") return { ...row, isDm: row.role === "dm", legacy: false, rolesEnabled };
+      if (row && row.status === "approved") {
+        // canApprove: DM'en, eller en spiller DM'en har givet lov til at godkende nye konti.
+        return { ...row, isDm: row.role === "dm", canApprove: row.role === "dm" || !!row.can_approve, legacy: false, rolesEnabled };
+      }
       if (shared.data) {
         return { email: session.user.email, display_name: null, role: "player", status: "approved", legacy: true, rolesEnabled, isDm: !rolesEnabled };
       }
@@ -522,6 +525,7 @@ async function guardPage() {
   }
   window.__member = member;
   document.documentElement.classList.toggle("is-dm", member.isDm);
+  document.documentElement.classList.toggle("is-approver", !!member.canApprove);
   // Logget ind med en midlertidig adgangskode fra DM'en: vælg din egen først.
   const page = location.pathname.split("/").pop();
   if (session.user.user_metadata && session.user.user_metadata.must_change_password && page !== "konto.html") {
@@ -604,9 +608,9 @@ async function renderNav(activeHref) {
     });
   }
 
-  // DM'en ser, når nogen venter på at blive godkendt.
+  // DM'en og godkenderne ser, når nogen venter på at blive godkendt.
   const m = window.__member;
-  if (m && m.isDm && m.rolesEnabled) {
+  if (m && (m.isDm || m.canApprove) && m.rolesEnabled) {
     window.sb
       .from("members")
       .select("user_id", { count: "exact", head: true })

@@ -73,6 +73,10 @@ Live and working: Supabase project, shared login, public repo, GitHub Pages, ima
 **Konti og roller** (login.html, DM Tools → Spillere = `spillere.html`): everyone has their own login. The old shared login has been removed (see *Clean slate* below).
 - *Signing up*: "Opret konto" on the login page asks for a name, an email and a password. A database trigger (`handle_new_member`) turns every new account into a **pending player** in `members`. Until the DM approves it, the account only sees a "Venter på godkendelse" screen with "Tjek igen" and "Log ud". Approval is required because the site's public key is in the public repo, so anyone can create an account.
 - *Approving*: the DM sees "N venter" in the menu. On Spillere they choose the player's character and press "Godkend som spiller", or "Afvis". The same page lets the DM rename members (the name is used as "skrevet af" everywhere), switch someone between Spiller and DM, move characters between accounts (one per account), and "Fjern adgang". There must always be at least one DM, and you can't remove yourself.
+- *Approvers ("Må godkende")*: the DM can tick "Må godkende" on a player's row on Spillere (`members.can_approve`).
+  - Those players also see the Spillere card, the "N venter" count in the menu, and the "Venter på godkendelse" list, where they can approve (with a character) or reject new signups.
+  - Approving goes through the database function `approve_member`. It checks the caller is the DM or an approver, only touches pending accounts, and always approves them as players.
+  - Approvers can't change roles or names, remove anyone, reset passwords or see DM data.
 - *Roles*: the database enforces who sees what, through two helper functions: `is_member()` (approved account, or the old shared login) and `is_dm()`. Players get everything the table shares. Only the DM gets:
   - the monster library;
   - fight drafts, plus running and editing fights;
