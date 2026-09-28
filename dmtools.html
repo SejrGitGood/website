@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
-<title>DM Tools &middot; Blessings of Valkyriegade</title>
+<title>Værktøjer &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=27">
+<link rel="stylesheet" href="css/styles.css?v=28">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -20,13 +20,14 @@
 
 <main>
   <div class="page-head">
-    <p class="eyebrow">Til dig, der styrer</p>
-    <h1>DM Tools</h1>
-    <p>Værktøjer til at holde styr på verden mellem sessionerne.</p>
+    <p class="eyebrow">Til bordet og bag skærmen</p>
+    <h1>Værktøjer</h1>
+    <p>Karakterer, skattekammer og opslag til alle &mdash; og DM'ens egne værktøjer.</p>
   </div>
 
   <div class="wrap">
-    <section class="section">
+    <section class="section hub-group" data-approver-only>
+      <h2>Til DM'en</h2>
       <div class="grid">
         <a class="card" href="encounters.html" style="display:block;" data-dm-only>
           <span class="badge">Kamp</span>
@@ -36,7 +37,7 @@
         <a class="card" href="spillere.html" style="display:block;" data-approver-only>
           <span class="badge">Adgang</span>
           <h3 style="margin-top:8px;">Spillere</h3>
-          <p class="body">Godkend nye konti, giv dem deres karakter, og luk den fælles login, når alle er med.</p>
+          <p class="body">Godkend nye konti, giv dem deres karakter, og nulstil en glemt adgangskode.</p>
         </a>
         <a class="card" href="monsterbibliotek.html" style="display:block;" data-dm-only>
           <span class="badge">Kamp</span>
@@ -48,21 +49,38 @@
           <h3 style="margin-top:8px;">Handouts</h3>
           <p class="body">Forbered breve, billeder og kort, og vis dem for bordet &mdash; de popper op hos alle og vises på Tavlen.</p>
         </a>
+        <a class="card" href="eksporter.html" style="display:block;" data-dm-only>
+          <span class="badge">Backup</span>
+          <h3 style="margin-top:8px;">Eksportér</h3>
+          <p class="body">Hent alt indhold &mdash; sessions, lore, mål, bytte, logistik &mdash; som ren tekst, til backup eller deling.</p>
+        </a>
+      </div>
+    </section>
+
+    <section class="section hub-group">
+      <h2>Ved bordet</h2>
+      <div class="grid">
         <a class="card" href="tavle.html" style="display:block;">
           <span class="badge">Ved bordet</span>
           <h3 style="margin-top:8px;">Tavle</h3>
           <p class="body">Fuld skærm til et tv eller en tablet på bordet: turrækkefølge, tid på dagen og handouts &mdash; uden monstrenes tal.</p>
-        </a>
-        <a class="card" href="shops.html" style="display:block;">
-          <span class="badge">Værktøj</span>
-          <h3 style="margin-top:8px;">Butiksgenerator</h3>
-          <p class="body">Markér de butikstyper, en by skal have, sæt en befolkning, og få priser og udstyr direkte fra D&amp;D 5e's officielle regler.</p>
         </a>
         <a class="card" href="characters.html" style="display:block;">
           <span class="badge">Roster</span>
           <h3 style="margin-top:8px;">Karakterer</h3>
           <p class="body">Selskabets karakterark, hentet fra D&amp;D Beyond &mdash; klasse, HP, ability scores og udstyr, for dem der er sat til offentlig.</p>
         </a>
+        <a class="card" href="loot.html" style="display:block;">
+          <span class="badge">Fælles</span>
+          <h3 style="margin-top:8px;">Skattekammer</h3>
+          <p class="body">Fælles guld og fund &mdash; hvad selskabet har, og hvem der bærer det.</p>
+        </a>
+      </div>
+    </section>
+
+    <section class="section hub-group">
+      <h2>Opslag</h2>
+      <div class="grid">
         <a class="card" href="monsters.html" style="display:block;">
           <span class="badge">Opslag</span>
           <h3 style="margin-top:8px;">Monstre</h3>
@@ -73,20 +91,15 @@
           <h3 style="margin-top:8px;">Besværgelser</h3>
           <p class="body">Hurtigt opslag af en besværgelse, uden at forlade siden.</p>
         </a>
-        <a class="card" href="loot.html" style="display:block;">
-          <span class="badge">Fælles</span>
-          <h3 style="margin-top:8px;">Skattekammer</h3>
-          <p class="body">Fælles guld og fund &mdash; hvad selskabet har, og hvem der bærer det.</p>
-        </a>
         <a class="card" href="conditions.html" style="display:block;">
           <span class="badge">Opslag</span>
           <h3 style="margin-top:8px;">Tilstande</h3>
           <p class="body">De 15 officielle D&amp;D 5e-tilstande, altid ved hånden.</p>
         </a>
-        <a class="card" href="eksporter.html" style="display:block;" data-dm-only>
-          <span class="badge">Backup</span>
-          <h3 style="margin-top:8px;">Eksportér</h3>
-          <p class="body">Hent alt indhold &mdash; sessions, lore, mål, bytte, logistik &mdash; som ren tekst, til backup eller deling.</p>
+        <a class="card" href="shops.html" style="display:block;">
+          <span class="badge">Værktøj</span>
+          <h3 style="margin-top:8px;">Butiksgenerator</h3>
+          <p class="body">Markér de butikstyper, en by skal have, sæt en befolkning, og få priser og udstyr direkte fra D&amp;D 5e's officielle regler.</p>
         </a>
       </div>
     </section>
@@ -97,7 +110,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=2"></script>
-<script src="js/app.js?v=24"></script>
+<script src="js/app.js?v=25"></script>
 <script>
 (async function () {
   const session = await guardPage();

@@ -7,7 +7,7 @@
 <title>Ved Bordet &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=27">
+<link rel="stylesheet" href="css/styles.css?v=28">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -107,6 +107,7 @@
           <a class="btn secondary" href="dagbog.html">Min dagbog</a>
           <a class="btn secondary" href="handouts.html">Handouts</a>
           <a class="btn secondary" href="tarokka.html">Tarokka</a>
+          <a class="btn secondary" href="loot.html">Skattekammer</a>
           <a class="btn secondary" href="encounters.html" data-dm-only>Kampbygger</a>
           <a class="btn secondary" href="monsters.html">Monstre</a>
           <a class="btn secondary" href="spells.html">Besværgelser</a>
@@ -121,7 +122,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=2"></script>
-<script src="js/app.js?v=24"></script>
+<script src="js/app.js?v=25"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -137,7 +138,6 @@
       .order("sort_order", { ascending: true });
     hpCard.innerHTML = hpWidgetHtml(charRows);
   }
-  await loadHp();
   wireHpWidget(hpCard);
 
   async function loadCombat() {
@@ -152,7 +152,12 @@
       .map((c) => {
         const name = c.is_out ? `<s>${escapeHtml(c.name)}</s>` : escapeHtml(c.name);
         const isTurn = enc.round > 0 && c.id === enc.turn_combatant_id;
-        return `<li>${isTurn ? `<strong>${name}</strong> &larr; tur` : name} <span class="enc-meta">&middot; ${c.initiative ?? "–"}</span></li>`;
+        // Monstre: helbred i ord (aldrig tal); tilstande som korte mærker.
+        const extra = [c.initiative ?? "–", !c.is_out && c.health && c.health !== "Uskadt" ? c.health : null, ...(c.conditions || [])]
+          .filter((x) => x != null)
+          .map((x) => escapeHtml(String(x)))
+          .join(" &middot; ");
+        return `<li>${isTurn ? `<strong>${name}</strong> &larr; tur` : name} <span class="enc-meta">&middot; ${extra}</span></li>`;
       })
       .join("");
     const combatLink = document.getElementById("combatLink");
@@ -164,14 +169,6 @@
       ${rows ? `<ul class="shop-items">${rows}</ul>` : ""}`;
     section.hidden = false;
   }
-  await loadCombat();
-
-  // Kører kamptrackeren på en anden enhed, henter den spillernes HP fra D&D
-  // Beyond løbende — de ændringer (og turskift) dukker op her med det samme.
-  subscribeToChanges("ved-bordet", FIGHT_TABLES, () => {
-    loadHp();
-    loadCombat();
-  });
 
   // --- Aftenens log: noter uden session_id hører til den åbne log. ---
   let loreIndex = [];
@@ -243,10 +240,6 @@
     await window.sb.from("session_log_entries").delete().eq("id", btn.dataset.delLog);
     await loadLog();
   });
-
-  await loadLoreIndex();
-  await loadLog();
-  subscribeToChanges("ved-bordet-log", ["session_log_entries"], loadLog);
 
   // --- Lige nu: kampagnedag, tid på dagen og sidste hvil ---
   const statusCard = document.getElementById("statusCard");
@@ -324,51 +317,63 @@
       await loadLog();
     }
   });
-  await loadStatus();
-  subscribeToChanges("ved-bordet-status", ["logistics"], loadStatus);
+  // (Handouts, som DM'en lægger på bordet, vises i banneret øverst — det sørger menuen for.)
 
-  // Handouts, som DM'en lægger på bordet, popper op her.
-  watchTableHandout(document.getElementById("handoutBanner"));
-
+  const questsCard = document.getElementById("questsCard");
+  let questRows = [];
   async function loadQuests() {
-    const questsCard = document.getElementById("questsCard");
     const { data } = await window.sb
       .from("quests")
       .select("*")
       .eq("done", false)
       .order("created_at", { ascending: true });
-    const rows = (data || []).sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1));
-    questsCard.innerHTML = rows.length
-      ? `<div class="card"><ul class="shop-items" id="questList">${rows
+    questRows = (data || []).sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1));
+    questsCard.innerHTML = questRows.length
+      ? `<div class="card"><ul class="shop-items" id="questList">${questRows
           .map(
             (q) => `
         <li data-id="${q.id}">
           <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
-            <input type="checkbox" class="questDoneBox" style="margin-top:4px;">
+            <input type="checkbox" class="questDoneBox" style="margin-top:4px;" aria-label="Marker ${escapeHtml(q.title)} som fuldført">
             <span>
               ${escapeHtml(q.title)}<span class="priority-badge ${PRIORITY_CLASS[q.priority] || "normal"}">${escapeHtml(q.priority || "Normal")}</span>
-              ${q.notes ? `<br><span class="meta">${escapeHtml(q.notes)}</span>` : ""}
+              ${q.notes ? `<span class="quest-note">${escapeHtml(q.notes)}</span>` : ""}
             </span>
           </label>
         </li>`
           )
           .join("")}</ul></div>`
       : `<div class="empty">Ingen aktive mål lige nu. <a href="quests.html">Tilføj et</a>.</div>`;
-    questsCard.querySelectorAll(".questDoneBox").forEach((box) => {
-      box.addEventListener("change", async () => {
-        const id = box.closest("li").dataset.id;
-        box.disabled = true;
-        await window.sb.from("quests").update({ done: true, updated_at: new Date().toISOString() }).eq("id", id);
-        loadQuests();
-      });
-    });
   }
-  await loadQuests();
+  // Et mål, der krydses af, forsvinder med det samme — med "Fortryd", hvis det var et fejltryk.
+  const setQuestDone = (id, done) => window.sb.from("quests").update({ done, updated_at: new Date().toISOString() }).eq("id", id);
+  questsCard.addEventListener("change", async (e) => {
+    const box = e.target.closest(".questDoneBox");
+    if (!box) return;
+    const id = box.closest("li").dataset.id;
+    const quest = questRows.find((q) => q.id === id);
+    box.disabled = true;
+    const { error } = await setQuestDone(id, true);
+    if (error) {
+      box.checked = false;
+      box.disabled = false;
+      notify("Kunne ikke gemme: " + error.message, { error: true });
+      return;
+    }
+    await loadQuests();
+    notify(`Fuldført: ${quest ? quest.title : "mål"}`, {
+      actionLabel: "Fortryd",
+      onAction: async () => {
+        await setQuestDone(id, false);
+        loadQuests();
+      },
+    });
+  });
 
   const RELATIONSHIP_OPTIONS = ["", "Fjendtlig", "Uvenlig", "Ligegyldig", "Venlig", "Hjælpsom"];
   const STATUS_OPTIONS = ["", "Levende", "Død", "Forsvundet", "Ukendt"];
-  function npcSelectHtml(cls, id, options, current) {
-    return `<select class="${cls}" data-id="${id}">${options
+  function npcSelectHtml(cls, id, options, current, label) {
+    return `<select class="${cls}" data-id="${id}" aria-label="${label}">${options
       .map((v) => `<option value="${v}" ${v === (current || "") ? "selected" : ""}>${v || "Ikke sat"}</option>`)
       .join("")}</select>`;
   }
@@ -387,31 +392,38 @@
             (l) => `
         <li class="npc-row">
           <a href="lore.html?id=${l.id}">${escapeHtml(l.title)}</a>
-          ${npcSelectHtml("npcAttitudeSelect", l.id, RELATIONSHIP_OPTIONS, l.relationship)}
-          ${npcSelectHtml("npcStatusSelect", l.id, STATUS_OPTIONS, l.status)}
+          ${npcSelectHtml("npcAttitudeSelect", l.id, RELATIONSHIP_OPTIONS, l.relationship, `Holdning for ${escapeHtml(l.title)}`)}
+          ${npcSelectHtml("npcStatusSelect", l.id, STATUS_OPTIONS, l.status, `Status for ${escapeHtml(l.title)}`)}
         </li>`
           )
           .join("")}</ul></div>`
       : `<div class="empty">Ingen NPC'er i Lore endnu. <a href="lore.html">Tilføj en</a>.</div>`;
-
-    npcCard.querySelectorAll(".npcAttitudeSelect").forEach((sel) => {
-      sel.addEventListener("change", async () => {
-        await window.sb
-          .from("lore_entries")
-          .update({ relationship: sel.value || null, updated_at: new Date().toISOString() })
-          .eq("id", sel.dataset.id);
-      });
-    });
-    npcCard.querySelectorAll(".npcStatusSelect").forEach((sel) => {
-      sel.addEventListener("change", async () => {
-        await window.sb
-          .from("lore_entries")
-          .update({ status: sel.value || null, updated_at: new Date().toISOString() })
-          .eq("id", sel.dataset.id);
-      });
-    });
   }
-  await loadNpcs();
+  // Holdning og status gemmes med det samme — med en kort bekræftelse, så man ved, det skete.
+  npcCard.addEventListener("change", async (e) => {
+    const sel = e.target.closest(".npcAttitudeSelect, .npcStatusSelect");
+    if (!sel) return;
+    const field = sel.classList.contains("npcAttitudeSelect") ? "relationship" : "status";
+    const name = sel.closest("li").querySelector("a").textContent;
+    const { error } = await window.sb
+      .from("lore_entries")
+      .update({ [field]: sel.value || null, updated_at: new Date().toISOString() })
+      .eq("id", sel.dataset.id);
+    if (error) notify("Kunne ikke gemme: " + error.message, { error: true });
+    else notify(`${name}: ${field === "relationship" ? "holdning" : "status"} ${sel.value ? `sat til ${sel.value}` : "fjernet"}`, { ms: 2500 });
+  });
+
+  // Alt hentes på én gang i stedet for ét efter ét — siden er klar langt hurtigere på en telefon.
+  await Promise.all([loadHp(), loadCombat(), loadStatus(), loadQuests(), loadNpcs(), loadLoreIndex().then(loadLog)]);
+
+  // Kører kamptrackeren på en anden enhed, henter den spillernes HP fra D&D
+  // Beyond løbende — de ændringer (og turskift) dukker op her med det samme.
+  subscribeToChanges("ved-bordet", FIGHT_TABLES, () => {
+    loadHp();
+    loadCombat();
+  });
+  subscribeToChanges("ved-bordet-log", ["session_log_entries"], loadLog);
+  subscribeToChanges("ved-bordet-status", ["logistics"], loadStatus);
 })();
 </script>
 </body>

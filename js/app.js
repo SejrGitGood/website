@@ -12,9 +12,23 @@ const NAV_LINKS = [
   { href: "index.html", label: "Forside" },
   { href: "ved-bordet.html", label: "Ved Bordet" },
   { href: "historien.html", label: "Historien" },
-  { href: "dmtools.html", label: "DM Tools" },
+  { href: "dmtools.html", label: "Værktøjer" },
   { href: "logistics.html", label: "Logistik" },
 ];
+// Hvilket menupunkt en side hører under — så menuen kan tegnes, før siden har
+// tjekket login (siden kalder selv renderNav med det rigtige bagefter).
+const NAV_SECTION = {
+  "ved-bordet.html": "ved-bordet.html",
+  "logistics.html": "logistics.html",
+  "index.html": "index.html",
+  "": "index.html",
+  ...Object.fromEntries(
+    ["historien", "sessions", "lore", "quests", "timeline", "kort", "forbindelser", "tarokka", "handouts"].map((p) => [`${p}.html`, "historien.html"])
+  ),
+  ...Object.fromEntries(
+    ["dmtools", "encounters", "spillere", "monsterbibliotek", "shops", "characters", "min-karakter", "monsters", "spells", "loot", "conditions", "eksporter"].map((p) => [`${p}.html`, "dmtools.html"])
+  ),
+};
 
 // --- Forfatter-tilskrivning: hvem skrev/redigerede en session eller
 // lore-indgang. Med en personlig konto kommer navnet fra kontoen; på den
@@ -195,8 +209,41 @@ function wireHpWidget(containerEl) {
     if (!btn) return;
     const newVal = !btn.classList.contains("active");
     btn.classList.toggle("active", newVal);
-    await window.sb.from("characters").update({ has_inspiration: newVal }).eq("id", btn.dataset.id);
+    const { error } = await window.sb.from("characters").update({ has_inspiration: newVal }).eq("id", btn.dataset.id);
+    if (error) {
+      btn.classList.toggle("active", !newVal);
+      notify("Kunne ikke gemme inspiration: " + error.message, { error: true });
+    }
   });
+}
+
+// Kort besked nederst på skærmen ("Gemt", "Mål fuldført — Fortryd"). Går
+// selv væk; med actionLabel/onAction får den en knap, f.eks. til at fortryde.
+let notifyTimer = null;
+function notify(text, { actionLabel, onAction, ms = 5000, error = false } = {}) {
+  let box = document.getElementById("appToast");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "appToast";
+    box.className = "toast";
+    box.setAttribute("role", "status");
+    box.setAttribute("aria-live", "polite");
+    document.body.appendChild(box);
+  }
+  clearTimeout(notifyTimer);
+  box.classList.toggle("error", error);
+  box.innerHTML = `<span></span>${actionLabel ? `<button type="button" class="btn">${escapeHtml(actionLabel)}</button>` : ""}`;
+  box.querySelector("span").textContent = text;
+  box.hidden = false;
+  const hide = () => (box.hidden = true);
+  if (actionLabel) {
+    box.querySelector("button").addEventListener("click", async () => {
+      clearTimeout(notifyTimer);
+      hide();
+      if (onAction) await onAction();
+    });
+  }
+  notifyTimer = setTimeout(hide, actionLabel ? Math.max(ms, 7000) : ms);
 }
 
 // Kalder onChange (samlet op, så en stribe ændringer kun giver ét kald), når
@@ -489,6 +536,25 @@ async function watchTableHandout(bannerEl, { popup = true, onChange } = {}) {
   subscribeToChanges("table-handout", ["handouts"], check);
 }
 
+// "+ Ny …"-formularer (<details class="add-toggle">): fokus i første felt, når
+// den foldes ud. openIf åbner den med det samme (f.eks. når listen er tom).
+function wireAddToggle(details, openIf = false) {
+  if (!details) return;
+  let quiet = false;
+  details.addEventListener("toggle", () => {
+    if (!details.open || quiet) return (quiet = false);
+    // Første synlige felt, der mangler at blive udfyldt (et udfyldt nummer eller en dato springes over).
+    const fields = [...details.querySelectorAll("input, textarea")].filter((el) => el.type !== "hidden" && el.offsetParent !== null);
+    const first = fields.find((el) => !el.value) || fields[0];
+    if (first) first.focus();
+  });
+  // Åbnet af siden selv (ikke et klik): ingen fokus, så telefonens tastatur ikke springer op.
+  if (openIf && !details.open) {
+    quiet = true;
+    details.open = true;
+  }
+}
+
 // Deaktiverer `btn` og viser `busyLabel`, mens `fn` kører — forhindrer
 // dobbelt-indsendelse og giver et tegn på, at noget sker, på en langsom
 // forbindelse. Gendanner altid knappen bagefter, uanset om fn fejler.
@@ -586,7 +652,7 @@ function requireDm() {
             ? "Du er logget ind med den fælles login. DM-værktøjerne kræver DM'ens egen konto."
             : "Denne side er DM'ens værktøj."}</p>
         </div>
-        <div class="card-actions"><a class="btn secondary" href="dmtools.html">&larr; DM Tools</a><a class="btn secondary" href="tavle.html">Tavle</a></div>
+        <div class="card-actions"><a class="btn secondary" href="dmtools.html">&larr; Værktøjer</a><a class="btn secondary" href="tavle.html">Tavle</a></div>
       </div>`;
   }
   return false;
@@ -596,13 +662,83 @@ function navSvg() {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 L14 10 L22 12 L14 14 L12 22 L10 14 L2 12 L10 10 Z"/></svg>`;
 }
 
+// Menuen tegnes i to trin: skallen (links, søgning, tema) med det samme, når
+// app.js indlæses — så siden ikke hopper, når den dukker op — og kontodelen
+// (navn, "venter", log ud), når siden har tjekket login og kalder renderNav.
+// På en telefon er alt andet end navnet foldet sammen bag en Menu-knap.
+function currentPageFile() {
+  return location.pathname.split("/").pop();
+}
+function renderNavShell(activeHref) {
+  const mount = document.getElementById("site-nav");
+  if (!mount) return null;
+  const currentQ = new URLSearchParams(location.search).get("q") || "";
+  mount.innerHTML = `
+    <div class="wrap">
+      <a class="brand" href="index.html">${navSvg()}<span class="brand-name">Blessings of Valkyriegade</span></a>
+      <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="navMenu">Menu<span class="nav-dot" id="navDot" hidden></span></button>
+      <div class="nav-menu" id="navMenu">
+        <div class="nav-links">${NAV_LINKS.map((l) => `<a href="${l.href}" data-nav="${l.href}">${l.label}</a>`).join("")}</div>
+        <form class="nav-search" id="navSearchForm" role="search">
+          <input type="search" id="navSearchInput" placeholder="Søg…" aria-label="Søg i sessions og lore" value="${escapeHtml(currentQ)}">
+        </form>
+        <div class="nav-auth">
+          <select class="theme-select" id="themeSelect" aria-label="Tema">
+            <option value="auto">Auto</option>
+            <option value="light">Lys</option>
+            <option value="dark">Mørk</option>
+            <option value="blood">Blodmåne</option>
+          </select>
+          <span class="nav-account" id="navAccount"></span>
+        </div>
+      </div>
+    </div>
+  `;
+  mount.dataset.ready = "1";
+  setNavActive(activeHref);
+
+  const toggle = document.getElementById("navToggle");
+  const setOpen = (open) => {
+    mount.classList.toggle("open", open);
+    toggle.setAttribute("aria-expanded", String(open));
+    toggle.firstChild.textContent = open ? "Luk" : "Menu";
+  };
+  toggle.addEventListener("click", () => setOpen(!mount.classList.contains("open")));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && mount.classList.contains("open")) {
+      setOpen(false);
+      toggle.focus();
+    }
+  });
+
+  const themeSelect = document.getElementById("themeSelect");
+  themeSelect.value = getStoredTheme();
+  themeSelect.addEventListener("change", () => {
+    setStoredTheme(themeSelect.value);
+    applyTheme(themeSelect.value);
+  });
+
+  document.getElementById("navSearchForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const q = document.getElementById("navSearchInput").value.trim();
+    if (!q) return;
+    location.href = `search.html?q=${encodeURIComponent(q)}`;
+  });
+  return mount;
+}
+function setNavActive(activeHref) {
+  document.querySelectorAll("#site-nav [data-nav]").forEach((a) => a.classList.toggle("active", a.dataset.nav === activeHref));
+}
+// Skallen med det samme — scripts ligger nederst i <body>, så <nav> findes allerede.
+renderNavShell(NAV_SECTION[currentPageFile()] || "");
+
+let handoutWatchStarted = false;
 async function renderNav(activeHref) {
   const mount = document.getElementById("site-nav");
   if (!mount) return;
+  if (!mount.dataset.ready) renderNavShell(activeHref);
+  else setNavActive(activeHref);
   const session = await currentSession();
-  const links = NAV_LINKS.map(
-    (l) => `<a href="${l.href}" class="${l.href === activeHref ? "active" : ""}">${l.label}</a>`
-  ).join("");
 
   let authHtml;
   if (session) {
@@ -613,27 +749,7 @@ async function renderNav(activeHref) {
   } else {
     authHtml = `<a href="login.html">Log ind</a>`;
   }
-
-  const currentQ = new URLSearchParams(location.search).get("q") || "";
-
-  mount.innerHTML = `
-    <div class="wrap">
-      <a class="brand" href="index.html">${navSvg()}Blessings of Valkyriegade</a>
-      <div class="nav-links">${links}</div>
-      <form class="nav-search" id="navSearchForm">
-        <input type="search" id="navSearchInput" placeholder="Søg…" aria-label="Søg i sessions og lore" value="${escapeHtml(currentQ)}">
-      </form>
-      <div class="nav-auth">
-        <select class="theme-select" id="themeSelect" aria-label="Tema">
-          <option value="auto">Auto</option>
-          <option value="light">Lys</option>
-          <option value="dark">Mørk</option>
-          <option value="blood">Blodmåne</option>
-        </select>
-        ${authHtml}
-      </div>
-    </div>
-  `;
+  document.getElementById("navAccount").innerHTML = authHtml;
 
   const signOutBtn = document.getElementById("signOutBtn");
   if (signOutBtn) {
@@ -657,22 +773,19 @@ async function renderNav(activeHref) {
           el.title = `${count} ${count === 1 ? "konto venter" : "konti venter"} på godkendelse`;
           el.hidden = false;
         }
+        const dot = document.getElementById("navDot");
+        if (dot) dot.hidden = !count;
       });
   }
 
-  const themeSelect = document.getElementById("themeSelect");
-  themeSelect.value = getStoredTheme();
-  themeSelect.addEventListener("change", () => {
-    setStoredTheme(themeSelect.value);
-    applyTheme(themeSelect.value);
-  });
-
-  document.getElementById("navSearchForm").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const q = document.getElementById("navSearchInput").value.trim();
-    if (!q) return;
-    location.href = `search.html?q=${encodeURIComponent(q)}`;
-  });
+  // Handouts, DM'en lægger på bordet, popper op på alle sider — ikke kun Ved
+  // Bordet. En side med #handoutBanner viser den også som banner. DM'en, der
+  // selv står i handout-forberedelsen, skal ikke have sin egen handout i hovedet.
+  if (session && !handoutWatchStarted) {
+    handoutWatchStarted = true;
+    const preparing = currentPageFile() === "handouts.html" && new URLSearchParams(location.search).has("dm");
+    watchTableHandout(document.getElementById("handoutBanner"), { popup: !preparing });
+  }
 }
 
 // --- Billeder: indsæt med Ctrl+V direkte i teksten, der hvor markøren står ---

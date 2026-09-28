@@ -7,7 +7,7 @@
 <title>Sessions &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=27">
+<link rel="stylesheet" href="css/styles.css?v=28">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -41,9 +41,10 @@
       </div>
     </section>
 
-    <section class="section" id="addSection">
-      <div class="section-title"><h2>Tilføj ny session</h2></div>
+    <section class="section" id="addSection" style="padding-bottom:0;">
       <p class="notice ember" id="draftNotice" hidden style="margin-bottom:14px;"></p>
+      <details class="add-toggle" id="addToggle">
+        <summary class="btn secondary"><span class="when-closed">+ Ny session</span><span class="when-open">Luk</span></summary>
       <div class="card">
         <form class="form" id="addForm">
           <div class="row">
@@ -79,6 +80,7 @@
           <button class="btn" type="submit">Gem session</button>
         </form>
       </div>
+      </details>
     </section>
 
     <section class="section">
@@ -95,7 +97,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=2"></script>
-<script src="js/app.js?v=24"></script>
+<script src="js/app.js?v=25"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -107,6 +109,7 @@
   const list = document.getElementById("list");
   const onlyId = new URLSearchParams(location.search).get("id");
   let loreIndex = [];
+  let lastNumber = 1; // højeste sessionsnummer (pilotepisoden er nr. 1)
 
   if (onlyId) {
     document.getElementById("addSection").hidden = true;
@@ -132,6 +135,7 @@
       list.innerHTML = `<div class="empty">Kunne ikke hente sessions: ${escapeHtml(error.message)}</div>`;
       return;
     }
+    if (!onlyId) lastNumber = data.reduce((max, x) => Math.max(max, x.number || 0), 1);
     if (!data.length) {
       list.innerHTML = onlyId
         ? `<div class="empty">Denne session findes ikke (mere). <a href="sessions.html">Se alle sessions</a>.</div>`
@@ -225,6 +229,20 @@
   wireInlinePasteUpload(document.getElementById("summary"));
   wireAuthorField(document.getElementById("author"));
 
+  // Når formularen åbnes: næste nummer og dagens dato er udfyldt på forhånd.
+  const todayIso = () => {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+  function prefillNumberAndDate() {
+    if (!document.getElementById("number").value) document.getElementById("number").value = Math.max(2, lastNumber + 1);
+    if (!document.getElementById("sessionDate").value) document.getElementById("sessionDate").value = todayIso();
+  }
+  document.getElementById("addToggle").addEventListener("toggle", (e) => {
+    if (e.target.open) prefillNumberAndDate();
+  });
+
   // --- Udkast fra Aftenens log (Ved Bordet → "Lav referat") ---
   // Kun de noter, der blev hentet ind i udkastet, knyttes til sessionen ved
   // gem — skriver nogen en ny note imens, bliver den i loggen til næste gang.
@@ -255,14 +273,14 @@
       return;
     }
     draftEntryIds = entries.map((e) => e.id);
-    const today = new Date();
-    const pad = (n) => String(n).padStart(2, "0");
+    document.getElementById("addToggle").open = true;
     document.getElementById("number").value = Math.max(2, ((last && last.number) || 1) + 1);
-    document.getElementById("sessionDate").value = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+    document.getElementById("sessionDate").value = todayIso();
     document.getElementById("summary").value = logToSummary(entries);
     notice.textContent = `Udkastet er hentet fra aftenens log (${entries.length} ${entries.length === 1 ? "note" : "noter"}). Giv det en titel, ret teksten til, og gem — så tømmes loggen.`;
     document.getElementById("addSection").scrollIntoView({ behavior: "smooth", block: "start" });
-    document.getElementById("title").focus({ preventScroll: true });
+    // Efter formularens egen "fold ud"-fokus (første felt): titlen er det, der mangler.
+    setTimeout(() => document.getElementById("title").focus({ preventScroll: true }), 50);
   }
 
   document.getElementById("addForm").addEventListener("submit", async (e) => {
@@ -304,10 +322,13 @@
       }
       e.target.reset();
       document.getElementById("author").value = author;
-      load();
+      document.getElementById("addToggle").open = false;
+      await load();
+      notify(`Gemt: session ${number}`, { ms: 3000 });
     });
   });
 
+  wireAddToggle(document.getElementById("addToggle"));
   if (!onlyId && new URLSearchParams(location.search).has("fraLog")) await prefillFromLog();
 
   await loadLoreIndex();

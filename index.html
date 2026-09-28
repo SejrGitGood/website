@@ -7,7 +7,7 @@
 <title>Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=27">
+<link rel="stylesheet" href="css/styles.css?v=28">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -26,6 +26,9 @@
   </div>
 
   <div class="wrap">
+    <div class="card handout-banner" id="handoutBanner" style="margin-top:8px;" hidden></div>
+    <div class="card handout-banner" id="fightBanner" style="margin-top:8px;" hidden></div>
+
     <section class="section" id="hpSection">
       <div class="section-title">
         <h2>Selskabets Helbred</h2>
@@ -72,43 +75,52 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=2"></script>
-<script src="js/app.js?v=24"></script>
+<script src="js/app.js?v=25"></script>
 <script>
 (async function () {
   const session = await guardPage();
   if (!session) return;
   renderNav("index.html");
 
-  const { data: charRows } = await window.sb
-    .from("characters")
-    .select("*")
-    .order("sort_order", { ascending: true });
-  const hpCard = document.getElementById("hpCard");
-  hpCard.innerHTML = hpWidgetHtml(charRows);
+  const $ = (id) => document.getElementById(id);
+  const hpCard = $("hpCard");
   wireHpWidget(hpCard);
 
-  const { data: questRowsRaw } = await window.sb
-    .from("quests")
-    .select("*")
-    .eq("done", false)
-    .order("created_at", { ascending: true });
+  // Alt hentes på én gang — forsiden er klar lige så hurtigt som det langsomste kald.
+  const [{ data: charRows }, { data: questRowsRaw }, { data: logistics }, { data: sessionsRows }, { data: loreRows }, fight] = await Promise.all([
+    window.sb.from("characters").select("*").order("sort_order", { ascending: true }),
+    window.sb.from("quests").select("*").eq("done", false).order("created_at", { ascending: true }),
+    window.sb.from("logistics").select("*").eq("id", 1).maybeSingle(),
+    window.sb.from("sessions").select("*").order("number", { ascending: false }).limit(3),
+    window.sb.from("lore_entries").select("*").order("updated_at", { ascending: false }).limit(3),
+    loadActiveFight(),
+  ]);
+
+  // Kamp i gang: DM'en til trackeren, spillerne til Tavlen.
+  if (fight.encounter) {
+    const enc = fight.encounter;
+    $("fightBanner").innerHTML = `<span class="enc-meta">Kamp i gang:</span> <strong>${escapeHtml(enc.name)}</strong>${enc.round ? ` <span class="enc-meta">&middot; runde ${enc.round}</span>` : ""}
+      <a class="btn secondary" style="padding:6px 12px;margin-left:auto;" href="${isDm() ? `encounters.html?id=${enc.id}` : "tavle.html"}">${isDm() ? "Åbn trackeren" : "Åbn Tavlen"}</a>`;
+    $("fightBanner").hidden = false;
+  }
+
+  hpCard.innerHTML = hpWidgetHtml(charRows);
+
   const questRows = (questRowsRaw || [])
     .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1))
     .slice(0, 6);
-  const questsCard = document.getElementById("questsCard");
-  questsCard.innerHTML = questRows.length
+  $("questsCard").innerHTML = questRows.length
     ? `<ul class="shop-items">${questRows
         .map((q) => `<li>${escapeHtml(q.title)}<span class="priority-badge ${PRIORITY_CLASS[q.priority] || "normal"}">${escapeHtml(q.priority || "Normal")}</span></li>`)
         .join("")}</ul>`
     : `<div class="empty">Ingen aktive mål lige nu. <a href="quests.html">Tilføj et</a>.</div>`;
 
-  const { data: logistics } = await window.sb.from("logistics").select("*").eq("id", 1).maybeSingle();
   if (logistics && logistics.campaign_day) {
-    const dayBadge = document.getElementById("dayBadge");
-    dayBadge.textContent = `Dag ${logistics.campaign_day}`;
+    const dayBadge = $("dayBadge");
+    dayBadge.textContent = "time_of_day" in logistics ? timeOfDayText(logistics.campaign_day, logistics.time_of_day) : `Dag ${logistics.campaign_day}`;
     dayBadge.hidden = false;
   }
-  const logisticsCard = document.getElementById("logisticsCard");
+  const logisticsCard = $("logisticsCard");
   if (logistics && logistics.next_session_date) {
     logisticsCard.innerHTML = `
       <div class="card">
@@ -118,7 +130,7 @@
           <button class="btn secondary" id="addToCalendarBtn">Tilføj til kalender</button>
         </div>
       </div>`;
-    document.getElementById("addToCalendarBtn").addEventListener("click", () => {
+    $("addToCalendarBtn").addEventListener("click", () => {
       downloadIcs({
         title: "D&D: Blessings of Valkyriegade",
         description: logistics.notes || "",
@@ -129,12 +141,6 @@
     logisticsCard.innerHTML = `<div class="empty">Ingen næste session sat endnu. <a href="logistics.html">Sæt en dato</a>.</div>`;
   }
 
-  const { data: sessionsRows } = await window.sb
-    .from("sessions")
-    .select("*")
-    .order("number", { ascending: false })
-    .limit(3);
-  const sessionsGrid = document.getElementById("sessionsGrid");
   const pilotCard = `
     <div class="card">
       <span class="badge">Session 1</span>
@@ -145,8 +151,9 @@
         <a class="btn secondary" href="sessions/session-1/daggerford-posten.html">Avisen</a>
       </div>
     </div>`;
-  if (sessionsRows && sessionsRows.length) {
-    sessionsGrid.innerHTML = pilotCard + sessionsRows
+  $("sessionsGrid").innerHTML =
+    pilotCard +
+    (sessionsRows || [])
       .map(
         (s) => `
       <a class="card" href="sessions.html?id=${s.id}" style="display:block;">
@@ -157,16 +164,8 @@
       </a>`
       )
       .join("");
-  } else {
-    sessionsGrid.innerHTML = pilotCard;
-  }
 
-  const { data: loreRows } = await window.sb
-    .from("lore_entries")
-    .select("*")
-    .order("updated_at", { ascending: false })
-    .limit(3);
-  const loreGrid = document.getElementById("loreGrid");
+  const loreGrid = $("loreGrid");
   if (loreRows && loreRows.length) {
     loreGrid.innerHTML = loreRows
       .map(

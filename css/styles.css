@@ -130,6 +130,15 @@ a:hover{text-decoration:underline;}
   background:var(--bg);border:1px solid var(--line);border-radius:999px;
   padding:7px 10px;color:var(--ink-soft);cursor:pointer;
 }
+/* Menu-knappen findes kun på smalle skærme; ellers ligger menuens dele direkte i baren */
+.nav-menu{display:contents;}
+.nav-account{display:contents;}
+.nav-toggle{
+  display:none;position:relative;margin-left:auto;
+  font-family:"Cinzel",serif;font-size:0.75rem;letter-spacing:0.05em;text-transform:uppercase;
+  background:none;border:1px solid var(--ember);color:var(--ember);padding:7px 14px;border-radius:999px;cursor:pointer;
+}
+.nav-dot{position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;background:var(--ember);border:2px solid var(--surface);}
 
 .attitude{
   display:inline-block;font-family:"Cinzel",serif;font-size:0.68rem;letter-spacing:0.05em;text-transform:uppercase;
@@ -245,7 +254,7 @@ a.card:hover{text-decoration:none;box-shadow:0 12px 30px -12px rgba(43,32,22,0.5
   padding:3px 9px;border-radius:999px;background:color-mix(in srgb, var(--ember) 14%, transparent);color:var(--ember);
 }
 
-.shop-items{list-style:none;margin:10px 0 0;padding-top:10px;border-top:1px dashed var(--line);}
+.shop-items{list-style:none;margin:10px 0 0;padding:10px 0 0;border-top:1px dashed var(--line);}
 .shop-items li{padding:6px 0;border-bottom:1px dashed var(--line);font-size:0.9rem;color:var(--ink-soft);}
 .shop-items li:last-child{border-bottom:none;}
 .shop-items strong{color:var(--ink);font-family:"Cinzel",serif;font-weight:600;font-size:0.92rem;}
@@ -506,10 +515,12 @@ select.small-input{width:auto;}
 body.has-turnbar{padding-bottom:calc(var(--turnbar-h, 94px) + 16px);}
 .toast{
   position:fixed;left:50%;bottom:calc(var(--turnbar-h, 90px) + 14px);transform:translateX(-50%);z-index:45;
-  display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);
+  display:flex;align-items:center;gap:12px;width:max-content;max-width:calc(100vw - 32px);
   background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:10px;box-shadow:var(--shadow);font-size:0.92rem;
 }
 .toast .btn{padding:6px 12px;background:transparent;border:1px solid currentColor;color:inherit;}
+body:not(.has-turnbar) .toast{bottom:calc(18px + env(safe-area-inset-bottom));}
+.toast.error{background:var(--blood);color:#fff;}
 
 @media (min-width:1180px){
   body.drawer-open main, body.drawer-open .site-footer{padding-right:440px;}
@@ -522,15 +533,31 @@ body.has-turnbar{padding-bottom:calc(var(--turnbar-h, 94px) + 16px);}
 
 [hidden]{display:none !important;}
 
+/* Telefon: en lav bar med navnet og en Menu-knap; resten folder ud under den */
+@media (max-width:760px){
+  .site-nav .wrap{gap:10px;padding-block:10px;}
+  .brand{font-size:0.95rem;min-width:0;}
+  .brand svg{width:22px;height:22px;flex:0 0 auto;}
+  .brand-name{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+  .nav-toggle{display:inline-block;flex:0 0 auto;padding:7px 12px;}
+  .nav-menu{display:none;}
+  .site-nav.open .nav-menu{display:flex;flex-direction:column;gap:12px;width:100%;padding-bottom:6px;}
+  .nav-links{flex-direction:column;gap:0;font-size:0.85rem;}
+  .nav-links a{padding:11px 2px;border-bottom:1px dashed var(--line);}
+  .nav-search input, .nav-search input:focus-visible{width:100%;}
+  .nav-search{width:100%;}
+  .nav-auth{width:100%;margin-left:0;flex-wrap:wrap;gap:10px;}
+  .nav-auth .linklike{margin-left:auto;}
+}
 @media (max-width:600px){
-  .site-nav .wrap{gap:10px;}
-  .nav-auth{width:100%;justify-content:space-between;margin-left:0;order:3;}
-  .nav-search{width:100%;order:2;}
-  .nav-search input{width:100%;}
-  .nav-search input:focus-visible{width:100%;}
-  .hp-row{flex-wrap:wrap;gap:8px;}
-  .hp-row .hp-name{flex:1 1 auto;min-width:0;}
-  .hp-row .hp-track{flex:1 1 100%;order:4;}
+  /* Helbred: navn og tal på første linje, bjælken under — billede og inspiration i siderne */
+  .hp-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;column-gap:10px;row-gap:5px;}
+  .hp-row .hp-portrait, .hp-row .hp-portrait-fallback{grid-column:1;grid-row:1 / span 2;}
+  .hp-row .hp-name{grid-column:2;grid-row:1;}
+  .hp-row .hp-text{grid-column:3;grid-row:1;min-width:0;}
+  .hp-row .inspiration-btn{grid-column:4;grid-row:1 / span 2;}
+  .hp-row .hp-track{grid-column:2 / 4;grid-row:2;}
+  .hp-row .hp-unknown{grid-column:2 / 4;grid-row:2;line-height:1.2;}
 }
 
 /* Tid på dagen og hvil (Ved Bordet "Lige nu") */
@@ -650,3 +677,18 @@ html:not(.is-dm):not(.is-approver) [data-approver-only]{display:none !important;
 .journal-tools input{flex:1 1 200px;}
 /* Knap, der venter på et bekræftende klik mere (f.eks. "Afslut kamp") */
 .btn.armed{background:var(--blood);border-color:var(--blood);color:#fff;}
+
+/* "+ Ny …": formularen folder ud fra en knap, så listen står øverst */
+.add-toggle > summary{list-style:none;display:inline-block;}
+.add-toggle > summary::-webkit-details-marker{display:none;}
+.add-toggle[open] > summary{margin-bottom:12px;}
+.add-toggle[open] > summary .when-closed, .add-toggle:not([open]) > summary .when-open{display:none;}
+/* Noter under et mål: almindelig, læsbar tekst (ikke versaler) */
+.quest-note{display:block;margin-top:2px;font-size:0.88rem;font-style:italic;color:var(--ink-faint);line-height:1.45;}
+.tabs .count{opacity:0.7;margin-left:4px;}
+/* Grupper på Værktøjer-siden */
+.hub-group + .hub-group{margin-top:10px;}
+.hub-group > h2{font-size:1.1rem;margin-bottom:12px;color:var(--ink-soft);}
+/* Guld: læg til / træk fra */
+.gold-adjust{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.gold-adjust .small-input{width:90px;}

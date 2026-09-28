@@ -7,7 +7,7 @@
 <title>Skattekammer &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=27">
+<link rel="stylesheet" href="css/styles.css?v=28">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -20,13 +20,13 @@
 
 <main>
   <div class="page-head">
-    <p class="eyebrow">DM Tools</p>
+    <p class="eyebrow">Værktøjer</p>
     <h1>Skattekammer</h1>
     <p>Fælles guld og fund &mdash; hvad selskabet har, og hvem der bærer det.</p>
   </div>
 
   <div class="wrap" style="max-width:760px;">
-    <p style="margin:-8px 0 4px;"><a href="dmtools.html" class="back-link">&larr; Alle DM Tools</a></p>
+    <p style="margin:-8px 0 4px;"><a href="dmtools.html" class="back-link">&larr; Alle værktøjer</a></p>
 
     <datalist id="playerNames">
       <option value="Emil"></option>
@@ -55,11 +55,18 @@
             <span id="goldSavedMsg" class="notice" style="display:none;">Gemt.</span>
           </div>
         </form>
+        <div class="gold-adjust" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);">
+          <label for="goldDelta" class="enc-meta">Fundet eller brugt:</label>
+          <input type="number" id="goldDelta" class="small-input" min="0" step="0.01" placeholder="gp" inputmode="decimal">
+          <button type="button" class="btn secondary" data-gold="1" style="padding:6px 12px;">+ Læg til</button>
+          <button type="button" class="btn secondary" data-gold="-1" style="padding:6px 12px;">&minus; Træk fra</button>
+        </div>
       </div>
     </section>
 
-    <section class="section" id="addSection">
-      <div class="section-title"><h2>Tilføj fund</h2></div>
+    <section class="section" id="addSection" style="padding-bottom:0;">
+      <details class="add-toggle" id="addToggle">
+        <summary class="btn secondary"><span class="when-closed">+ Tilføj fund</span><span class="when-open">Luk</span></summary>
       <div class="card">
         <form class="form" id="addForm">
           <div class="row">
@@ -83,6 +90,7 @@
           <button class="btn" type="submit">Tilføj</button>
         </form>
       </div>
+      </details>
     </section>
 
     <section class="section">
@@ -96,7 +104,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=2"></script>
-<script src="js/app.js?v=24"></script>
+<script src="js/app.js?v=25"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -132,6 +140,42 @@
       goldSavedMsg.style.display = "inline-block";
     });
   });
+
+  // Læg til / træk fra: regner selv, og tager udgangspunkt i det gemte beløb
+  // (ikke feltet), så to, der gør det samtidig, ikke overskriver hinanden.
+  async function setGold(value) {
+    return window.sb.from("party_treasury").upsert({ id: 1, gold: value, notes: goldNotesEl.value.trim(), updated_at: new Date().toISOString() });
+  }
+  document.querySelectorAll("[data-gold]").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      const deltaEl = document.getElementById("goldDelta");
+      const amount = parseFloat(deltaEl.value);
+      if (!amount || amount < 0) {
+        deltaEl.focus();
+        return;
+      }
+      await withBusy(btn, "…", async () => {
+        const { data: fresh } = await window.sb.from("party_treasury").select("gold").eq("id", 1).maybeSingle();
+        const before = Number((fresh && fresh.gold) ?? goldEl.value) || 0;
+        const after = Math.round((before + Number(btn.dataset.gold) * amount) * 100) / 100;
+        if (after < 0) {
+          goldEl.value = before;
+          return notify(`Selskabet har kun ${before} gp.`, { error: true });
+        }
+        const { error } = await setGold(after);
+        if (error) return notify("Kunne ikke gemme: " + error.message, { error: true });
+        goldEl.value = after;
+        deltaEl.value = "";
+        notify(`Guld: ${before} → ${after} gp`, {
+          actionLabel: "Fortryd",
+          onAction: async () => {
+            const { error: undoErr } = await setGold(before);
+            if (!undoErr) goldEl.value = before;
+          },
+        });
+      });
+    })
+  );
 
   const list = document.getElementById("list");
 
@@ -216,10 +260,11 @@
         const quantity = parseInt(card.querySelector(".f-quantity").value, 10) || 1;
         const carriedBy = card.querySelector(".f-carried").value.trim() || null;
         const notes = card.querySelector(".f-notes").value.trim();
-        await window.sb
+        const { error } = await window.sb
           .from("loot_items")
           .update({ name, quantity, carried_by: carriedBy, notes, updated_at: new Date().toISOString() })
           .eq("id", row.id);
+        if (error) return notify("Kunne ikke gemme: " + error.message, { error: true });
         load();
       });
     });
@@ -246,10 +291,13 @@
       }
       e.target.reset();
       document.getElementById("quantity").value = 1;
+      document.getElementById("addToggle").open = false;
       load();
+      notify(`Tilføjet: ${name}`, { ms: 3000 });
     });
   });
 
+  wireAddToggle(document.getElementById("addToggle"));
   load();
 })();
 </script>
