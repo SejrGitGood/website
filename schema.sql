@@ -436,6 +436,20 @@ from encounter_combatants c
 join encounters e on e.id = c.encounter_id and e.status <> 'kladde'
 where public.is_member();
 
+-- Min dagbog (dagbog.html): private noter pr. konto — mistanker, hemmeligheder,
+-- planer. Kun ejeren kan læse og skrive dem (og kun med en godkendt konto);
+-- heller ikke DM'en kan se andres.
+create table if not exists journal_entries (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  title text,
+  body text not null,
+  campaign_day int,
+  pinned boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 -- En ny konto bliver automatisk en ventende spiller (navnet sendes med ved oprettelsen).
 create or replace function public.handle_new_member() returns trigger
 language plpgsql security definer set search_path = public as $$
@@ -485,6 +499,12 @@ alter table handouts enable row level security;
 alter table tarokka_reading enable row level security;
 alter table tarokka_answers enable row level security;
 alter table members enable row level security;
+alter table journal_entries enable row level security;
+drop policy if exists "owner only" on journal_entries;
+create policy "owner only" on journal_entries
+  for all
+  using (user_id = auth.uid() and (select public.is_member()))
+  with check (user_id = auth.uid() and (select public.is_member()));
 alter table fight_board enable row level security;
 drop policy if exists "members read fight board" on fight_board;
 create policy "members read fight board" on fight_board

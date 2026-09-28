@@ -643,3 +643,8 @@ html:not(.is-dm) [data-dm-only]{display:none !important;}
 .temp-password code{font-size:1.1rem;letter-spacing:0.05em;color:var(--ink);}
 /* Godkendere (spillere med "Må godkende") ser Spillere-kortet; alle andre ikke */
 html:not(.is-dm):not(.is-approver) [data-approver-only]{display:none !important;}
+
+/* Min dagbog */
+.journal-card.pinned{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold);}
+.journal-tools{display:flex;gap:8px 12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
+.journal-tools input{flex:1 1 200px;}

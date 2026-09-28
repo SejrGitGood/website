@@ -90,6 +90,10 @@ Live and working: Supabase project, shared login, public repo, GitHub Pages, ima
   - The view `fight_combatants`: monsters appear only as name, conditions and a health word (Uskadt/Såret/Blodig/Besejret); players show their HP.
   - The shared `loadActiveFight()` in app.js reads these, and falls back to the old tables before the SQL is run.
 - *Author names*: the "Hvem skriver?" fields fill themselves from the account name and are hidden. On the shared login they still work as before.
+- *Min dagbog* (`dagbog.html`: Historien, Ved Bordet quick links, or Min konto): a private journal per account for suspicions, secrets and plans.
+  - Rows live in `journal_entries` with an "owner only" rule: `user_id = auth.uid()` plus an approved account. Only the author can read or write their notes, not even the DM (whose own journal works the same way, for secret notes).
+  - Each note has an optional title and the text, and is stamped with the campaign day. Notes can be edited, deleted and pinned to the top, Lore names are auto-linked, and there's a search box and "Hent som tekstfil" for a backup.
+  - Text only, since images live in the public `photos` bucket and wouldn't stay private. Not in Eksportér, which is the DM's and would only contain the DM's own journal.
 - *Min Karakter* now uses the normal login (there's no separate personal login any more). On the shared login it asks you to create your own account. Players can still claim their own character there, or the DM links it on Spillere. The private backstory is still readable only by its owner — not by the DM, not by other players.
 - *Forgot password*: "Glemt adgangskode?" on the login page emails a link back to login.html, where the new password is set.
   - In the Supabase dashboard, check **Authentication → URL Configuration**: add `https://sejrgitgood.github.io/website/login.html` under Redirect URLs, so confirmation and reset links come back to the site.

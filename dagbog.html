@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Min dagbog &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=26">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#A6461C">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Valkyriegade">
+<script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">Kun for dig</p>
+    <h1>Min dagbog</h1>
+    <p>Dine egne noter &mdash; mistanker, hemmeligheder og planer. Kun du kan læse dem; heller ikke DM'en.</p>
+  </div>
+
+  <div class="wrap" style="max-width:760px;">
+    <section class="section">
+      <div class="section-title"><h2 id="formTitle">Ny note</h2></div>
+      <div class="card">
+        <form class="form" id="entryForm">
+          <div class="field">
+            <label for="entryTitle">Titel <span class="enc-meta">(valgfri)</span></label>
+            <input type="text" id="entryTitle" maxlength="120" placeholder="F.eks. Stoler vi på Ireena?">
+          </div>
+          <div class="field">
+            <label for="entryBody">Note</label>
+            <textarea id="entryBody" required style="min-height:140px;" placeholder="Skriv løs. Navne fra Lore bliver til links af sig selv."></textarea>
+          </div>
+          <div class="card-actions">
+            <button class="btn" type="submit">Gem</button>
+            <button class="btn secondary" type="button" id="cancelEdit" hidden>Annuller</button>
+          </div>
+        </form>
+        <p class="paste-hint" style="margin-top:10px;">Kun tekst &mdash; billeder ville ligge i det fælles billedlager, og så var de ikke private længere.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title"><h2>Dine noter</h2></div>
+      <div class="journal-tools" id="tools" hidden>
+        <input type="search" id="filter" class="small-input" placeholder="Søg i dine noter…" aria-label="Søg i dine noter">
+        <button type="button" class="btn secondary" id="downloadBtn" style="padding:6px 12px;">Hent som tekstfil</button>
+      </div>
+      <div id="entryList"><div class="empty">Indlæser&hellip;</div></div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=2"></script>
+<script src="js/app.js?v=24"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("");
+  wireLoreMentionPreviews();
+
+  const $ = (id) => document.getElementById(id);
+  const me = session.user.id;
+  let entries = [];
+  let loreIndex = [];
+  let editingId = null;
+
+  async function loadLoreIndex() {
+    const [{ data: loreData }, { data: charData }, { data: sessionData }] = await Promise.all([
+      window.sb.from("lore_entries").select("id, title, category, body, relationship, status"),
+      window.sb.from("characters").select("id, character_name, teaser"),
+      window.sb.from("sessions").select("id, title, summary"),
+    ]);
+    loreIndex = [...(loreData || []), ...characterMentionEntries(charData), ...sessionMentionEntries(sessionData)];
+    setLorePreviewData(loreIndex);
+  }
+
+  const shortDate = (iso) => new Date(iso).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" });
+  function cardHtml(x) {
+    const edited = x.updated_at && new Date(x.updated_at) - new Date(x.created_at) > 60000 ? ` &middot; redigeret ${shortDate(x.updated_at)}` : "";
+    const meta = [x.campaign_day ? `Dag ${x.campaign_day}` : "", shortDate(x.created_at)].filter(Boolean).join(" &middot; ") + edited;
+    return `
+      <div class="card journal-card ${x.pinned ? "pinned" : ""}" data-id="${x.id}">
+        ${x.pinned ? `<span class="badge">Fastgjort</span>` : ""}
+        ${x.title ? `<h3 style="${x.pinned ? "margin-top:8px;" : ""}">${escapeHtml(x.title)}</h3>` : ""}
+        <p class="meta">${meta}</p>
+        <p class="body" style="margin-top:8px;">${linkifyLoreMentions(escapeHtml(x.body), loreIndex)}</p>
+        <div class="card-actions" style="margin-top:12px;">
+          <button class="btn secondary" data-act="pin" style="padding:6px 12px;">${x.pinned ? "Løsn" : "Fastgør"}</button>
+          <button class="btn secondary" data-act="edit" style="padding:6px 12px;">Rediger</button>
+          <button class="btn danger" data-act="delete" style="padding:6px 12px;">Slet</button>
+        </div>
+      </div>`;
+  }
+  function render() {
+    const term = $("filter").value.trim().toLowerCase();
+    const shown = entries
+      .filter((x) => !term || `${x.title || ""} ${x.body}`.toLowerCase().includes(term))
+      .sort((a, b) => (b.pinned - a.pinned) || b.created_at.localeCompare(a.created_at));
+    $("tools").hidden = !entries.length;
+    $("entryList").innerHTML = shown.length
+      ? shown.map(cardHtml).join("")
+      : `<div class="empty">${entries.length ? "Ingen noter matcher." : "Ingen noter endnu &mdash; skriv den første ovenfor."}</div>`;
+  }
+
+  async function load() {
+    const { data, error } = await window.sb.from("journal_entries").select("*").eq("user_id", me);
+    if (error) {
+      $("entryList").innerHTML = /journal_entries/.test(error.message)
+        ? `<div class="empty">Dagbogen er ikke sat op endnu &mdash; DM'en skal køre den nye SQL fra schema.sql.</div>`
+        : `<div class="empty">Kunne ikke hente dine noter: ${escapeHtml(error.message)}</div>`;
+      return;
+    }
+    entries = data || [];
+    render();
+  }
+
+  function resetForm() {
+    editingId = null;
+    $("entryForm").reset();
+    $("formTitle").textContent = "Ny note";
+    $("cancelEdit").hidden = true;
+  }
+  $("cancelEdit").addEventListener("click", resetForm);
+
+  $("entryForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = $("entryBody").value.trim();
+    if (!body) return;
+    const title = $("entryTitle").value.trim() || null;
+    await withBusy(e.target.querySelector('button[type="submit"]'), "Gemmer…", async () => {
+      let res;
+      if (editingId) {
+        res = await window.sb.from("journal_entries").update({ title, body, updated_at: new Date().toISOString() }).eq("id", editingId);
+      } else {
+        // Noten stemples med kampagnedagen, så den kan placeres i historien bagefter.
+        const { data: day } = await window.sb.from("logistics").select("campaign_day").eq("id", 1).maybeSingle();
+        res = await window.sb.from("journal_entries").insert({ user_id: me, title, body, campaign_day: day ? day.campaign_day : null });
+      }
+      if (res.error) {
+        alert("Kunne ikke gemme: " + res.error.message);
+        return;
+      }
+      resetForm();
+      await load();
+    });
+  });
+
+  $("entryList").addEventListener("click", async (e) => {
+    const card = e.target.closest("[data-id]");
+    const act = e.target.closest("[data-act]")?.dataset.act;
+    const x = card && entries.find((y) => y.id === card.dataset.id);
+    if (!x || !act) return;
+    if (act === "pin") {
+      await window.sb.from("journal_entries").update({ pinned: !x.pinned }).eq("id", x.id);
+    } else if (act === "delete") {
+      if (!confirm(`Slet noten${x.title ? ` "${x.title}"` : ""}? Den kan ikke hentes tilbage.`)) return;
+      await window.sb.from("journal_entries").delete().eq("id", x.id);
+    } else if (act === "edit") {
+      editingId = x.id;
+      $("entryTitle").value = x.title || "";
+      $("entryBody").value = x.body;
+      $("formTitle").textContent = "Rediger note";
+      $("cancelEdit").hidden = false;
+      $("formTitle").scrollIntoView({ behavior: "smooth", block: "start" });
+      $("entryBody").focus();
+      return;
+    }
+    await load();
+  });
+
+  $("filter").addEventListener("input", render);
+
+  // Backup: hele dagbogen som én tekstfil, ældste først.
+  $("downloadBtn").addEventListener("click", () => {
+    const text = [...entries]
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .map((x) => [`# ${x.title || "(uden titel)"}`, [x.campaign_day ? `Dag ${x.campaign_day}` : "", shortDate(x.created_at)].filter(Boolean).join(" · "), "", x.body].join("\n"))
+      .join("\n\n---\n\n");
+    const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "min-dagbog.txt";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  await loadLoreIndex();
+  await load();
+})();
+</script>
+</body>
+</html>
