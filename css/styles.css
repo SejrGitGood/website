@@ -648,3 +648,5 @@ html:not(.is-dm):not(.is-approver) [data-approver-only]{display:none !important;
 .journal-card.pinned{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold);}
 .journal-tools{display:flex;gap:8px 12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
 .journal-tools input{flex:1 1 200px;}
+/* Knap, der venter på et bekræftende klik mere (f.eks. "Afslut kamp") */
+.btn.armed{background:var(--blood);border-color:var(--blood);color:#fff;}

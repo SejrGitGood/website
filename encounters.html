@@ -7,7 +7,7 @@
 <title>Kampbygger &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=26">
+<link rel="stylesheet" href="css/styles.css?v=27">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -953,12 +953,18 @@
     }
     return { cur: cb.hp_current, max: cb.hp_max, temp: cb.hp_temp || 0, synced: false };
   }
+  // "Afslut kamp" bekræftes med et ekstra klik på selve knappen i stedet for
+  // browserens egen dialog — den kan være slået fra eller blokeret (f.eks. i
+  // indlejrede browsere), og så skete der bare ingenting.
+  let endArmedUntil = 0;
+  const END_CONFIRM_MS = 4000;
   function renderTrackerHead() {
     const inRound = encounter.round > 0;
+    const armed = Date.now() < endArmedUntil;
     $("trackerHead").innerHTML = `
       <div class="section-title" style="margin-bottom:4px;">
         <h2>${inRound ? `Runde ${encounter.round}` : "Initiativ"}</h2>
-        <button class="btn secondary" data-act="end" style="padding:6px 12px;">Afslut kamp</button>
+        <button class="btn ${armed ? "armed" : "secondary"}" data-act="end" style="padding:6px 12px;">${armed ? "Tryk igen for at afslutte" : "Afslut kamp"}</button>
       </div>
       <p class="enc-meta">${
         inRound
@@ -1678,9 +1684,22 @@
       else if (act === "prev") await advanceTurn(-1);
       else if (act === "begin") await beginCombat();
       else if (act === "roll-monsters") await rollMonsterInitiative();
-      else if (act === "end" && confirm("Afslut kampen?")) {
-        await updateEncounter({ status: "afsluttet" });
-        await logFightSummary();
+      else if (act === "end") {
+        if (Date.now() < endArmedUntil) {
+          endArmedUntil = 0;
+          await updateEncounter({ status: "afsluttet" });
+          await logFightSummary();
+        } else {
+          // Første klik: knappen bliver rød og beder om et klik mere.
+          endArmedUntil = Date.now() + END_CONFIRM_MS;
+          renderTrackerHead();
+          setTimeout(() => {
+            if (endArmedUntil && Date.now() >= endArmedUntil) {
+              endArmedUntil = 0;
+              if (encounter.status === "aktiv") renderTrackerHead();
+            }
+          }, END_CONFIRM_MS + 100);
+        }
       }
       else if (act === "details-current" && encounter.turn_combatant_id) openDrawer({ type: "combatant", id: encounter.turn_combatant_id });
     }
