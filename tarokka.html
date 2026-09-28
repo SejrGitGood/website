@@ -7,7 +7,7 @@
 <title>Tarokka-læsningen &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=22">
+<link rel="stylesheet" href="css/styles.css?v=23">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -28,7 +28,7 @@
   <div class="wrap">
     <p style="margin:-8px 0 4px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
       <a href="historien.html" class="back-link">&larr; Historien</a>
-      <button type="button" class="btn secondary" id="editToggle" style="padding:6px 12px;">Rediger læsningen (DM)</button>
+      <button type="button" class="btn secondary" id="editToggle" style="padding:6px 12px;" data-dm-only>Rediger læsningen (DM)</button>
     </p>
     <p class="enc-meta" id="editHint" hidden>DM-visning: betydningerne står her, også de skjulte. Spillerne ser kun kortet, Madam Evas ord og de betydninger, du har afsløret.</p>
     <section class="section">
@@ -41,7 +41,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=20"></script>
+<script src="js/app.js?v=21"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -61,6 +61,19 @@
   let rows = {};
   let loreIndex = [];
   let editing = false;
+  // De skjulte betydninger ligger i tarokka_answers, som kun DM'en kan læse;
+  // tarokka_reading.answer har kun de afslørede. (Før den nye SQL findes
+  // tabellen ikke — så ligger betydningen i tarokka_reading som før.)
+  let answers = {};
+  let answersTable = true;
+  async function loadAnswers() {
+    if (!isDm()) return;
+    const { data, error } = await window.sb.from("tarokka_answers").select("*");
+    answersTable = !error;
+    answers = {};
+    (data || []).forEach((a) => (answers[a.slot] = a.answer));
+  }
+  const dmAnswer = (slot, r) => (answersTable ? answers[slot] ?? r.answer : r.answer);
 
   async function loadLoreIndex() {
     const [{ data: loreData }, { data: charData }] = await Promise.all([
@@ -88,7 +101,7 @@
         <p class="meta" style="margin:0;">${escapeHtml(s.title)}</p>
         <div class="field"><label>Kort</label><input type="text" name="card" value="${escapeHtml(r.card || "")}" placeholder="Det kort, der blev trukket"></div>
         <div class="field"><label>Madam Evas ord</label><textarea name="prophecy" style="min-height:90px;" placeholder="Det, hun sagde — spillerne ser det">${escapeHtml(r.prophecy || "")}</textarea></div>
-        <div class="field"><label>Betydning <span class="enc-meta">(skjult, indtil du afslører den)</span></label><textarea name="answer" style="min-height:70px;" placeholder="Hvor / hvem det er">${escapeHtml(r.answer || "")}</textarea></div>
+        <div class="field"><label>Betydning <span class="enc-meta">(skjult, indtil du afslører den)</span></label><textarea name="answer" style="min-height:70px;" placeholder="Hvor / hvem det er">${escapeHtml(dmAnswer(s.slot, r) || "")}</textarea></div>
         <label class="enc-meta" style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="answer_revealed" ${r.answer_revealed ? "checked" : ""}> Vis betydningen for spillerne</label>
         <label class="enc-meta" style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="resolved" ${r.resolved ? "checked" : ""}> ${s.done}</label>
         <div><button class="btn" type="submit">Gem</button> <span class="enc-meta" data-saved hidden>Gemt</span></div>
@@ -112,7 +125,8 @@
     return true;
   }
 
-  $("editToggle").addEventListener("click", () => {
+  $("editToggle").addEventListener("click", async () => {
+    if (!editing) await loadAnswers();
     editing = !editing;
     $("editToggle").textContent = editing ? "Færdig" : "Rediger læsningen (DM)";
     $("editHint").hidden = !editing;
@@ -123,16 +137,29 @@
     const form = e.target.closest("form[data-slot]");
     if (!form) return;
     const f = form.elements;
+    const slot = form.dataset.slot;
+    const answer = f.answer.value.trim() || null;
+    const revealed = f.answer_revealed.checked;
+    const now = new Date().toISOString();
     const row = {
-      slot: form.dataset.slot,
+      slot,
       card: f.card.value.trim() || null,
       prophecy: f.prophecy.value.trim() || null,
-      answer: f.answer.value.trim() || null,
-      answer_revealed: f.answer_revealed.checked,
+      // Spillerne kan læse tarokka_reading — betydningen står der kun, når den er afsløret.
+      answer: answersTable ? (revealed ? answer : null) : answer,
+      answer_revealed: revealed,
       resolved: f.resolved.checked,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     };
     await withBusy(form.querySelector('button[type="submit"]'), "Gemmer…", async () => {
+      if (answersTable) {
+        const saved = await window.sb.from("tarokka_answers").upsert({ slot, answer, updated_at: now }, { onConflict: "slot" });
+        if (saved.error) {
+          alert("Kunne ikke gemme betydningen: " + saved.error.message);
+          return;
+        }
+        answers[slot] = answer;
+      }
       // upsert, så det også virker, hvis de fem rækker ikke er oprettet endnu.
       const { error } = await window.sb.from("tarokka_reading").upsert(row, { onConflict: "slot" });
       if (error) {

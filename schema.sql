@@ -84,13 +84,9 @@ create table if not exists character_private_notes (
   updated_at timestamptz not null default now()
 );
 
--- Hvilke mails der må oprette en PERSONLIG konto og kræve en karakter via
--- min-karakter.html. Uden denne liste ville policyerne nedenfor ("se ledige
--- karakterer" / "kræv en karakter") gælde for enhver, der selv opretter en
--- konto med den offentlige anon-nøgle (som ligger frit i det offentlige
--- repo) — dvs. hvem som helst på internettet, ikke kun jer fem. Tilføj hver
--- spillers valgte mail her, én gang, når de fortæller dig den:
--- insert into approved_personal_emails (email) values ('spiller@eksempel.dk');
+-- AFLØST af members (se "Personlige konti og roller" længere nede): DM'en
+-- godkender nu konti på spillere.html. Tabellen bruges kun til at føre konti,
+-- der blev godkendt her før, over som godkendte medlemmer.
 create table if not exists approved_personal_emails (
   email text primary key
 );
@@ -290,6 +286,74 @@ create table if not exists session_log_entries (
   created_at timestamptz not null default now()
 );
 
+-- Tarokka-kortenes betydning ligger i en tabel, kun DM'en kan læse;
+-- tarokka_reading.answer udfyldes først, når DM'en afslører den (tarokka.html).
+create table if not exists tarokka_answers (
+  slot text primary key,
+  answer text,
+  updated_at timestamptz not null default now()
+);
+insert into tarokka_answers (slot, answer)
+select slot, answer from tarokka_reading where answer is not null
+on conflict (slot) do nothing;
+update tarokka_reading set answer = null where not answer_revealed;
+
+-- --- Personlige konti og roller ---
+-- Alle opretter deres egen konto (login.html) og venter, til DM'en godkender
+-- dem (spillere.html). role: 'player' eller 'dm'. status: 'pending',
+-- 'approved' eller 'rejected'. Den gamle fælles login (allowed_users) tæller
+-- som spiller, indtil DM'en lukker den.
+create table if not exists members (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  email text not null unique,
+  display_name text,
+  role text not null default 'player' check (role in ('player', 'dm')),
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  created_at timestamptz not null default now(),
+  approved_at timestamptz
+);
+
+-- Bruges af alle policies nedenfor. security definer, så de kan læse members
+-- og allowed_users uden selv at ramme RLS (og uden rekursion i members' egne).
+create or replace function public.is_member() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from members m where m.user_id = auth.uid() and m.status = 'approved')
+      or exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email');
+$$;
+create or replace function public.is_dm() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from members m where m.user_id = auth.uid() and m.status = 'approved' and m.role = 'dm');
+$$;
+
+-- En ny konto bliver automatisk en ventende spiller (navnet sendes med ved oprettelsen).
+create or replace function public.handle_new_member() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.members (user_id, email, display_name)
+  values (new.id, new.email, nullif(trim(new.raw_user_meta_data ->> 'name'), ''))
+  on conflict (user_id) do nothing;
+  return new;
+end $$;
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created after insert on auth.users
+  for each row execute function public.handle_new_member();
+
+-- Konti oprettet før dette (via Min Karakter) kommer med: godkendt, hvis mailen
+-- var godkendt eller ejer en karakter, og med karakterens spillernavn. Den
+-- fælles login springes over — den dækkes af allowed_users.
+insert into members (user_id, email, display_name, status, approved_at)
+select u.id, u.email,
+  coalesce(nullif(trim(u.raw_user_meta_data ->> 'name'), ''), (select c.player_name from characters c where c.owner_email = u.email limit 1)),
+  case when ok then 'approved' else 'pending' end,
+  case when ok then now() end
+from (
+  select u.*, (exists (select 1 from approved_personal_emails a where a.email = u.email)
+            or exists (select 1 from characters c where c.owner_email = u.email)) as ok
+  from auth.users u
+) u
+where not exists (select 1 from allowed_users au where au.email = u.email)
+on conflict (user_id) do nothing;
+
 alter table sessions enable row level security;
 alter table lore_entries enable row level security;
 alter table logistics enable row level security;
@@ -308,198 +372,149 @@ alter table session_log_entries enable row level security;
 alter table monster_library enable row level security;
 alter table handouts enable row level security;
 alter table tarokka_reading enable row level security;
+alter table tarokka_answers enable row level security;
+alter table members enable row level security;
 
--- Rydder op efter en evt. tidligere, mere åben version af dette skema,
--- så denne fil altid trygt kan køres igen fra toppen.
-drop policy if exists "authenticated full access" on sessions;
-drop policy if exists "authenticated full access" on lore_entries;
-drop policy if exists "authenticated full access" on logistics;
+-- === Adgang (RLS) ===
+-- Godkendte medlemmer (spillere og DM) deler alt det, selskabet deler; kun
+-- DM'en ser og ændrer DM-værktøjernes data. Den gamle fælles login
+-- (allowed_users) tæller som spiller, indtil DM'en lukker den på spillere.html.
+-- Idempotent: filen kan stadig køres igen fra toppen.
+
+-- Ryd op efter tidligere versioner af politikkerne.
+do $$
+declare t text;
+begin
+  foreach t in array array['sessions', 'lore_entries', 'logistics', 'characters', 'loot_items', 'party_treasury',
+    'quests', 'maps', 'map_markers', 'encounters', 'encounter_combatants', 'session_log_entries',
+    'monster_library', 'handouts', 'tarokka_reading'] loop
+    execute format('drop policy if exists "authenticated full access" on %I', t);
+    execute format('drop policy if exists "allow-listed users only" on %I', t);
+  end loop;
+end $$;
+drop policy if exists "select unclaimed characters" on characters;
+drop policy if exists "claim unclaimed character" on characters;
+
+-- Enhver logget-ind bruger må slå sin egen mail op (sådan genkendes den fælles login).
 drop policy if exists "read own membership" on allowed_users;
-drop policy if exists "allow-listed users only" on sessions;
-drop policy if exists "allow-listed users only" on lore_entries;
-drop policy if exists "allow-listed users only" on logistics;
-
--- Enhver logget-ind bruger må slå sin egen mail op (nødvendigt for at policies nedenfor kan tjekke den).
 create policy "read own membership" on allowed_users
   for select using (auth.jwt() ->> 'email' = email);
+-- DM'en må se og lukke den fælles login.
+drop policy if exists "dm manages shared login" on allowed_users;
+create policy "dm manages shared login" on allowed_users
+  for all using ((select public.is_dm())) with check ((select public.is_dm()));
 
--- Kun mails på listen må læse/skrive sessions, lore og logistik.
-create policy "allow-listed users only" on sessions
-  for all
-  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
-  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+-- Det, hele selskabet deler: godkendte medlemmer må læse og skrive.
+do $$
+declare t text;
+begin
+  foreach t in array array['sessions', 'lore_entries', 'logistics', 'characters', 'loot_items', 'party_treasury',
+    'quests', 'maps', 'map_markers', 'session_log_entries'] loop
+    execute format('drop policy if exists "members only" on %I', t);
+    execute format('create policy "members only" on %I for all using ((select public.is_member())) with check ((select public.is_member()))', t);
+  end loop;
+end $$;
 
-create policy "allow-listed users only" on lore_entries
-  for all
-  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
-  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+-- Kampe: spillerne ser kampe, der er i gang (Ved Bordet, Tavlen) — ikke DM'ens
+-- kladder — og kun DM'en kører dem. (Monstrenes HP kan stadig læses direkte i
+-- databasen af den, der ved hvordan; siderne viser dem aldrig for spillerne.)
+drop policy if exists "members read running fights" on encounters;
+create policy "members read running fights" on encounters
+  for select using ((select public.is_member()) and status <> 'kladde');
+drop policy if exists "dm runs fights" on encounters;
+create policy "dm runs fights" on encounters
+  for all using ((select public.is_dm())) with check ((select public.is_dm()));
+drop policy if exists "members read combatants" on encounter_combatants;
+create policy "members read combatants" on encounter_combatants
+  for select using ((select public.is_member()));
+drop policy if exists "dm runs combatants" on encounter_combatants;
+create policy "dm runs combatants" on encounter_combatants
+  for all using ((select public.is_dm())) with check ((select public.is_dm()));
 
-create policy "allow-listed users only" on logistics
-  for all
-  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
-  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+-- Handouts: spillerne ser kun dem, der er vist for bordet; forberedte er DM'ens.
+drop policy if exists "members read shown handouts" on handouts;
+create policy "members read shown handouts" on handouts
+  for select using ((select public.is_member()) and revealed_at is not null);
+drop policy if exists "dm manages handouts" on handouts;
+create policy "dm manages handouts" on handouts
+  for all using ((select public.is_dm())) with check ((select public.is_dm()));
 
-drop policy if exists "allow-listed users only" on characters;
-create policy "allow-listed users only" on characters
-  for all
-  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
-  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+-- Tarokka: alle ser kortene og de afslørede betydninger; kun DM'en redigerer
+-- og ser de skjulte (tarokka_answers).
+drop policy if exists "members read tarokka" on tarokka_reading;
+create policy "members read tarokka" on tarokka_reading
+  for select using ((select public.is_member()));
+drop policy if exists "dm manages tarokka" on tarokka_reading;
+create policy "dm manages tarokka" on tarokka_reading
+  for all using ((select public.is_dm())) with check ((select public.is_dm()));
+drop policy if exists "dm only" on tarokka_answers;
+create policy "dm only" on tarokka_answers
+  for all using ((select public.is_dm())) with check ((select public.is_dm()));
 
-drop policy if exists "allow-listed users only" on loot_items;
-create policy "allow-listed users only" on loot_items
-  for all
-  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
-  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+-- Monsterbiblioteket er kun DM'ens.
+drop policy if exists "dm only" on monster_library;
+create policy "dm only" on monster_library
+  for all using ((select public.is_dm())) with check ((select public.is_dm()));
 
-drop policy if exists "allow-listed users only" on party_treasury;
-create policy "allow-listed users only" on party_treasury
-  for all
-  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
-  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
+-- Medlemmer: man ser altid sin egen række (også mens man venter), godkendte
+-- ser hinandens navne, og kun DM'en godkender, ændrer roller og fjerner.
+-- Rækker oprettes kun af triggeren, når en konto oprettes.
+drop policy if exists "read members" on members;
+create policy "read members" on members
+  for select using (user_id = auth.uid() or (select public.is_member()));
+drop policy if exists "dm manages members" on members;
+create policy "dm manages members" on members
+  for update using ((select public.is_dm())) with check ((select public.is_dm()));
+drop policy if exists "dm removes members" on members;
+create policy "dm removes members" on members
+  for delete using ((select public.is_dm()));
 
-drop policy if exists "allow-listed users only" on quests;
-create policy "allow-listed users only" on quests
-  for all
-  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
-  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
-
-drop policy if exists "allow-listed users only" on maps;
-create policy "allow-listed users only" on maps
-  for all
-  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
-  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
-
-drop policy if exists "allow-listed users only" on map_markers;
-create policy "allow-listed users only" on map_markers
-  for all
-  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
-  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
-
-drop policy if exists "allow-listed users only" on encounters;
-create policy "allow-listed users only" on encounters
-  for all
-  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
-  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
-
-drop policy if exists "allow-listed users only" on encounter_combatants;
-create policy "allow-listed users only" on encounter_combatants
-  for all
-  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
-  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
-
-drop policy if exists "allow-listed users only" on session_log_entries;
-create policy "allow-listed users only" on session_log_entries
-  for all
-  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
-  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
-
-drop policy if exists "allow-listed users only" on monster_library;
-create policy "allow-listed users only" on monster_library
-  for all
-  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
-  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
-
-drop policy if exists "allow-listed users only" on handouts;
-create policy "allow-listed users only" on handouts
-  for all
-  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
-  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
-
-drop policy if exists "allow-listed users only" on tarokka_reading;
-create policy "allow-listed users only" on tarokka_reading
-  for all
-  using (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'))
-  with check (exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email'));
-
--- --- Personlige konti (min-karakter.html) ---
--- Disse politikker gælder UDOVER "allow-listed users only" ovenfor (Postgres
--- OR'er alle policies for samme kommando sammen) — en personlig konto behøver
--- ALDRIG stå i allowed_users, den kan kun røre sin egen karakterrække.
-
--- En konto må slå sin egen mail op i godkendelseslisten (nødvendigt for at
--- de to policies nedenfor kan bruge exists(...) til at tjekke den).
-drop policy if exists "read own approval" on approved_personal_emails;
-create policy "read own approval" on approved_personal_emails
-  for select using (auth.jwt() ->> 'email' = email);
-
--- En spiller, der endnu ikke har valgt sin karakter, må se hvilke rækker der
--- stadig er ledige (owner_email er null), så min-karakter.html kan vise en
--- vælger. KRÆVER at mailen står i approved_personal_emails — ellers ville
--- dette gælde for enhver, der selv opretter en konto med den offentlige
--- anon-nøgle, ikke kun jer fem.
-drop policy if exists "select unclaimed characters" on characters;
-create policy "select unclaimed characters" on characters
-  for select
-  using (
-    owner_email is null
-    and exists (select 1 from approved_personal_emails ape where ape.email = auth.jwt() ->> 'email')
-  );
-
--- Ejeren må altid læse sin egen række (for at forudfylde redigeringsformularen).
+-- Min Karakter: ejeren må altid læse og opdatere sin egen karakter (ud over
+-- "members only" ovenfor).
 drop policy if exists "owner can select own character" on characters;
 create policy "owner can select own character" on characters
   for select
   using (auth.jwt() ->> 'email' = owner_email);
-
--- Selvbetjent "claim": en godkendt personlig konto må sætte sig selv som
--- ejer af en karakter, der endnu ikke er krævet af nogen. Når owner_email
--- først er sat, matcher "unclaimed"-betingelsen (using) ikke længere, så
--- karakteren kan ikke kapres af en anden konto bagefter. Samme
--- godkendelseskrav som ovenfor.
-drop policy if exists "claim unclaimed character" on characters;
-create policy "claim unclaimed character" on characters
-  for update
-  using (
-    owner_email is null
-    and exists (select 1 from approved_personal_emails ape where ape.email = auth.jwt() ->> 'email')
-  )
-  with check (auth.jwt() ->> 'email' = owner_email);
-
--- Ejeren må opdatere sin egen karakter (bruges til at gemme teaser).
 drop policy if exists "owner can update own character" on characters;
 create policy "owner can update own character" on characters
   for update
   using (auth.jwt() ->> 'email' = owner_email)
   with check (auth.jwt() ->> 'email' = owner_email);
 
--- Privat baggrundshistorie: KUN ejeren selv, ingen andre — heller ikke den
--- delte konto. Bevidst ingen "allow-listed users only"-politik på denne tabel.
+-- Privat baggrundshistorie: KUN ejeren selv, ingen andre — heller ikke DM'en.
 drop policy if exists "owner only" on character_private_notes;
 create policy "owner only" on character_private_notes
   for all
   using (auth.jwt() ->> 'email' = owner_email)
   with check (auth.jwt() ->> 'email' = owner_email);
 
--- Vil du senere tilføje eller fjerne en spiller, uden at køre hele filen igen:
--- insert into allowed_users (email) values ('ny@eksempel.dk');
--- delete from allowed_users where email = 'gammel@eksempel.dk';
+-- approved_personal_emails er afløst af members (godkendelse på spillere.html)
+-- og bruges kun til at føre gamle Min Karakter-konti over.
+drop policy if exists "read own approval" on approved_personal_emails;
+create policy "read own approval" on approved_personal_emails
+  for select using (auth.jwt() ->> 'email' = email);
 
--- Samme for personlige Min Karakter-konti — kør én gang pr. spiller, når du
--- kender deres valgte mail (kræves FØR de kan vælge/kræve deres karakter):
--- insert into approved_personal_emails (email) values ('spiller@eksempel.dk');
+-- Gør din egen konto til DM (én gang, efter du har oprettet den på login.html):
+-- update members set role = 'dm', status = 'approved', approved_at = now() where email = 'din@mail.dk';
 
 -- Billeder: en offentligt-læsbar bucket (så <img src> altid virker uden ekstra
--- login-håndtering), men kun allow-listede brugere må lægge noget op eller slette.
+-- login-håndtering), men kun godkendte medlemmer må lægge noget op eller slette.
 insert into storage.buckets (id, name, public)
 values ('photos', 'photos', true)
 on conflict (id) do nothing;
 
 drop policy if exists "allow-listed can upload photos" on storage.objects;
 drop policy if exists "allow-listed can delete photos" on storage.objects;
+drop policy if exists "members can upload photos" on storage.objects;
+drop policy if exists "members can delete photos" on storage.objects;
 
-create policy "allow-listed can upload photos" on storage.objects
+create policy "members can upload photos" on storage.objects
   for insert
-  with check (
-    bucket_id = 'photos'
-    and exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email')
-  );
+  with check (bucket_id = 'photos' and (select public.is_member()));
 
-create policy "allow-listed can delete photos" on storage.objects
+create policy "members can delete photos" on storage.objects
   for delete
-  using (
-    bucket_id = 'photos'
-    and exists (select 1 from allowed_users au where au.email = auth.jwt() ->> 'email')
-  );
+  using (bucket_id = 'photos' and (select public.is_member()));
 
 -- Live-opdatering (Supabase Realtime) af kamptrackeren og Ved Bordet på tværs
 -- af enheder. RLS gælder stadig for hvad hver abonnent får at se. Idempotent:

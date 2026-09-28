@@ -7,7 +7,7 @@
 <title>Kampbygger &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=22">
+<link rel="stylesheet" href="css/styles.css?v=23">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -157,12 +157,13 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=20"></script>
+<script src="js/app.js?v=21"></script>
 <script>
 (async function () {
   const session = await guardPage();
   if (!session) return;
   renderNav("dmtools.html");
+  if (!requireDm()) return;
 
   // --- Regler (DMG 2014) — CR_XP ligger i app.js, delt med monsteropslaget ---
   const CR_OPTIONS = [["0", 0], ["1/8", 0.125], ["1/4", 0.25], ["1/2", 0.5]].concat(

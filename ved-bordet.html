@@ -7,7 +7,7 @@
 <title>Ved Bordet &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=22">
+<link rel="stylesheet" href="css/styles.css?v=23">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -106,7 +106,7 @@
           <a class="btn secondary" href="tavle.html">Tavle</a>
           <a class="btn secondary" href="handouts.html">Handouts</a>
           <a class="btn secondary" href="tarokka.html">Tarokka</a>
-          <a class="btn secondary" href="encounters.html">Kampbygger</a>
+          <a class="btn secondary" href="encounters.html" data-dm-only>Kampbygger</a>
           <a class="btn secondary" href="monsters.html">Monstre</a>
           <a class="btn secondary" href="spells.html">Besværgelser</a>
           <a class="btn secondary" href="conditions.html">Tilstande</a>
@@ -120,7 +120,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
-<script src="js/app.js?v=20"></script>
+<script src="js/app.js?v=21"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -164,7 +164,9 @@
         return `<li>${isTurn ? `<strong>${name}</strong> &larr; tur` : name} <span class="enc-meta">&middot; ${c.initiative ?? "–"}</span></li>`;
       })
       .join("");
-    document.getElementById("combatLink").href = `encounters.html?id=${enc.id}`;
+    const combatLink = document.getElementById("combatLink");
+    combatLink.href = isDm() ? `encounters.html?id=${enc.id}` : "tavle.html";
+    combatLink.innerHTML = isDm() ? "Åbn trackeren &rarr;" : "Åbn Tavlen &rarr;";
     document.getElementById("combatCard").innerHTML = `
       <h3>${escapeHtml(enc.name)}</h3>
       <p class="meta">${enc.round ? `Runde ${enc.round}` : "Initiativ slås"}</p>

@@ -621,3 +621,14 @@ body.tavle{min-height:100vh;display:flex;flex-direction:column;}
   .tavle-row{grid-template-columns:auto minmax(0,1fr) auto;}
   .tavle-row .tavle-avatar{display:none;}
 }
+
+/* Konti og roller: DM-mærke og "venter"-tæller i menuen; DM-elementer skjules for alle andre */
+.nav-role{display:inline-block;margin-left:4px;padding:1px 7px;border-radius:999px;background:var(--ember);color:var(--surface);font-family:"Cinzel",serif;font-size:0.62rem;letter-spacing:0.06em;vertical-align:middle;}
+.nav-pending{padding:2px 9px;border-radius:999px;border:1px solid var(--ember);color:var(--ember);font-size:0.8rem;text-decoration:none;}
+.nav-pending:hover{background:var(--ember);color:var(--surface);}
+html:not(.is-dm) [data-dm-only]{display:none !important;}
+.auth-tabs{display:flex;gap:6px;margin-bottom:14px;}
+.member-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) auto;gap:8px 12px;align-items:center;padding:10px 0;border-bottom:1px dashed var(--line);}
+.member-row:last-child{border-bottom:none;}
+.member-row .enc-meta{overflow-wrap:anywhere;}
+@media (max-width:640px){ .member-row{grid-template-columns:1fr;} }

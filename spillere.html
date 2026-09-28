@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Spillere &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=23">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#A6461C">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Valkyriegade">
+<script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">DM Tools</p>
+    <h1>Spillere</h1>
+    <p>Hvem har adgang til kampagnen: godkend nye konti, giv dem deres karakter, og luk den fælles login, når alle er med.</p>
+  </div>
+
+  <div class="wrap" style="max-width:820px;">
+    <p style="margin:-8px 0 4px;"><a href="dmtools.html" class="back-link">&larr; Alle DM Tools</a></p>
+
+    <section class="section">
+      <div class="section-title"><h2>Venter på godkendelse</h2></div>
+      <div id="pendingList"><div class="empty">Indlæser&hellip;</div></div>
+    </section>
+
+    <section class="section">
+      <div class="section-title"><h2>Selskabet</h2></div>
+      <div class="card" id="memberList"><div class="empty">Indlæser&hellip;</div></div>
+      <p class="paste-hint" style="margin-top:8px;">Navnet bruges som "skrevet af" overalt på siden. En DM ser og styrer DM-værktøjerne; spillere ser alt andet.</p>
+    </section>
+
+    <section class="section">
+      <div class="section-title"><h2>Den fælles login</h2></div>
+      <div class="card" id="sharedCard"><div class="empty">Indlæser&hellip;</div></div>
+    </section>
+
+    <section class="section" id="rejectedSection" hidden>
+      <div class="section-title"><h2>Afviste</h2></div>
+      <div class="card" id="rejectedList"></div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=21"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("dmtools.html");
+  if (!requireDm()) return;
+
+  const $ = (id) => document.getElementById(id);
+  const me = window.__member;
+  let members = [];
+  let characters = [];
+  let shared = [];
+
+  async function load() {
+    const [m, c, s] = await Promise.all([
+      window.sb.from("members").select("*").order("created_at", { ascending: true }),
+      window.sb.from("characters").select("id, character_name, player_name, owner_email").order("sort_order", { ascending: true }),
+      window.sb.from("allowed_users").select("email"),
+    ]);
+    if (m.error) {
+      $("pendingList").innerHTML = `<div class="empty">Kontoerne er ikke sat op endnu &mdash; kør den nye SQL fra schema.sql i Supabase.</div>`;
+      $("memberList").innerHTML = "";
+      $("sharedCard").innerHTML = "";
+      return;
+    }
+    members = m.data || [];
+    characters = c.data || [];
+    shared = s.data || [];
+    render();
+  }
+
+  const charOf = (member) => characters.find((ch) => ch.owner_email === member.email);
+  function characterSelect(member, { onlyFree = false } = {}) {
+    const mine = charOf(member);
+    const options = characters
+      .filter((ch) => !onlyFree || !ch.owner_email || ch.owner_email === member.email)
+      .map((ch) => {
+        const takenBy = ch.owner_email && ch.owner_email !== member.email ? members.find((x) => x.email === ch.owner_email) : null;
+        return `<option value="${ch.id}" ${mine && mine.id === ch.id ? "selected" : ""}>${escapeHtml(ch.character_name)}${takenBy ? ` (${escapeHtml(takenBy.display_name || takenBy.email)})` : ""}</option>`;
+      })
+      .join("");
+    return `<select class="small-input" data-field="character" aria-label="Karakter"><option value="">Ingen karakter</option>${options}</select>`;
+  }
+
+  function render() {
+    const pending = members.filter((x) => x.status === "pending");
+    const approved = members.filter((x) => x.status === "approved");
+    const rejected = members.filter((x) => x.status === "rejected");
+
+    $("pendingList").innerHTML = pending.length
+      ? pending
+          .map(
+            (x) => `
+        <div class="card" data-id="${x.user_id}">
+          <h3>${escapeHtml(x.display_name || "(uden navn)")}</h3>
+          <p class="meta">${escapeHtml(x.email)} &middot; oprettet ${formatDate(x.created_at)}</p>
+          <div class="card-actions" style="margin-top:10px;align-items:center;">
+            ${characterSelect(x, { onlyFree: true })}
+            <button class="btn" data-act="approve">Godkend som spiller</button>
+            <button class="btn danger" data-act="reject">Afvis</button>
+          </div>
+        </div>`
+          )
+          .join("")
+      : `<div class="empty">Ingen venter lige nu.</div>`;
+
+    $("memberList").innerHTML = approved.length
+      ? approved
+          .map((x) => {
+            const self = x.user_id === me.user_id;
+            return `
+        <div class="member-row" data-id="${x.user_id}">
+          <div>
+            <input type="text" class="small-input" data-field="name" value="${escapeHtml(x.display_name || "")}" placeholder="Navn" aria-label="Navn" style="width:100%;">
+            <div class="enc-meta" style="margin-top:4px;">${escapeHtml(x.email)}${self ? " &middot; dig" : ""}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <select class="small-input" data-field="role" aria-label="Rolle">
+              <option value="player" ${x.role === "player" ? "selected" : ""}>Spiller</option>
+              <option value="dm" ${x.role === "dm" ? "selected" : ""}>DM</option>
+            </select>
+            ${characterSelect(x)}
+          </div>
+          <div>${self ? "" : `<button class="btn secondary" data-act="remove" style="padding:6px 12px;">Fjern adgang</button>`}</div>
+        </div>`;
+          })
+          .join("")
+      : `<div class="empty">Ingen godkendte konti endnu.</div>`;
+
+    $("rejectedSection").hidden = !rejected.length;
+    $("rejectedList").innerHTML = rejected
+      .map(
+        (x) => `
+        <div class="member-row" data-id="${x.user_id}">
+          <div>${escapeHtml(x.display_name || "(uden navn)")}<div class="enc-meta">${escapeHtml(x.email)}</div></div>
+          <div></div>
+          <div><button class="btn secondary" data-act="approve" style="padding:6px 12px;">Godkend alligevel</button></div>
+        </div>`
+      )
+      .join("");
+
+    // Den fælles login: hvor mange karakterer har fået en spillerkonto?
+    const linked = characters.filter((ch) => ch.owner_email && members.some((x) => x.email === ch.owner_email && x.status === "approved")).length;
+    $("sharedCard").innerHTML = shared.length
+      ? `<p class="body">Den fælles login (${shared.map((s) => escapeHtml(s.email)).join(", ")}) virker stadig &mdash; alle, der kender den fælles adgangskode, kan se det, spillerne ser.</p>
+         <p class="body" style="margin-top:8px;"><strong>${linked} af ${characters.length}</strong> karakterer har en godkendt spillerkonto.</p>
+         <div class="card-actions" style="margin-top:12px;"><button class="btn danger" data-act="close-shared">Luk den fælles login</button></div>
+         <p class="paste-hint" style="margin-top:10px;">Luk den, når alle logger ind med deres egen konto. Enheder, der stadig er logget ind med den, bliver bedt om at oprette deres egen.</p>`
+      : `<p class="body">Den fælles login er lukket &mdash; alle logger ind med deres egen konto.</p>`;
+  }
+
+  // --- Ændringer ---
+  const byId = (id) => members.find((x) => x.user_id === id);
+  const otherDms = (id) => members.filter((x) => x.status === "approved" && x.role === "dm" && x.user_id !== id).length;
+  async function updateMember(x, patch) {
+    const { error } = await window.sb.from("members").update(patch).eq("user_id", x.user_id);
+    if (error) alert("Kunne ikke gemme: " + error.message);
+  }
+  // Én karakter pr. konto: den gamle slippes, den nye gives til kontoen.
+  async function setCharacter(x, charId) {
+    const target = characters.find((ch) => ch.id === charId);
+    if (target && target.owner_email && target.owner_email !== x.email) {
+      const holder = members.find((m) => m.email === target.owner_email);
+      if (!confirm(`${target.character_name} er knyttet til ${holder ? holder.display_name || holder.email : target.owner_email}. Flyt den til ${x.display_name || x.email}?`)) return false;
+    }
+    let res = await window.sb.from("characters").update({ owner_email: null }).eq("owner_email", x.email);
+    if (!res.error && target) res = await window.sb.from("characters").update({ owner_email: x.email }).eq("id", target.id);
+    if (res.error) {
+      alert("Kunne ikke knytte karakteren: " + res.error.message);
+      return false;
+    }
+    return true;
+  }
+
+  document.querySelector("main").addEventListener("click", async (e) => {
+    const act = e.target.closest("[data-act]")?.dataset.act;
+    if (!act) return;
+    if (act === "close-shared") {
+      if (!confirm("Luk den fælles login? Derefter kan kun godkendte, personlige konti se kampagnen.")) return;
+      const { error } = await window.sb.from("allowed_users").delete().in("email", shared.map((s) => s.email));
+      if (error) alert("Kunne ikke lukke den: " + error.message);
+      return load();
+    }
+    const row = e.target.closest("[data-id]");
+    const x = row && byId(row.dataset.id);
+    if (!x) return;
+    if (act === "approve") {
+      await updateMember(x, { status: "approved", approved_at: new Date().toISOString() });
+      const sel = row.querySelector('[data-field="character"]');
+      if (sel && sel.value) await setCharacter(x, sel.value);
+    } else if (act === "reject") {
+      if (!confirm(`Afvis ${x.display_name || x.email}?`)) return;
+      await updateMember(x, { status: "rejected" });
+    } else if (act === "remove") {
+      if (x.role === "dm" && !otherDms(x.user_id)) return alert("Der skal være mindst én DM.");
+      if (!confirm(`Fjern ${x.display_name || x.email}s adgang? Kontoen flyttes til "Afviste" og kan godkendes igen senere.`)) return;
+      await updateMember(x, { status: "rejected" });
+      await setCharacter(x, "");
+    }
+    await load();
+  });
+
+  document.querySelector("main").addEventListener("change", async (e) => {
+    const row = e.target.closest("[data-id]");
+    const x = row && byId(row.dataset.id);
+    const field = e.target.dataset.field;
+    if (!x || !field || x.status !== "approved") return;
+    if (field === "name") {
+      await updateMember(x, { display_name: e.target.value.trim() || null });
+    } else if (field === "role") {
+      if (e.target.value === "player" && x.role === "dm" && !otherDms(x.user_id)) {
+        alert("Der skal være mindst én DM.");
+        e.target.value = "dm";
+        return;
+      }
+      if (x.user_id === me.user_id && e.target.value === "player" && !confirm("Gøre dig selv til spiller? Så mister du adgangen til DM-værktøjerne, også denne side.")) {
+        e.target.value = "dm";
+        return;
+      }
+      await updateMember(x, { role: e.target.value });
+      if (x.user_id === me.user_id && e.target.value === "player") return (location.href = "index.html");
+    } else if (field === "character") {
+      await setCharacter(x, e.target.value);
+    }
+    await load();
+  });
+
+  await load();
+})();
+</script>
+</body>
+</html>

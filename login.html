@@ -7,7 +7,7 @@
 <title>Log ind &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=22">
+<link rel="stylesheet" href="css/styles.css?v=23">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -17,60 +17,212 @@
 </head>
 <body>
 <main>
-  <div class="wrap" style="max-width:420px;padding-top:10vh;">
+  <div class="wrap" style="max-width:440px;padding-top:8vh;">
     <div class="page-head" style="padding-top:0;">
       <p class="eyebrow">Blessings of Valkyriegade</p>
-      <h1>Log ind</h1>
-      <p>Én adgangskode, delt af hele selskabet.</p>
+      <h1 id="pageTitle">Log ind</h1>
+      <p id="pageIntro">Med din egen konto. Ny her? Opret en &mdash; DM'en godkender den.</p>
     </div>
 
-    <div class="card">
+    <!-- Log ind -->
+    <div class="card" id="loginView">
+      <div class="auth-tabs">
+        <button type="button" class="btn" data-view="loginView">Log ind</button>
+        <button type="button" class="btn secondary" data-view="signupView">Opret konto</button>
+      </div>
       <form class="form" id="loginForm">
-        <div class="field">
-          <label for="password">Adgangskode</label>
-          <input type="password" id="password" required autocomplete="current-password">
-        </div>
-        <button class="btn" type="submit" id="loginBtn">Log ind</button>
+        <div class="field"><label for="loginEmail">Email</label><input type="email" id="loginEmail" required autocomplete="username"></div>
+        <div class="field"><label for="loginPassword">Adgangskode</label><input type="password" id="loginPassword" required autocomplete="current-password"></div>
+        <button class="btn" type="submit">Log ind</button>
       </form>
-      <p class="notice" id="statusMsg" hidden style="margin-top:14px;"></p>
+      <p class="enc-meta" style="margin-top:14px;display:flex;gap:6px 16px;flex-wrap:wrap;">
+        <button type="button" class="text-link" data-view="forgotView">Glemt adgangskode?</button>
+        <button type="button" class="text-link" data-view="sharedView" id="sharedLink">Den fælles adgangskode (udfases)</button>
+      </p>
     </div>
+
+    <!-- Opret konto -->
+    <div class="card" id="signupView" hidden>
+      <div class="auth-tabs">
+        <button type="button" class="btn secondary" data-view="loginView">Log ind</button>
+        <button type="button" class="btn" data-view="signupView">Opret konto</button>
+      </div>
+      <form class="form" id="signupForm">
+        <div class="field"><label for="signupName">Dit navn</label><input type="text" id="signupName" required maxlength="40" placeholder="Det navn, de andre kender dig ved" autocomplete="nickname"></div>
+        <div class="field"><label for="signupEmail">Email</label><input type="email" id="signupEmail" required autocomplete="email"></div>
+        <div class="field"><label for="signupPassword">Adgangskode <span class="enc-meta">(mindst 6 tegn)</span></label><input type="password" id="signupPassword" required minlength="6" autocomplete="new-password"></div>
+        <button class="btn" type="submit">Opret konto</button>
+      </form>
+      <p class="paste-hint" style="margin-top:12px;">Kontoen skal godkendes af DM'en, før du kan se kampagnen.</p>
+    </div>
+
+    <!-- Glemt adgangskode -->
+    <div class="card" id="forgotView" hidden>
+      <form class="form" id="forgotForm">
+        <div class="field"><label for="forgotEmail">Din email</label><input type="email" id="forgotEmail" required autocomplete="email"></div>
+        <button class="btn" type="submit">Send et link til en ny adgangskode</button>
+      </form>
+      <p class="enc-meta" style="margin-top:14px;"><button type="button" class="text-link" data-view="loginView">&larr; Tilbage til log ind</button></p>
+    </div>
+
+    <!-- Ny adgangskode (efter linket i mailen) -->
+    <div class="card" id="resetView" hidden>
+      <form class="form" id="resetForm">
+        <div class="field"><label for="newPassword">Ny adgangskode <span class="enc-meta">(mindst 6 tegn)</span></label><input type="password" id="newPassword" required minlength="6" autocomplete="new-password"></div>
+        <button class="btn" type="submit">Gem adgangskoden</button>
+      </form>
+    </div>
+
+    <!-- Den gamle fælles login, indtil DM'en lukker den -->
+    <div class="card" id="sharedView" hidden>
+      <form class="form" id="sharedForm">
+        <div class="field"><label for="sharedPassword">Den fælles adgangskode</label><input type="password" id="sharedPassword" required autocomplete="current-password"></div>
+        <button class="btn" type="submit">Log ind</button>
+      </form>
+      <p class="paste-hint" style="margin-top:12px;">Den fælles login forsvinder, når alle har deres egen konto. Opret gerne din egen allerede nu.</p>
+      <p class="enc-meta" style="margin-top:10px;"><button type="button" class="text-link" data-view="loginView">&larr; Tilbage til log ind</button></p>
+    </div>
+
+    <!-- Venter på godkendelse / afvist / fælles login lukket -->
+    <div class="card" id="pendingView" hidden>
+      <h3 id="pendingTitle">Venter på godkendelse</h3>
+      <p class="body" id="pendingText"></p>
+      <div class="card-actions" style="margin-top:14px;">
+        <button type="button" class="btn" id="checkAgainBtn">Tjek igen</button>
+        <button type="button" class="btn secondary" id="logoutBtn">Log ud</button>
+      </div>
+    </div>
+
+    <p class="notice" id="statusMsg" hidden style="margin-top:14px;"></p>
   </div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=1"></script>
+<script src="js/app.js?v=21"></script>
 <script>
-  window.sb = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
-
+(async function () {
+  const $ = (id) => document.getElementById(id);
   const params = new URLSearchParams(location.search);
   const redirectTarget = params.get("redirect") || "index.html";
+  // Links i mails (bekræft konto, ny adgangskode) sendes tilbage hertil.
+  const loginUrl = `${location.origin}${location.pathname}`;
+  const VIEWS = ["loginView", "signupView", "forgotView", "resetView", "sharedView", "pendingView"];
+  const TITLES = { loginView: "Log ind", signupView: "Opret konto", forgotView: "Glemt adgangskode", resetView: "Ny adgangskode", sharedView: "Fælles login", pendingView: "Din konto" };
 
-  window.sb.auth.getSession().then(({ data }) => {
-    if (data.session) location.href = redirectTarget;
+  function show(view) {
+    VIEWS.forEach((v) => ($(v).hidden = v !== view));
+    $("pageTitle").textContent = TITLES[view];
+    $("pageIntro").hidden = view !== "loginView";
+    $("statusMsg").hidden = true;
+  }
+  function say(text) {
+    $("statusMsg").textContent = text;
+    $("statusMsg").hidden = false;
+  }
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-view]");
+    if (btn) show(btn.dataset.view);
   });
+  if (!window.SUPABASE_CONFIG.sharedEmail) $("sharedLink").hidden = true;
 
-  const form = document.getElementById("loginForm");
-  const statusMsg = document.getElementById("statusMsg");
-  const loginBtn = document.getElementById("loginBtn");
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const password = document.getElementById("password").value;
-    loginBtn.disabled = true;
-    loginBtn.textContent = "Logger ind...";
-    const { error } = await window.sb.auth.signInWithPassword({
-      email: window.SUPABASE_CONFIG.sharedEmail,
-      password,
-    });
-    if (error) {
-      statusMsg.hidden = false;
-      statusMsg.textContent = "Forkert adgangskode, eller kontoen er ikke sat op endnu.";
-      loginBtn.disabled = false;
-      loginBtn.textContent = "Log ind";
-    } else {
-      location.href = redirectTarget;
+  // Logget ind: godkendt → videre; ellers forklar, hvorfor ikke.
+  async function continueIfApproved() {
+    resetMember();
+    const member = await loadMember();
+    if (!member) {
+      show("loginView");
+      return;
     }
+    if (!member.pending) {
+      location.href = redirectTarget;
+      return;
+    }
+    const sharedClosed = member.email === window.SUPABASE_CONFIG.sharedEmail;
+    $("pendingTitle").textContent = sharedClosed ? "Den fælles login er lukket" : member.status === "rejected" ? "Ikke godkendt" : "Venter på godkendelse";
+    $("pendingText").textContent = sharedClosed
+      ? "DM'en har lukket den fælles login. Log ud, og opret din egen konto — så godkender DM'en den."
+      : member.status === "rejected"
+        ? `Kontoen ${member.email} er ikke godkendt. Tal med DM'en, hvis det er en fejl.`
+        : `Tak${member.display_name ? `, ${member.display_name}` : ""}! Kontoen ${member.email} er oprettet og venter på, at DM'en godkender den. Tryk "Tjek igen", når DM'en har gjort det.`;
+    $("checkAgainBtn").hidden = sharedClosed || member.status === "rejected";
+    show("pendingView");
+  }
+
+  $("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await withBusy(e.target.querySelector('button[type="submit"]'), "Logger ind…", async () => {
+      const { error } = await window.sb.auth.signInWithPassword({ email: $("loginEmail").value.trim(), password: $("loginPassword").value });
+      if (error) return say("Forkert email eller adgangskode — eller kontoen er ikke bekræftet endnu (tjek din mail).");
+      await continueIfApproved();
+    });
   });
+
+  $("sharedForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await withBusy(e.target.querySelector('button[type="submit"]'), "Logger ind…", async () => {
+      const { error } = await window.sb.auth.signInWithPassword({ email: window.SUPABASE_CONFIG.sharedEmail, password: $("sharedPassword").value });
+      if (error) return say("Forkert adgangskode.");
+      await continueIfApproved();
+    });
+  });
+
+  $("signupForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await withBusy(e.target.querySelector('button[type="submit"]'), "Opretter…", async () => {
+      const { data, error } = await window.sb.auth.signUp({
+        email: $("signupEmail").value.trim(),
+        password: $("signupPassword").value,
+        options: { data: { name: $("signupName").value.trim() }, emailRedirectTo: loginUrl },
+      });
+      if (error) return say("Kunne ikke oprette kontoen: " + error.message);
+      if (data.session) {
+        await continueIfApproved();
+      } else {
+        show("loginView");
+        say("Kontoen er oprettet. Tjek din mail og klik på linket for at bekræfte den — derefter skal DM'en godkende den, før du kan logge ind og se kampagnen.");
+      }
+    });
+  });
+
+  $("forgotForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await withBusy(e.target.querySelector('button[type="submit"]'), "Sender…", async () => {
+      const { error } = await window.sb.auth.resetPasswordForEmail($("forgotEmail").value.trim(), { redirectTo: loginUrl });
+      if (error) return say("Kunne ikke sende mailen: " + error.message);
+      say("Findes der en konto med den mail, er der nu sendt et link til at vælge en ny adgangskode.");
+    });
+  });
+
+  $("resetForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await withBusy(e.target.querySelector('button[type="submit"]'), "Gemmer…", async () => {
+      const { error } = await window.sb.auth.updateUser({ password: $("newPassword").value });
+      if (error) return say("Kunne ikke gemme adgangskoden: " + error.message);
+      await continueIfApproved();
+    });
+  });
+
+  $("checkAgainBtn").addEventListener("click", continueIfApproved);
+  $("logoutBtn").addEventListener("click", async () => {
+    await window.sb.auth.signOut();
+    resetMember();
+    show("loginView");
+  });
+
+  // Kommer man fra "ny adgangskode"-linket, skal der vælges en ny, før man sendes videre.
+  const recovering = location.hash.includes("type=recovery");
+  window.sb.auth.onAuthStateChange((event) => {
+    if (event === "PASSWORD_RECOVERY") show("resetView");
+  });
+  if (recovering) {
+    show("resetView");
+    return;
+  }
+  const { data } = await window.sb.auth.getSession();
+  if (data.session) await continueIfApproved();
+  else show(params.get("opret") === "1" ? "signupView" : "loginView");
+})();
 </script>
 </body>
 </html>

@@ -17,9 +17,11 @@ const NAV_LINKS = [
 ];
 
 // --- Forfatter-tilskrivning: hvem skrev/redigerede en session eller
-// lore-indgang. `created_by` kan ikke komme fra login'et (alle fem deler én
-// konto), så brugeren vælger selv sit navn — huskes pr. browser bagefter. ---
+// lore-indgang. Med en personlig konto kommer navnet fra kontoen; på den
+// gamle fælles login vælger brugeren selv sit navn (huskes pr. browser). ---
 function getStoredAuthorName() {
+  const m = window.__member;
+  if (m && !m.legacy && m.display_name) return m.display_name;
   try {
     return localStorage.getItem("authorName") || "";
   } catch (e) {
@@ -27,6 +29,14 @@ function getStoredAuthorName() {
   }
 }
 function wireAuthorField(inputEl) {
+  // Personlig konto med navn: feltet er overflødigt — udfyldes og skjules.
+  const m = window.__member;
+  if (m && !m.legacy && m.display_name) {
+    inputEl.value = m.display_name;
+    const field = inputEl.closest(".field");
+    if (field) field.hidden = true;
+    return;
+  }
   if (!inputEl.value) inputEl.value = getStoredAuthorName();
   inputEl.addEventListener("change", () => {
     try {
@@ -464,15 +474,77 @@ async function currentSession() {
   return data.session;
 }
 
-// Kaldes øverst på beskyttede sider. Sender til login.html hvis ingen er logget ind.
+// --- Konti og roller (members-tabellen) ---
+// Hvem er logget ind: en godkendt personlig konto (spiller eller DM), den gamle
+// fælles login (legacy — tæller som spiller), eller en konto, der venter på
+// DM'ens godkendelse. Før den nye SQL er kørt, findes members ikke — så virker
+// den fælles login som hidtil, også til DM-værktøjerne.
+let memberPromise = null;
+function loadMember() {
+  if (!memberPromise) {
+    memberPromise = (async () => {
+      const session = await currentSession();
+      if (!session) return null;
+      const [own, shared] = await Promise.all([
+        window.sb.from("members").select("*").eq("user_id", session.user.id).maybeSingle(),
+        window.sb.from("allowed_users").select("email").eq("email", session.user.email).maybeSingle(),
+      ]);
+      const rolesEnabled = !own.error;
+      const row = own.data;
+      if (row && row.status === "approved") return { ...row, isDm: row.role === "dm", legacy: false, rolesEnabled };
+      if (shared.data) {
+        return { email: session.user.email, display_name: null, role: "player", status: "approved", legacy: true, rolesEnabled, isDm: !rolesEnabled };
+      }
+      return { email: session.user.email, display_name: row ? row.display_name : null, status: row ? row.status : "pending", pending: true, rolesEnabled };
+    })();
+  }
+  return memberPromise;
+}
+const isDm = () => !!(window.__member && window.__member.isDm);
+// Efter log ind/ud på login.html skal kontoen slås op igen.
+function resetMember() {
+  memberPromise = null;
+}
+
+// Kaldes øverst på beskyttede sider. Sender til login.html, hvis ingen er
+// logget ind, eller hvis kontoen endnu ikke er godkendt af DM'en.
 async function guardPage() {
   const session = await currentSession();
   if (!session) {
-    const here = encodeURIComponent(location.pathname.split("/").pop());
+    const here = encodeURIComponent(location.pathname.split("/").pop() + location.search);
     location.href = `login.html?redirect=${here}`;
     return null;
   }
+  const member = await loadMember();
+  if (!member || member.pending) {
+    location.href = `login.html?konto=${member && member.status === "rejected" ? "afvist" : "afventer"}`;
+    return null;
+  }
+  window.__member = member;
+  document.documentElement.classList.toggle("is-dm", member.isDm);
   return session;
+}
+
+// DM-sider (Kampbygger, Monsterbibliotek, Spillere …): viser en besked i stedet
+// for indholdet for alle andre end DM'en. Kaldes efter renderNav.
+function requireDm() {
+  if (isDm()) return true;
+  const main = document.querySelector("main");
+  if (main) {
+    const legacy = window.__member && window.__member.legacy;
+    main.innerHTML = `
+      <div class="wrap" style="max-width:640px;">
+        <div class="page-head">
+          <p class="eyebrow">Kun for DM'en</p>
+          <h1>Ingen adgang</h1>
+          <p>${legacy
+            ? "Du er logget ind med den fælles login. DM-værktøjerne kræver DM'ens egen konto."
+            : "Denne side er DM'ens værktøj."}</p>
+        </div>
+        <div class="card-actions"><a class="btn secondary" href="dmtools.html">&larr; DM Tools</a><a class="btn secondary" href="tavle.html">Tavle</a></div>
+      </div>`;
+  }
+  return false;
 }
 
 function navSvg() {
@@ -489,7 +561,9 @@ async function renderNav(activeHref) {
 
   let authHtml;
   if (session) {
-    authHtml = `<span>Logget ind</span><button class="linklike" id="signOutBtn">Log ud</button>`;
+    const m = window.__member;
+    const who = m && m.display_name ? escapeHtml(m.display_name) : m && m.legacy ? "Fælles login" : "Logget ind";
+    authHtml = `<span>${who}${m && m.isDm && m.rolesEnabled ? ` <span class="nav-role">DM</span>` : ""}</span><a class="nav-pending" id="navPending" href="spillere.html" hidden></a><button class="linklike" id="signOutBtn">Log ud</button>`;
   } else {
     authHtml = `<a href="login.html">Log ind</a>`;
   }
@@ -521,6 +595,23 @@ async function renderNav(activeHref) {
       await window.sb.auth.signOut();
       location.href = "login.html";
     });
+  }
+
+  // DM'en ser, når nogen venter på at blive godkendt.
+  const m = window.__member;
+  if (m && m.isDm && m.rolesEnabled) {
+    window.sb
+      .from("members")
+      .select("user_id", { count: "exact", head: true })
+      .eq("status", "pending")
+      .then(({ count }) => {
+        const el = document.getElementById("navPending");
+        if (el && count) {
+          el.textContent = `${count} venter`;
+          el.title = `${count} ${count === 1 ? "konto venter" : "konti venter"} på godkendelse`;
+          el.hidden = false;
+        }
+      });
   }
 
   const themeSelect = document.getElementById("themeSelect");
