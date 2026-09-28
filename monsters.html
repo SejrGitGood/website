@@ -22,7 +22,7 @@
   <div class="page-head">
     <p class="eyebrow">DM Tools</p>
     <h1>Monsteropslag</h1>
-    <p>Slå et monster op midt i kamp &mdash; AC, HP og angreb, direkte fra D&amp;D 5e's officielle regler.</p>
+    <p>Slå et monster op midt i kamp &mdash; AC, HP og angreb, direkte fra D&amp;D 5e's officielle regler<span data-dm-only> og fra dit eget monsterbibliotek</span>.</p>
   </div>
 
   <div class="wrap" style="max-width:760px;">
@@ -64,7 +64,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=2"></script>
-<script src="js/app.js?v=23"></script>
+<script src="js/app.js?v=24"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -109,21 +109,34 @@
     return lines.join("\n");
   }
 
+  // Monstre fra DM'ens bibliotek kan ikke gemmes i Lore — spillerne læser Lore,
+  // og biblioteket er netop holdt uden for deres rækkevidde.
   function monsterDetailHtml(m) {
     return `
       <div class="card">
+        ${m.__library ? `<p class="enc-meta" style="margin-bottom:8px;">Fra dit monsterbibliotek</p>` : ""}
         ${monsterStatBlockHtml(m)}
-        <div class="card-actions" style="margin-top:14px;">
+        ${m.__library ? "" : `<div class="card-actions" style="margin-top:14px;">
           <button class="btn secondary" id="saveNpcBtn">Gem som lore-indgang (NPC)</button>
           <span id="savedMsg" class="notice" style="display:none;">Gemt i Lore.</span>
-        </div>
+        </div>`}
       </div>`;
   }
 
   function renderResultsList() {
     document.getElementById("resultsList").innerHTML = lastResults
-      .map((m, i) => `<button type="button" data-idx="${i}">${escapeHtml(m.name)} (CR ${escapeHtml(m.challenge_rating)})</button>`)
+      .map((m, i) => `<button type="button" data-idx="${i}">${escapeHtml(m.name)} (CR ${escapeHtml(m.challenge_rating || "?")})${m.__library ? " &middot; dit bibliotek" : ""}</button>`)
       .join("");
+  }
+
+  // DM'ens egne monstre (monsterbibliotek.html). Spillere får ingen — databasen
+  // giver kun DM'en adgang til biblioteket.
+  async function searchLibrary(term) {
+    const { data } = await window.sb.from("monster_library").select("id, name, block");
+    const needle = term.toLowerCase();
+    return (data || [])
+      .filter((e) => e.name.toLowerCase().includes(needle))
+      .map((e) => ({ ...(e.block || {}), name: e.name, __library: true }));
   }
 
   function selectMonster(idx) {
@@ -131,6 +144,7 @@
     document.querySelectorAll("#resultsList button").forEach((b, i) => b.classList.toggle("active", i === idx));
     document.getElementById("detail").innerHTML = monsterDetailHtml(selected);
     document.getElementById("detailSection").hidden = false;
+    if (selected.__library) return;
     document.getElementById("saveNpcBtn").addEventListener("click", async () => {
       const btn = document.getElementById("saveNpcBtn");
       await withBusy(btn, "Gemmer…", async () => {
@@ -166,16 +180,20 @@
       document.getElementById("resultsTitle").textContent = "Søger…";
       document.getElementById("resultsList").innerHTML = "";
       try {
+        // Biblioteket hentes hver gang (DM'en kan have tilføjet et monster); SRD-svar caches.
+        const libraryHits = await searchLibrary(term);
         const cacheKey = term.toLowerCase();
+        let srd;
         if (searchCache.has(cacheKey)) {
-          lastResults = searchCache.get(cacheKey);
+          srd = searchCache.get(cacheKey);
         } else {
           const url = `https://api.open5e.com/v1/monsters/?document__slug=wotc-srd&search=${encodeURIComponent(term)}&limit=20`;
           const res = await fetch(url);
           const data = await res.json();
-          lastResults = data.results || [];
-          searchCache.set(cacheKey, lastResults);
+          srd = data.results || [];
+          searchCache.set(cacheKey, srd);
         }
+        lastResults = [...libraryHits, ...srd];
         document.getElementById("resultsTitle").textContent = lastResults.length
           ? `Resultater for "${term}"`
           : `Ingen monstre fundet for "${term}"`;

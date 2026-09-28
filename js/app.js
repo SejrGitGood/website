@@ -341,6 +341,41 @@ function healthWord(cur, max) {
   return cur > max / 2 ? "Såret" : "Blodig";
 }
 
+// --- Kampen, som spillerne ser den (Tavlen, Ved Bordet) ---
+// Deltagere uden hemmeligheder: monstre kun med helbred i ord, spillere med HP.
+function publicCombatant(cb) {
+  const pc = cb.kind === "pc";
+  const out = !pc && cb.hp_max != null && (cb.hp_current ?? 0) <= 0;
+  return {
+    id: cb.id, encounter_id: cb.encounter_id, kind: cb.kind, character_id: cb.character_id, name: cb.name,
+    initiative: cb.initiative, init_bonus: cb.init_bonus, conditions: cb.conditions, condition_timers: cb.condition_timers,
+    health: !pc && cb.hp_max != null ? healthWord(cb.hp_current ?? 0, cb.hp_max) : null,
+    is_out: out,
+    hp_current: pc ? cb.hp_current : null, hp_max: pc ? cb.hp_max : null, hp_temp: pc ? cb.hp_temp : null,
+  };
+}
+// Den kamp, der er i gang: navn, runde, tur og deltagere. Spillere kan ikke læse
+// selve kamptabellerne — de læser fight_board og viewet fight_combatants, som
+// kun indeholder det, spillerne må se. (Før den nye SQL findes de ikke; så
+// hentes kampen fra tabellerne som hidtil og renses her.)
+async function loadActiveFight() {
+  const board = await window.sb.from("fight_board").select("*").eq("status", "aktiv").order("updated_at", { ascending: false }).limit(1).maybeSingle();
+  if (!board.error) {
+    if (!board.data) return { encounter: null, combatants: [] };
+    const b = board.data;
+    const encounter = { id: b.encounter_id, name: b.name, round: b.round, turn_combatant_id: b.turn_combatant_id };
+    const { data } = await window.sb.from("fight_combatants").select("*").eq("encounter_id", encounter.id);
+    return { encounter, combatants: data || [] };
+  }
+  const { data: enc } = await window.sb.from("encounters").select("id, name, round, turn_combatant_id").eq("status", "aktiv").order("updated_at", { ascending: false }).limit(1).maybeSingle();
+  if (!enc) return { encounter: null, combatants: [] };
+  const { data: cbs } = await window.sb.from("encounter_combatants").select("*").eq("encounter_id", enc.id);
+  return { encounter: enc, combatants: (cbs || []).map(publicCombatant) };
+}
+// Tabeller, der ændres, når kampen gør — til subscribeToChanges. Spillerne får kun
+// signaler fra fight_board (og characters); DM'en også fra selve tabellerne.
+const FIGHT_TABLES = ["fight_board", "encounters", "encounter_combatants", "characters"];
+
 // Varighed på en tilstand (encounter_combatants.condition_timers): udløber ved
 // starten af anchors tur i runde t.until (uden anchor: ved rundens start).
 // Returnerer hvor mange gange anchors tur endnu skal starte (0 = udløbet).

@@ -359,6 +359,83 @@ end $$;
 revoke all on function public.approve_member(uuid, boolean) from public;
 grant execute on function public.approve_member(uuid, boolean) to authenticated;
 
+-- --- Kampen, som spillerne ser den (Tavlen, Ved Bordet) ---
+-- Kun DM'en kan læse encounters/encounter_combatants (monstrenes HP, AC, noter,
+-- kladdens monsterliste). Spillerne får i stedet:
+--   fight_board      — navn, status, runde og tur for kampe, der ikke er kladder;
+--                       holdes ajour af triggere og bruges til Realtime.
+--   fight_combatants — deltagerne uden hemmeligheder: monstre kun med helbred i
+--                       ord (Uskadt/Såret/Blodig/Besejret), spillere med HP.
+create table if not exists fight_board (
+  encounter_id uuid primary key references encounters(id) on delete cascade,
+  name text,
+  status text,
+  round int,
+  turn_combatant_id uuid,
+  updated_at timestamptz not null default now()
+);
+
+create or replace function public.sync_fight_board() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'DELETE' then
+    delete from fight_board where encounter_id = old.id;
+    return old;
+  end if;
+  if new.status = 'kladde' then
+    delete from fight_board where encounter_id = new.id;
+  else
+    insert into fight_board (encounter_id, name, status, round, turn_combatant_id, updated_at)
+    values (new.id, new.name, new.status, new.round, new.turn_combatant_id, now())
+    on conflict (encounter_id) do update
+      set name = excluded.name, status = excluded.status, round = excluded.round,
+          turn_combatant_id = excluded.turn_combatant_id, updated_at = excluded.updated_at;
+  end if;
+  return new;
+end $$;
+drop trigger if exists fight_board_sync on encounters;
+create trigger fight_board_sync after insert or update or delete on encounters
+  for each row execute function public.sync_fight_board();
+
+-- Ændres en deltager (skade, tilstande, initiativ …), "prikkes" fight_board, så
+-- spillernes sider får et Realtime-signal og henter kampen igen.
+create or replace function public.touch_fight_board() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'DELETE' then
+    update fight_board set updated_at = now() where encounter_id = old.encounter_id;
+  else
+    update fight_board set updated_at = now() where encounter_id = new.encounter_id;
+  end if;
+  return null;
+end $$;
+drop trigger if exists fight_board_touch on encounter_combatants;
+create trigger fight_board_touch after insert or update or delete on encounter_combatants
+  for each row execute function public.touch_fight_board();
+
+insert into fight_board (encounter_id, name, status, round, turn_combatant_id, updated_at)
+select id, name, status, round, turn_combatant_id, updated_at from encounters where status <> 'kladde'
+on conflict (encounter_id) do nothing;
+
+-- Viewet kører med ejerens rettigheder (uden om RLS på encounter_combatants),
+-- så adgangen styres her: kun godkendte medlemmer, og kun ikke-hemmelige felter.
+create or replace view public.fight_combatants as
+select c.id, c.encounter_id, c.kind, c.character_id, c.name, c.initiative, c.init_bonus,
+       c.conditions, c.condition_timers, c.created_at,
+       case when c.kind = 'monster' and c.hp_max is not null then
+         case when coalesce(c.hp_current, 0) <= 0 then 'Besejret'
+              when c.hp_current >= c.hp_max then 'Uskadt'
+              when c.hp_current > c.hp_max / 2.0 then 'Såret'
+              else 'Blodig' end
+       end as health,
+       (c.kind = 'monster' and c.hp_max is not null and coalesce(c.hp_current, 0) <= 0) as is_out,
+       case when c.kind = 'pc' then c.hp_current end as hp_current,
+       case when c.kind = 'pc' then c.hp_max end as hp_max,
+       case when c.kind = 'pc' then c.hp_temp end as hp_temp
+from encounter_combatants c
+join encounters e on e.id = c.encounter_id and e.status <> 'kladde'
+where public.is_member();
+
 -- En ny konto bliver automatisk en ventende spiller (navnet sendes med ved oprettelsen).
 create or replace function public.handle_new_member() returns trigger
 language plpgsql security definer set search_path = public as $$
@@ -408,6 +485,10 @@ alter table handouts enable row level security;
 alter table tarokka_reading enable row level security;
 alter table tarokka_answers enable row level security;
 alter table members enable row level security;
+alter table fight_board enable row level security;
+drop policy if exists "members read fight board" on fight_board;
+create policy "members read fight board" on fight_board
+  for select using ((select public.is_member()));
 
 -- === Adgang (RLS) ===
 -- Godkendte medlemmer (spillere og DM) deler alt det, selskabet deler; kun
@@ -449,18 +530,14 @@ begin
   end loop;
 end $$;
 
--- Kampe: spillerne ser kampe, der er i gang (Ved Bordet, Tavlen) — ikke DM'ens
--- kladder — og kun DM'en kører dem. (Monstrenes HP kan stadig læses direkte i
--- databasen af den, der ved hvordan; siderne viser dem aldrig for spillerne.)
+-- Kampe: kun DM'en læser og kører selve kamptabellerne. Spillerne ser kampen
+-- gennem fight_board og viewet fight_combatants (se ovenfor) — så monstrenes
+-- tal, DM'ens noter og kladder aldrig når ud til dem.
 drop policy if exists "members read running fights" on encounters;
-create policy "members read running fights" on encounters
-  for select using ((select public.is_member()) and status <> 'kladde');
 drop policy if exists "dm runs fights" on encounters;
 create policy "dm runs fights" on encounters
   for all using ((select public.is_dm())) with check ((select public.is_dm()));
 drop policy if exists "members read combatants" on encounter_combatants;
-create policy "members read combatants" on encounter_combatants
-  for select using ((select public.is_member()));
 drop policy if exists "dm runs combatants" on encounter_combatants;
 create policy "dm runs combatants" on encounter_combatants
   for all using ((select public.is_dm())) with check ((select public.is_dm()));
@@ -552,7 +629,7 @@ do $$
 declare t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    foreach t in array array['encounters', 'encounter_combatants', 'characters', 'session_log_entries', 'logistics', 'handouts', 'tarokka_reading'] loop
+    foreach t in array array['encounters', 'encounter_combatants', 'characters', 'session_log_entries', 'logistics', 'handouts', 'tarokka_reading', 'fight_board'] loop
       if not exists (
         select 1 from pg_publication_tables
         where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t

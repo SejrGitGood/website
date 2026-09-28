@@ -157,7 +157,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=2"></script>
-<script src="js/app.js?v=23"></script>
+<script src="js/app.js?v=24"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -1491,6 +1491,40 @@
       if (await reloadEncounter()) requestRender();
     }
   }
+  // "Afslut kamp": en linje i Aftenens log, så kampen kommer med i sessionens
+  // referat — hvem der blev besejret, hvem der stod tilbage, og XP'en.
+  async function logFightSummary() {
+    if (!(encounter.round > 0)) return;
+    const monsters = combatants.filter((c) => c.kind === "monster");
+    const pcs = combatants.filter((c) => c.kind === "pc");
+    const defeated = monsters.filter(isOut);
+    const standing = monsters.filter((c) => !isOut(c));
+    // "Wolf 1", "Wolf 2" → "2 × Wolf" — men kun når hele flokken står samme sted;
+    // er den delt (én død, én flygtet), beholdes numrene, så det kan skelnes.
+    const baseOf = (c) => c.name.replace(/\s+\d+$/, "");
+    const totals = new Map();
+    monsters.forEach((c) => totals.set(baseOf(c), (totals.get(baseOf(c)) || 0) + 1));
+    const group = (list) => {
+      const byBase = new Map();
+      list.forEach((c) => byBase.set(baseOf(c), [...(byBase.get(baseOf(c)) || []), c]));
+      return [...byBase]
+        .map(([base, cs]) => (cs.length === totals.get(base) ? (cs.length > 1 ? `${cs.length} × ${base}` : base) : cs.map((c) => c.name).join(", ")))
+        .join(", ");
+    };
+    const xp = defeated.reduce((s, c) => s + (c.xp || 0), 0);
+    const parts = [`Kamp: ${encounter.name} — ${encounter.round} ${encounter.round === 1 ? "runde" : "runder"}.`];
+    if (defeated.length) parts.push(`Besejret: ${group(defeated)}.`);
+    if (standing.length) parts.push(`Overlevede: ${group(standing)}.`);
+    if (xp) parts.push(`${fmt(xp)} XP${pcs.length ? ` (${fmt(Math.floor(xp / pcs.length))} hver)` : ""}.`);
+    const { data: day } = await window.sb.from("logistics").select("campaign_day").eq("id", 1).maybeSingle();
+    const { error } = await window.sb.from("session_log_entries").insert({
+      body: parts.join(" "),
+      author: getStoredAuthorName() || null,
+      campaign_day: day ? day.campaign_day : null,
+    });
+    if (!error) showToast("Kampen er skrevet i Aftenens log.");
+  }
+
   async function updateEncounter(patch) {
     Object.assign(encounter, patch);
     requestRender();
@@ -1644,7 +1678,10 @@
       else if (act === "prev") await advanceTurn(-1);
       else if (act === "begin") await beginCombat();
       else if (act === "roll-monsters") await rollMonsterInitiative();
-      else if (act === "end" && confirm("Afslut kampen?")) await updateEncounter({ status: "afsluttet" });
+      else if (act === "end" && confirm("Afslut kampen?")) {
+        await updateEncounter({ status: "afsluttet" });
+        await logFightSummary();
+      }
       else if (act === "details-current" && encounter.turn_combatant_id) openDrawer({ type: "combatant", id: encounter.turn_combatant_id });
     }
     const onActionClick = (e) => {

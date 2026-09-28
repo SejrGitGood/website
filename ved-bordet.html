@@ -120,7 +120,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=2"></script>
-<script src="js/app.js?v=23"></script>
+<script src="js/app.js?v=24"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -141,25 +141,15 @@
 
   async function loadCombat() {
     const section = document.getElementById("combatSection");
-    const { data: enc } = await window.sb
-      .from("encounters")
-      .select("id, name, round, turn_combatant_id")
-      .eq("status", "aktiv")
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Kun det, spillerne må se (fight_board + fight_combatants, se app.js).
+    const { encounter: enc, combatants: cbs } = await loadActiveFight();
     if (!enc) {
       section.hidden = true;
       return;
     }
-    const { data: cbs } = await window.sb
-      .from("encounter_combatants")
-      .select("id, name, kind, initiative, init_bonus, hp_current, hp_max")
-      .eq("encounter_id", enc.id);
-    const rows = sortCombatants(cbs || [])
+    const rows = sortCombatants(cbs)
       .map((c) => {
-        const out = c.kind === "monster" && c.hp_max != null && (c.hp_current ?? 0) <= 0;
-        const name = out ? `<s>${escapeHtml(c.name)}</s>` : escapeHtml(c.name);
+        const name = c.is_out ? `<s>${escapeHtml(c.name)}</s>` : escapeHtml(c.name);
         const isTurn = enc.round > 0 && c.id === enc.turn_combatant_id;
         return `<li>${isTurn ? `<strong>${name}</strong> &larr; tur` : name} <span class="enc-meta">&middot; ${c.initiative ?? "–"}</span></li>`;
       })
@@ -177,7 +167,7 @@
 
   // Kører kamptrackeren på en anden enhed, henter den spillernes HP fra D&D
   // Beyond løbende — de ændringer (og turskift) dukker op her med det samme.
-  subscribeToChanges("ved-bordet", ["encounters", "encounter_combatants", "characters"], () => {
+  subscribeToChanges("ved-bordet", FIGHT_TABLES, () => {
     loadHp();
     loadCombat();
   });
