@@ -54,7 +54,7 @@
 <footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=1"></script>
+<script src="js/config.js?v=2"></script>
 <script src="js/app.js?v=21"></script>
 <script>
 (async function () {
@@ -159,6 +159,8 @@
 
     // Den fælles login: hvor mange karakterer har fået en spillerkonto?
     const linked = characters.filter((ch) => ch.owner_email && members.some((x) => x.email === ch.owner_email && x.status === "approved")).length;
+    // Den fælles login er fjernet — afsnittet vises kun, hvis der stadig ligger en i allowed_users.
+    $("sharedCard").closest("section").hidden = !shared.length;
     $("sharedCard").innerHTML = shared.length
       ? `<p class="body">Den fælles login (${shared.map((s) => escapeHtml(s.email)).join(", ")}) virker stadig &mdash; alle, der kender den fælles adgangskode, kan se det, spillerne ser.</p>
          <p class="body" style="margin-top:8px;"><strong>${linked} af ${characters.length}</strong> karakterer har en godkendt spillerkonto.</p>

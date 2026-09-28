@@ -31,13 +31,12 @@
         <button type="button" class="btn secondary" data-view="signupView">Opret konto</button>
       </div>
       <form class="form" id="loginForm">
-        <div class="field"><label for="loginEmail">Email</label><input type="email" id="loginEmail" required autocomplete="username"></div>
+        <div class="field"><label for="loginEmail">Email eller brugernavn</label><input type="text" id="loginEmail" required autocomplete="username" autocapitalize="none" spellcheck="false"></div>
         <div class="field"><label for="loginPassword">Adgangskode</label><input type="password" id="loginPassword" required autocomplete="current-password"></div>
         <button class="btn" type="submit">Log ind</button>
       </form>
       <p class="enc-meta" style="margin-top:14px;display:flex;gap:6px 16px;flex-wrap:wrap;">
         <button type="button" class="text-link" data-view="forgotView">Glemt adgangskode?</button>
-        <button type="button" class="text-link" data-view="sharedView" id="sharedLink">Den fælles adgangskode (udfases)</button>
       </p>
     </div>
 
@@ -73,16 +72,6 @@
       </form>
     </div>
 
-    <!-- Den gamle fælles login, indtil DM'en lukker den -->
-    <div class="card" id="sharedView" hidden>
-      <form class="form" id="sharedForm">
-        <div class="field"><label for="sharedPassword">Den fælles adgangskode</label><input type="password" id="sharedPassword" required autocomplete="current-password"></div>
-        <button class="btn" type="submit">Log ind</button>
-      </form>
-      <p class="paste-hint" style="margin-top:12px;">Den fælles login forsvinder, når alle har deres egen konto. Opret gerne din egen allerede nu.</p>
-      <p class="enc-meta" style="margin-top:10px;"><button type="button" class="text-link" data-view="loginView">&larr; Tilbage til log ind</button></p>
-    </div>
-
     <!-- Venter på godkendelse / afvist / fælles login lukket -->
     <div class="card" id="pendingView" hidden>
       <h3 id="pendingTitle">Venter på godkendelse</h3>
@@ -98,7 +87,7 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=1"></script>
+<script src="js/config.js?v=2"></script>
 <script src="js/app.js?v=21"></script>
 <script>
 (async function () {
@@ -107,8 +96,15 @@
   const redirectTarget = params.get("redirect") || "index.html";
   // Links i mails (bekræft konto, ny adgangskode) sendes tilbage hertil.
   const loginUrl = `${location.origin}${location.pathname}`;
-  const VIEWS = ["loginView", "signupView", "forgotView", "resetView", "sharedView", "pendingView"];
-  const TITLES = { loginView: "Log ind", signupView: "Opret konto", forgotView: "Glemt adgangskode", resetView: "Ny adgangskode", sharedView: "Fælles login", pendingView: "Din konto" };
+  const VIEWS = ["loginView", "signupView", "forgotView", "resetView", "pendingView"];
+  const TITLES = { loginView: "Log ind", signupView: "Opret konto", forgotView: "Glemt adgangskode", resetView: "Ny adgangskode", pendingView: "Din konto" };
+  // Konti uden rigtig email (admin) logger ind med et brugernavn; Supabase
+  // kræver en email, så brugernavnet får et fast, fiktivt domæne.
+  const USERNAME_DOMAIN = "valkyriegade.local";
+  const toLoginEmail = (value) => {
+    const v = value.trim();
+    return v.includes("@") ? v : `${v.toLowerCase()}@${USERNAME_DOMAIN}`;
+  };
 
   function show(view) {
     VIEWS.forEach((v) => ($(v).hidden = v !== view));
@@ -124,7 +120,6 @@
     const btn = e.target.closest("[data-view]");
     if (btn) show(btn.dataset.view);
   });
-  if (!window.SUPABASE_CONFIG.sharedEmail) $("sharedLink").hidden = true;
 
   // Logget ind: godkendt → videre; ellers forklar, hvorfor ikke.
   async function continueIfApproved() {
@@ -138,31 +133,20 @@
       location.href = redirectTarget;
       return;
     }
-    const sharedClosed = member.email === window.SUPABASE_CONFIG.sharedEmail;
-    $("pendingTitle").textContent = sharedClosed ? "Den fælles login er lukket" : member.status === "rejected" ? "Ikke godkendt" : "Venter på godkendelse";
-    $("pendingText").textContent = sharedClosed
-      ? "DM'en har lukket den fælles login. Log ud, og opret din egen konto — så godkender DM'en den."
-      : member.status === "rejected"
+    $("pendingTitle").textContent = member.status === "rejected" ? "Ikke godkendt" : "Venter på godkendelse";
+    $("pendingText").textContent =
+      member.status === "rejected"
         ? `Kontoen ${member.email} er ikke godkendt. Tal med DM'en, hvis det er en fejl.`
         : `Tak${member.display_name ? `, ${member.display_name}` : ""}! Kontoen ${member.email} er oprettet og venter på, at DM'en godkender den. Tryk "Tjek igen", når DM'en har gjort det.`;
-    $("checkAgainBtn").hidden = sharedClosed || member.status === "rejected";
+    $("checkAgainBtn").hidden = member.status === "rejected";
     show("pendingView");
   }
 
   $("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     await withBusy(e.target.querySelector('button[type="submit"]'), "Logger ind…", async () => {
-      const { error } = await window.sb.auth.signInWithPassword({ email: $("loginEmail").value.trim(), password: $("loginPassword").value });
-      if (error) return say("Forkert email eller adgangskode — eller kontoen er ikke bekræftet endnu (tjek din mail).");
-      await continueIfApproved();
-    });
-  });
-
-  $("sharedForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    await withBusy(e.target.querySelector('button[type="submit"]'), "Logger ind…", async () => {
-      const { error } = await window.sb.auth.signInWithPassword({ email: window.SUPABASE_CONFIG.sharedEmail, password: $("sharedPassword").value });
-      if (error) return say("Forkert adgangskode.");
+      const { error } = await window.sb.auth.signInWithPassword({ email: toLoginEmail($("loginEmail").value), password: $("loginPassword").value });
+      if (error) return say("Forkert email/brugernavn eller adgangskode.");
       await continueIfApproved();
     });
   });

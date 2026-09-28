@@ -469,24 +469,19 @@ drop policy if exists "dm removes members" on members;
 create policy "dm removes members" on members
   for delete using ((select public.is_dm()));
 
--- Min Karakter: ejeren må altid læse og opdatere sin egen karakter (ud over
--- "members only" ovenfor).
+-- Min Karakter bruger "members only" ovenfor. De gamle ejer-politikker (kun
+-- mail-match) er fjernet: uden mailbekræftelse kan enhver oprette en konto med
+-- en andens mail, så alt skal også kræve en godkendt konto.
 drop policy if exists "owner can select own character" on characters;
-create policy "owner can select own character" on characters
-  for select
-  using (auth.jwt() ->> 'email' = owner_email);
 drop policy if exists "owner can update own character" on characters;
-create policy "owner can update own character" on characters
-  for update
-  using (auth.jwt() ->> 'email' = owner_email)
-  with check (auth.jwt() ->> 'email' = owner_email);
 
--- Privat baggrundshistorie: KUN ejeren selv, ingen andre — heller ikke DM'en.
+-- Privat baggrundshistorie: KUN ejeren selv (og kun med en godkendt konto) —
+-- ingen andre, heller ikke DM'en.
 drop policy if exists "owner only" on character_private_notes;
 create policy "owner only" on character_private_notes
   for all
-  using (auth.jwt() ->> 'email' = owner_email)
-  with check (auth.jwt() ->> 'email' = owner_email);
+  using (auth.jwt() ->> 'email' = owner_email and (select public.is_member()))
+  with check (auth.jwt() ->> 'email' = owner_email and (select public.is_member()));
 
 -- approved_personal_emails er afløst af members (godkendelse på spillere.html)
 -- og bruges kun til at føre gamle Min Karakter-konti over.
