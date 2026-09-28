@@ -7,7 +7,7 @@
 <title>Spillere &middot; Blessings of Valkyriegade</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=23">
+<link rel="stylesheet" href="css/styles.css?v=24">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#A6461C">
 <link rel="apple-touch-icon" href="icons/icon.svg">
@@ -55,7 +55,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=2"></script>
-<script src="js/app.js?v=21"></script>
+<script src="js/app.js?v=22"></script>
 <script>
 (async function () {
   const session = await guardPage();
@@ -68,6 +68,7 @@
   let members = [];
   let characters = [];
   let shared = [];
+  const tempPasswords = {}; // user_id -> midlertidig adgangskode, vist indtil siden forlades
 
   async function load() {
     const [m, c, s] = await Promise.all([
@@ -147,7 +148,8 @@
             </select>
             ${characterSelect(x)}
           </div>
-          <div>${self ? "" : `<button class="btn secondary" data-act="remove" style="padding:6px 12px;">Fjern adgang</button>`}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">${self ? "" : `<button class="btn secondary" data-act="reset" style="padding:6px 12px;">Nulstil adgangskode</button><button class="btn secondary" data-act="remove" style="padding:6px 12px;">Fjern adgang</button>`}</div>
+          ${tempPasswords[x.user_id] ? `<div class="temp-password" style="grid-column:1 / -1;"><span class="enc-meta">Midlertidig adgangskode til ${escapeHtml(x.display_name || x.email)}:</span><code>${escapeHtml(tempPasswords[x.user_id])}</code><button class="btn secondary" data-act="copy" style="padding:4px 10px;">Kopiér</button><span class="enc-meta">Giv den videre ved bordet — de vælger deres egen, når de logger ind.</span></div>` : ""}
         </div>`;
           })
           .join("")
@@ -219,6 +221,34 @@
     } else if (act === "reject") {
       if (!confirm(`Afvis ${x.display_name || x.email}?`)) return;
       await updateMember(x, { status: "rejected" });
+    } else if (act === "copy") {
+      try {
+        await navigator.clipboard.writeText(tempPasswords[x.user_id]);
+        e.target.textContent = "Kopieret";
+      } catch (err) {
+        e.target.textContent = "Markér og kopiér selv";
+      }
+      return;
+    } else if (act === "reset") {
+      if (!confirm(`Lav en ny, midlertidig adgangskode til ${x.display_name || x.email}? Den gamle holder op med at virke med det samme.`)) return;
+      await withBusy(e.target, "Nulstiller…", async () => {
+        const { data, error } = await window.sb.functions.invoke("dm-reset-password", { body: { userId: x.user_id } });
+        // Funktionens egen fejlbesked ligger i svaret, når den ikke svarer 200.
+        let message = error ? error.message : data && data.error;
+        if (error && error.context && typeof error.context.json === "function") {
+          try {
+            message = (await error.context.json()).error || message;
+          } catch (err) {
+            // behold den generelle besked
+          }
+        }
+        if (message) {
+          alert("Kunne ikke nulstille: " + message);
+          return;
+        }
+        tempPasswords[x.user_id] = data.password;
+      });
+      return render();
     } else if (act === "remove") {
       if (x.role === "dm" && !otherDms(x.user_id)) return alert("Der skal være mindst én DM.");
       if (!confirm(`Fjern ${x.display_name || x.email}s adgang? Kontoen flyttes til "Afviste" og kan godkendes igen senere.`)) return;

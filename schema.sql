@@ -325,6 +325,17 @@ language sql stable security definer set search_path = public as $$
   select exists (select 1 from members m where m.user_id = auth.uid() and m.status = 'approved' and m.role = 'dm');
 $$;
 
+-- Min konto (konto.html): en godkendt konto må ændre sit eget navn — og kun
+-- det; rolle og status styrer DM'en. Derfor en funktion frem for en
+-- update-politik på members (RLS kan ikke begrænse til én kolonne).
+create or replace function public.set_my_name(new_name text) returns void
+language sql security definer set search_path = public as $$
+  update members set display_name = nullif(left(trim(new_name), 40), '')
+  where user_id = auth.uid() and status = 'approved';
+$$;
+revoke all on function public.set_my_name(text) from public;
+grant execute on function public.set_my_name(text) to authenticated;
+
 -- En ny konto bliver automatisk en ventende spiller (navnet sendes med ved oprettelsen).
 create or replace function public.handle_new_member() returns trigger
 language plpgsql security definer set search_path = public as $$

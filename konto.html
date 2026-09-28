@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<title>Min konto &middot; Blessings of Valkyriegade</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=24">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#A6461C">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Valkyriegade">
+<script>try{var t=localStorage.getItem("theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<nav class="site-nav" id="site-nav"></nav>
+
+<main>
+  <div class="page-head">
+    <p class="eyebrow">Personligt</p>
+    <h1>Min konto</h1>
+    <p>Dit navn og din adgangskode.</p>
+  </div>
+
+  <div class="wrap" style="max-width:560px;">
+    <div class="card handout-banner" id="tempBanner" hidden>
+      <span><strong>Du er logget ind med en midlertidig adgangskode fra DM'en.</strong> Vælg din egen herunder, før du fortsætter.</span>
+    </div>
+
+    <section class="section" id="profileSection">
+      <div class="section-title"><h2>Dig</h2></div>
+      <div class="card">
+        <form class="form" id="nameForm">
+          <div class="field">
+            <label for="displayName">Navn <span class="enc-meta">(vises som "skrevet af" overalt på siden)</span></label>
+            <input type="text" id="displayName" maxlength="40" required>
+          </div>
+          <div class="card-actions">
+            <button class="btn" type="submit">Gem navn</button>
+            <span class="notice" id="nameSaved" style="display:none;">Gemt.</span>
+          </div>
+        </form>
+        <p class="body" id="accountFacts" style="margin-top:14px;"></p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title"><h2>Skift adgangskode</h2></div>
+      <div class="card">
+        <form class="form" id="passwordForm">
+          <div class="field">
+            <label for="currentPassword" id="currentLabel">Nuværende adgangskode</label>
+            <input type="password" id="currentPassword" required autocomplete="current-password">
+          </div>
+          <div class="field">
+            <label for="newPassword">Ny adgangskode <span class="enc-meta">(mindst 6 tegn)</span></label>
+            <input type="password" id="newPassword" required minlength="6" autocomplete="new-password">
+          </div>
+          <div class="field">
+            <label for="repeatPassword">Gentag den nye</label>
+            <input type="password" id="repeatPassword" required minlength="6" autocomplete="new-password">
+          </div>
+          <div><button class="btn" type="submit">Skift adgangskode</button></div>
+        </form>
+        <p class="notice" id="passwordMsg" hidden style="margin-top:14px;"></p>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">Blessings of Valkyriegade &middot; skrevet af os, for os.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=2"></script>
+<script src="js/app.js?v=22"></script>
+<script>
+(async function () {
+  const session = await guardPage();
+  if (!session) return;
+  renderNav("");
+  const $ = (id) => document.getElementById(id);
+  const me = window.__member;
+  const mustChange = !!(session.user.user_metadata && session.user.user_metadata.must_change_password);
+
+  if (mustChange) {
+    $("tempBanner").hidden = false;
+    $("currentLabel").textContent = "Den midlertidige adgangskode fra DM'en";
+  }
+
+  // --- Navn, rolle og karakter ---
+  $("displayName").value = me.display_name || "";
+  const { data: myChar } = await window.sb.from("characters").select("character_name").eq("owner_email", session.user.email).maybeSingle();
+  $("accountFacts").innerHTML = [
+    `<strong>Login:</strong> ${escapeHtml(session.user.email.endsWith("@valkyriegade.local") ? session.user.email.split("@")[0] : session.user.email)}`,
+    `<strong>Rolle:</strong> ${me.isDm ? "DM" : "Spiller"}`,
+    `<strong>Karakter:</strong> ${myChar ? `${escapeHtml(myChar.character_name)} &middot; <a href="min-karakter.html">Min karakter &rarr;</a>` : "ingen endnu &mdash; DM'en knytter den til din konto"}`,
+  ].join("<br>");
+
+  $("nameForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = $("displayName").value.trim();
+    if (!name) return;
+    await withBusy(e.target.querySelector('button[type="submit"]'), "Gemmer…", async () => {
+      const { error } = await window.sb.rpc("set_my_name", { new_name: name });
+      if (error) {
+        alert(/set_my_name/.test(error.message) ? "Navne kan ikke ændres endnu — DM'en skal køre den nye SQL." : "Kunne ikke gemme: " + error.message);
+        return;
+      }
+      me.display_name = name;
+      renderNav("");
+      $("nameSaved").style.display = "inline-block";
+      setTimeout(() => ($("nameSaved").style.display = "none"), 1500);
+    });
+  });
+
+  // --- Adgangskode: den nuværende tjekkes først, så en anden ved en åben skærm ikke kan skifte den ---
+  function say(text, ok) {
+    $("passwordMsg").textContent = text;
+    $("passwordMsg").hidden = false;
+    $("passwordMsg").style.borderColor = ok ? "" : "var(--blood)";
+  }
+  $("passwordForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const current = $("currentPassword").value;
+    const next = $("newPassword").value;
+    if (next !== $("repeatPassword").value) return say("De to nye adgangskoder er ikke ens.");
+    if (next === current) return say("Den nye adgangskode skal være en anden end den nuværende.");
+    await withBusy(e.target.querySelector('button[type="submit"]'), "Skifter…", async () => {
+      const check = await window.sb.auth.signInWithPassword({ email: session.user.email, password: current });
+      if (check.error) return say(mustChange ? "Den midlertidige adgangskode er forkert." : "Den nuværende adgangskode er forkert.");
+      const { error } = await window.sb.auth.updateUser({ password: next, data: { must_change_password: false } });
+      if (error) return say("Kunne ikke skifte adgangskoden: " + error.message);
+      e.target.reset();
+      if (mustChange) {
+        say("Adgangskoden er skiftet. Sender dig videre…", true);
+        setTimeout(() => (location.href = "index.html"), 1200);
+      } else {
+        say("Adgangskoden er skiftet.", true);
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -632,3 +632,12 @@ html:not(.is-dm) [data-dm-only]{display:none !important;}
 .member-row:last-child{border-bottom:none;}
 .member-row .enc-meta{overflow-wrap:anywhere;}
 @media (max-width:640px){ .member-row{grid-template-columns:1fr;} }
+
+/* Min konto: navnet i menuen er et link; midlertidig adgangskode på Spillere */
+.nav-user{color:inherit;text-decoration:none;border-bottom:1px dotted currentColor;}
+.nav-user:hover{color:var(--ember);}
+.temp-password{
+  display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;margin-top:8px;padding:10px 12px;
+  border:1px dashed var(--ember);border-radius:8px;background:color-mix(in srgb, var(--ember) 8%, var(--surface));
+}
+.temp-password code{font-size:1.1rem;letter-spacing:0.05em;color:var(--ink);}

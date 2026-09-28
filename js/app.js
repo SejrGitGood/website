@@ -522,6 +522,12 @@ async function guardPage() {
   }
   window.__member = member;
   document.documentElement.classList.toggle("is-dm", member.isDm);
+  // Logget ind med en midlertidig adgangskode fra DM'en: vælg din egen først.
+  const page = location.pathname.split("/").pop();
+  if (session.user.user_metadata && session.user.user_metadata.must_change_password && page !== "konto.html") {
+    location.href = "konto.html?skift=1";
+    return null;
+  }
   return session;
 }
 
@@ -563,7 +569,8 @@ async function renderNav(activeHref) {
   if (session) {
     const m = window.__member;
     const who = m && m.display_name ? escapeHtml(m.display_name) : m && m.legacy ? "Fælles login" : "Logget ind";
-    authHtml = `<span>${who}${m && m.isDm && m.rolesEnabled ? ` <span class="nav-role">DM</span>` : ""}</span><a class="nav-pending" id="navPending" href="spillere.html" hidden></a><button class="linklike" id="signOutBtn">Log ud</button>`;
+    const nameHtml = `${who}${m && m.isDm && m.rolesEnabled ? ` <span class="nav-role">DM</span>` : ""}`;
+    authHtml = `${m && !m.legacy ? `<a class="nav-user" href="konto.html" title="Min konto">${nameHtml}</a>` : `<span>${nameHtml}</span>`}<a class="nav-pending" id="navPending" href="spillere.html" hidden></a><button class="linklike" id="signOutBtn">Log ud</button>`;
   } else {
     authHtml = `<a href="login.html">Log ind</a>`;
   }
